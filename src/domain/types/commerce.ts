@@ -1,3 +1,4 @@
+import type { ProductSummary } from './catalog';
 import type { AudienceType, CouponScope, CouponType, PaymentMethod, PromotionType, StockLevel } from '../enums';
 
 /* -------------------------------------------------------------- price math */
@@ -240,7 +241,7 @@ export interface WishlistItem {
 
 export interface WishlistLine {
   item: WishlistItem;
-  product: import('./catalog').ProductSummary;
+  product: ProductSummary;
   priceDrop: number;
   isBackInStock: boolean;
   selectedSize: string | null;
