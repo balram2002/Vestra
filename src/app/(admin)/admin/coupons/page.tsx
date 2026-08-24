@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
+import { CouponToggle } from '@/components/console/admin-actions';
 import { DataTable, TableEmpty, type Column } from '@/components/console/data-table';
 import { Badge } from '@/components/ui/badge';
 import type { Coupon } from '@/domain/types';
@@ -112,12 +113,18 @@ async function CouponTable() {
       key: 'state',
       header: 'State',
       render: (coupon) => {
-        const live = coupon.isActive && coupon.startsAt <= now && coupon.endsAt >= now;
         const expired = coupon.endsAt < now;
+        // An expired coupon cannot be "enabled" into working again, so it shows
+        // its state rather than a toggle that would do nothing.
+        if (expired) {
+          return (
+            <Badge tone="neutral" size="sm">
+              Expired
+            </Badge>
+          );
+        }
         return (
-          <Badge tone={live ? 'success' : expired ? 'neutral' : 'warning'} size="sm">
-            {live ? 'Live' : expired ? 'Expired' : 'Scheduled'}
-          </Badge>
+          <CouponToggle couponId={coupon.id} code={coupon.code} isActive={coupon.isActive} />
         );
       },
     },

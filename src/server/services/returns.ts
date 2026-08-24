@@ -15,6 +15,7 @@ import { collections, toEntities, toEntity } from '../db/collections';
 import { nextReturnNumber } from '../db/sequences';
 import { gateway } from '../payments';
 import * as inventory from '../repositories/inventory';
+import { NOTIFY } from './notifications';
 import { getOrder, recomputeOrderStatus } from './orders';
 
 /**
@@ -224,6 +225,10 @@ export async function approveReturn(
   );
 
   await setItemStatus(request, 'RETURN_APPROVED', actor);
+
+  if (request.userId) {
+    void NOTIFY.returnApproved(request.userId, request.returnNumber, request.orderId);
+  }
   return { ok: true };
 }
 

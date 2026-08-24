@@ -18,7 +18,9 @@
     "screenshot": "node scripts/screenshot.mjs",
     "smoke": "node scripts/smoke-funnel.mjs",
     "smoke:rbac": "node scripts/smoke-rbac.mjs",
-    "verify": "npm run typecheck && npm run lint && npm run build"
+    "verify": "npm run typecheck && npm run lint && npm run build",
+    "smoke:admin": "node scripts/smoke-admin.mjs",
+    "restart": "powershell -NoProfile -File scripts/restart-server.ps1"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",

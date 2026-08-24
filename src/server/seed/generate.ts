@@ -14,6 +14,7 @@ import type {
   Role,
   Seller,
   SellerLocation,
+  ProductStatus,
   User,
   UserRole,
 } from '@/domain/types';
@@ -633,6 +634,17 @@ function buildProduct({ rng, archetype, category, brand, seller, now }: BuildPro
   const publishedDaysAgo = rng.int(1, 300);
   const publishedAt = daysAgo(publishedDaysAgo, now);
 
+  const listingStatus = rng.weighted<ProductStatus>([
+    ['PUBLISHED', 88],
+    ['PENDING_REVIEW', 4],
+    ['DRAFT', 3],
+    ['REJECTED', 2],
+    ['UNPUBLISHED', 2],
+    ['ARCHIVED', 1],
+  ]);
+  const isLive = listingStatus === 'PUBLISHED';
+  const wasReviewed = isLive || listingStatus === 'REJECTED' || listingStatus === 'UNPUBLISHED';
+
   /* ------------------------------------------------------------ variants */
 
   const media: Media[] = [];
@@ -784,7 +796,12 @@ function buildProduct({ rng, archetype, category, brand, seller, now }: BuildPro
     categoryId: category.id,
     categoryPath: category.path,
     gender: category.gender ?? 'UNISEX',
-    status: 'PUBLISHED',
+    /*
+     * Not everything is live. A catalogue where every listing is PUBLISHED
+     * leaves the moderation queue permanently empty, so the review screen
+     * cannot be judged and the approve path is never exercised.
+     */
+    status: listingStatus,
 
     description: buildDescription(archetype, fabric, pattern, silhouette, brand.name),
     highlights: archetype.highlights,
@@ -855,11 +872,14 @@ function buildProduct({ rng, archetype, category, brand, seller, now }: BuildPro
     codAvailable: seller.policies.codEnabled && rng.bool(0.9),
     warrantyMonths: shape === 'bag' || shape === 'shoe' ? rng.int(3, 12) : null,
 
-    submittedAt: publishedAt,
-    approvedAt: publishedAt,
+    submittedAt: listingStatus === 'DRAFT' ? null : publishedAt,
+    approvedAt: wasReviewed ? publishedAt : null,
     approvedByUserId: null,
-    rejectionReason: null,
-    publishedAt,
+    rejectionReason:
+      listingStatus === 'REJECTED'
+        ? 'Product images do not show the garment on a plain background as our catalogue guidelines require.'
+        : null,
+    publishedAt: isLive ? publishedAt : null,
     createdAt: daysAgo(publishedDaysAgo + rng.int(1, 20), now),
     updatedAt: daysAgo(rng.int(0, 40), now),
 

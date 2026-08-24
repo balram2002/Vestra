@@ -3,6 +3,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Suspense } from 'react';
 
+import { ProductReviewActions } from '@/components/console/admin-actions';
 import { ConsoleTabs } from '@/components/console/console-tabs';
 import { DataTable, TableEmpty, type Column } from '@/components/console/data-table';
 import { Pager } from '@/components/console/pager';
@@ -126,6 +127,19 @@ async function ProductTable({
       ),
     },
   ];
+
+  // The decision column only appears where a decision is actually pending, so
+  // browsing the live catalogue does not offer an approve button for something
+  // already approved.
+  if (status === 'PENDING_REVIEW' || status === 'SUBMITTED') {
+    columns.push({
+      key: 'decide',
+      header: 'Decision',
+      render: (product) => (
+        <ProductReviewActions productId={product.id} title={product.title} />
+      ),
+    });
+  }
 
   return (
     <div className="mt-6">

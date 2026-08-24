@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Suspense } from 'react';
 
+import { SellerStatusActions } from '@/components/console/admin-actions';
 import { ConsoleTabs } from '@/components/console/console-tabs';
 import { DataTable, TableEmpty, type Column } from '@/components/console/data-table';
 import { Pager } from '@/components/console/pager';
@@ -133,6 +134,17 @@ async function SellerTable({
       secondary: true,
       render: (seller) => (
         <span className="text-faint text-2xs">{formatDateShort(seller.joinedAt)}</span>
+      ),
+    },
+    {
+      key: 'actions',
+      header: '',
+      render: (seller) => (
+        <SellerStatusActions
+          sellerId={seller.id}
+          name={seller.displayName}
+          status={seller.status}
+        />
       ),
     },
   ];

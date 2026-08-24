@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
+import { SectionToggle } from '@/components/console/admin-actions';
 import { Badge } from '@/components/ui/badge';
 import { requirePermission } from '@/server/auth/session';
 import { collections, toEntities } from '@/server/db/collections';
@@ -68,9 +69,11 @@ async function Sections() {
                 </p>
               </div>
 
-              <Badge tone={section.isActive ? 'success' : 'neutral'} size="sm">
-                {section.isActive ? 'Live' : 'Hidden'}
-              </Badge>
+              <SectionToggle
+                sectionId={section.id}
+                label={section.title ?? section.kind}
+                isActive={section.isActive}
+              />
             </li>
           ))}
         </ol>

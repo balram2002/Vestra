@@ -27,6 +27,7 @@ import { nextOrderNumber, nextSellerOrderNumber } from '../db/sequences';
 import { attemptKey, gateway, newIdempotencyKey } from '../payments';
 import * as inventory from '../repositories/inventory';
 import { getCartView } from './cart';
+import { NOTIFY, notifyQuietly } from './notifications';
 import type { Owner } from '../auth/session';
 
 /**
@@ -690,6 +691,10 @@ export async function settlePayment(
         },
       },
     );
+
+    if (payment.userId) {
+      void NOTIFY.paymentFailed(payment.userId, payment.orderNumber, payment.orderId);
+    }
     return { ok: true, alreadySettled: false };
   }
 
@@ -734,6 +739,13 @@ async function confirmOrder(orderId: string, note: string): Promise<void> {
       $push: { timeline: event('CONFIRMED', 'Confirmed by seller', 'SYSTEM', iso) },
     },
   );
+
+  // Fire-and-forget: a notification that fails to send must never undo a
+  // confirmed order.
+  const order = toEntity(await orders.findOne({ _id: orderId }));
+  if (order?.userId) {
+    void NOTIFY.orderPlaced(order.userId, order.orderNumber, order.id);
+  }
 }
 
 /* ------------------------------------------------------------------ reads */
@@ -983,6 +995,34 @@ export async function transitionItem(
       },
     },
   );
+
+  if (to === 'SHIPPED' || to === 'DELIVERED') {
+    const orders = await collections.orders();
+    const order = toEntity(await orders.findOne({ _id: item.orderId }));
+    if (order?.userId) {
+      notifyQuietly(
+        to === 'SHIPPED'
+          ? {
+              userId: order.userId,
+              category: 'SHIPPING',
+              title: `Order ${order.orderNumber} is on its way`,
+              body: `"${item.productTitle}" has been handed to the courier.`,
+              href: `/orders/${order.id}`,
+              entityType: 'order',
+              entityId: order.id,
+            }
+          : {
+              userId: order.userId,
+              category: 'SHIPPING',
+              title: `Order ${order.orderNumber} delivered`,
+              body: 'Let us know how it fits — your review helps other shoppers get the size right.',
+              href: `/orders/${order.id}`,
+              entityType: 'order',
+              entityId: order.id,
+            },
+      );
+    }
+  }
 
   await recomputeOrderStatus(item.orderId);
   return { ok: true };

@@ -55,6 +55,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               ),
             },
             { href: '/admin/payments', label: 'Payments' },
+            {
+              href: '/admin/support',
+              label: 'Support',
+              badge: (
+                <Suspense fallback={null}>
+                  <SupportBadge />
+                </Suspense>
+              ),
+            },
           ],
         },
         {
@@ -111,6 +120,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {children}
     </ConsoleShell>
   );
+}
+
+async function SupportBadge() {
+  await requireAnyRole(STAFF_ROLES);
+  const tickets = await collections.supportTickets();
+  const count = await tickets.countDocuments({ status: 'OPEN' });
+  return <QueueBadge count={count} />;
 }
 
 async function ReturnsBadge() {

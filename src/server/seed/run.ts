@@ -20,6 +20,7 @@ import {
   generateSellers,
   generateStaff,
 } from './generate';
+import { generateEngagement } from './engagement';
 import { generateOrders } from './orders';
 import { generateCmsPages } from './pages';
 
@@ -146,6 +147,15 @@ export async function seedDatabase(
     count: 1400,
   });
 
+  log('Generating notifications and support tickets...');
+  const engagement = generateEngagement({
+    orders: history.orders,
+    items: history.items,
+    customers,
+    staff,
+    now,
+  });
+
   log('Generating offers and content...');
   const marketingUser = staff.find((u) => u.roles.includes('MARKETING_MANAGER')) ?? staff[0]!;
   const coupons = generateCoupons(categories, sellers, marketingUser.id, now);
@@ -167,6 +177,11 @@ export async function seedDatabase(
   const categoryById = new Map(categories.map((c) => [c.id, c]));
 
   for (const product of products) {
+    // Only LIVE listings count. A category tile promising 118 styles that opens
+    // on 104 is a small lie, and it is the kind that erodes trust in every
+    // other number on the page.
+    if (product.status !== 'PUBLISHED') continue;
+
     productsByBrand.set(product.brandId, (productsByBrand.get(product.brandId) ?? 0) + 1);
     productsBySeller.set(product.sellerId, (productsBySeller.get(product.sellerId) ?? 0) + 1);
 
@@ -210,9 +225,10 @@ export async function seedDatabase(
   }
 
   for (const seller of sellers) {
-    const count = productsBySeller.get(seller.id) ?? 0;
-    seller.metrics.productCount = count;
-    seller.metrics.liveProductCount = count;
+    // `productCount` is everything the seller has, live or not; `liveProductCount`
+    // is what shoppers can see. The seller console shows both and they differ.
+    seller.metrics.productCount = products.filter((p) => p.sellerId === seller.id).length;
+    seller.metrics.liveProductCount = productsBySeller.get(seller.id) ?? 0;
   }
 
   // Seller metrics are derived from the generated history, so the number on a
@@ -259,6 +275,8 @@ export async function seedDatabase(
   counts.sellerOrders = await insert(COLLECTIONS.sellerOrders, history.sellerOrders);
   counts.orderItems = await insert(COLLECTIONS.orderItems, history.items);
   counts.payments = await insert(COLLECTIONS.payments, history.payments);
+  counts.notifications = await insert(COLLECTIONS.notifications, engagement.notifications);
+  counts.supportTickets = await insert(COLLECTIONS.supportTickets, engagement.tickets);
   counts.homeSections = await insert(COLLECTIONS.homeSections, homeSections);
   counts.banners = await insert(COLLECTIONS.banners, banners);
   counts.cmsPages = await insert(COLLECTIONS.cmsPages, cmsPages);

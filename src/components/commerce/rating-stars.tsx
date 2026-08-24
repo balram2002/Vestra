@@ -22,7 +22,12 @@ export function RatingStars({
   className,
 }: {
   rating: number;
-  count: number;
+  /**
+   * How many ratings the figure aggregates. Pass null where the rating is a
+   * single person's own score — one review has no count, and rendering "1"
+   * beside it would imply an aggregate.
+   */
+  count: number | null;
   size?: 'sm' | 'md';
   showCount?: boolean;
   className?: string;
@@ -45,7 +50,7 @@ export function RatingStars({
         <Star className={size === 'sm' ? 'size-2.5' : 'size-3'} fill="currentColor" strokeWidth={0} />
       </span>
 
-      {showCount ? (
+      {showCount && count !== null ? (
         <span className={cn('text-faint tabular', size === 'sm' ? 'text-2xs' : 'text-xs')}>
           {formatCompactNumber(count)}
         </span>

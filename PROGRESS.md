@@ -6,8 +6,8 @@ Living checklist. Updated as work lands, not as it is planned.
 a server running: `npm run smoke` (purchase funnel) and `npm run smoke:rbac`
 (role access).
 
-Latest run: **build 253/253 routes · typecheck clean · lint clean · funnel 11/11
-· RBAC 19/19**
+Latest run: **build 258/258 routes · typecheck clean · lint clean · funnel 11/11
+· RBAC 19/19 · admin writes 6/6**
 
 ---
 
@@ -67,6 +67,25 @@ Latest run: **build 253/253 routes · typecheck clean · lint clean · funnel 11
 - [x] `authInterrupts` enabled — without it `forbidden()` was inert and every
       permission check silently passed
 
+## Phase 7 — Notifications, support, governance · **done**
+
+- [x] Notification service with per-channel adapters; preferences and the
+      transactional/marketing split enforced in one place
+- [x] Wired into order confirmation, dispatch, delivery, payment failure,
+      return approval and every admin decision
+- [x] `/account/notifications` with preference summary; account section nav
+- [x] `/account/returns` and `/account/reviews` — the three dead links on the
+      account page now go somewhere
+- [x] Account overview rebuilt around recent orders instead of a tile grid
+- [x] Support tickets: customer thread view and agent queue, SLA-ordered,
+      internal notes never leak into the customer view
+- [x] Admin write actions — approve/reject listings, suspend/reinstate stores,
+      toggle coupons and homepage sections
+- [x] Append-only audit service with field-level diffs; every admin mutation
+      writes one and notifies the affected party
+- [x] Seeded 635 notifications and 34 tickets derived from real orders; listing
+      statuses varied so the review queue is not permanently empty
+
 ---
 
 ## Not yet done
@@ -83,15 +102,17 @@ Honest list of what the brief asks for that is not built.
 - [ ] **Settlements and invoices.** Earnings are computed and the hold period is
       modelled, but no settlement run creates payouts and no GST invoice is
       generated.
-- [ ] **Notifications.** No in-app centre, no email or SMS adapters. Preferences
-      are stored on the user but nothing reads them.
-- [ ] **Support tickets.** Types and seed vocabulary exist; no ticket UI.
+- [ ] **Real notification delivery.** The in-app centre works and preferences
+      are honoured, but the email, SMS and push adapters log rather than send —
+      deliberately visible as stubs.
+- [ ] **Replying to a ticket from the UI.** The service supports it; the agent
+      view is read-only.
 - [ ] **Seller onboarding and KYC submission flow.** Sellers are seeded as
       approved; there is no application journey.
 - [ ] **Product create/edit for sellers.** The catalogue is read-only in the
       console — no listing form, no media upload, no approval submission.
-- [ ] **Admin write actions.** Approve a listing, suspend a seller, issue a
-      manual refund: all read-only today, and audit-log writing depends on them.
+- [ ] **Manual refunds from the console.** Approvals, suspensions and toggles
+      are done; issuing a refund by hand is not.
 - [ ] **Promotions engine.** Coupons work. Promotions (flash sales, bank offers,
       BXGY) are typed but not evaluated.
 - [ ] **Guest checkout.** Checkout requires an account.
