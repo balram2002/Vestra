@@ -1,0 +1,14 @@
+node_modules
+.next
+.next-*
+out
+build
+.data
+.env
+.env*.local
+!.env.example
+*.tsbuildinfo
+next-env.d.ts
+coverage
+.DS_Store
+.vercel
