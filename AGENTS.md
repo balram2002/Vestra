@@ -28,11 +28,25 @@ ways that predate most training data:
   and switching mid-project buys nothing).
 
 ```bash
-npm run seed        # rebuild the demo dataset (destructive)
+npm run seed         # rebuild the demo dataset (destructive)
 npm run dev
-npm run build
-npm run typecheck
-npm run lint
+npm run verify       # typecheck + lint + build, in one go
+
+# With a server running (npm run start):
+npm run smoke        # drives the purchase funnel in a real browser
+npm run smoke:rbac   # checks every role reaches only what it should
+npm run screenshot   # captures key routes, for reviewing visual changes
+```
+
+**Verify visually, not just structurally.** A storefront cannot be reviewed from
+a diff. `npm run screenshot` exists because the first pass of this UI shipped
+flat vector clipart on a cramped type scale and it took a screenshot to notice.
+
+**Free the port before restarting.** `next start` fails with EADDRINUSE and the
+old build keeps serving, which silently invalidates any smoke run against it:
+
+```powershell
+Get-NetTCPConnection -LocalPort 3000 -State Listen | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
 ```
 
 ## The one thing that shapes the data layer
@@ -55,6 +69,25 @@ pattern:
 
 If the deployment ever moves to a replica set, the seam is the repository
 layer; nothing above it changes.
+
+## Cache Components rules that bite
+
+- **A layout that reads cookies makes its whole subtree dynamic.** Both console
+  layouts therefore read nothing in the layout body — the nav is static and the
+  per-user pieces (store name, queue badges, current user) are `<Suspense>`
+  islands. Each page enforces its own permission inside its own boundary.
+- **Never `await params` or `searchParams` in a page body.** Pass the promise
+  into the suspended child. Awaiting it in the shell stops the route
+  prerendering and fails the build.
+- **`export const dynamic` is rejected.** Use `<Suspense>` boundaries, or
+  `connection()` when rendering genuinely must wait for a request.
+- **`authInterrupts: true` is required** for `forbidden()` and `unauthorized()`
+  to render their boundaries. Without it both are inert and every
+  `requirePermission` call silently passes — which is exactly the hole
+  `npm run smoke:rbac` was written to catch.
+- **Reading the clock during render is impure** and the React compiler lint will
+  fail the build. Derive time-dependent values in the service layer (see
+  `returnWindowOpen` in `services/orders.ts`).
 
 ## Conventions
 
@@ -85,9 +118,15 @@ layer; nothing above it changes.
 - **Auth is a jose-based session rather than NextAuth v5.** The brief allows
   "or equivalent". NextAuth v5 is still beta against Next 16, and sessions here
   need role-switching plus seller scoping that is simpler to own outright.
-- **Product images are generated SVG** served from `/api/media/...`, not
-  binaries or a stock CDN. Swapping in real photography touches only
-  `src/server/seed/media.ts`; every consumer sees a URL string.
+- **Product photography is representative stock, not the real product.** Images
+  come from a pool of verified Unsplash photographs matched by product family
+  (`server/seed/photos.ts`). They stand in for seller uploads and must be
+  replaced before launch. `MEDIA_SOURCE=generated` falls back to the
+  first-party SVG renderer in `app/api/media`, which needs no network — use it
+  offline or in CI.
+- **Media URLs carry a renderer version** (`MEDIA_VERSION`). They are served
+  immutable for a year, so changing the renderer without changing the URL would
+  leave caches serving the old art forever. Bump it on any visual change.
 
 ## Layout
 

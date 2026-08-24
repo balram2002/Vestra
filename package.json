@@ -16,7 +16,9 @@
     "test:watch": "vitest",
     "seed": "node --conditions=react-server --env-file=.env.local --import ./scripts/register-loader.mjs scripts/seed.ts",
     "screenshot": "node scripts/screenshot.mjs",
-    "smoke": "node scripts/smoke-funnel.mjs"
+    "smoke": "node scripts/smoke-funnel.mjs",
+    "smoke:rbac": "node scripts/smoke-rbac.mjs",
+    "verify": "npm run typecheck && npm run lint && npm run build"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",

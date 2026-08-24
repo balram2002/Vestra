@@ -65,6 +65,14 @@ const nextConfig: NextConfig = {
 
   experimental: {
     optimizePackageImports: ['lucide-react', 'recharts'],
+    /*
+     * Required for `forbidden()` and `unauthorized()` to render the
+     * `forbidden.tsx` / `unauthorized.tsx` boundaries. Without it those calls
+     * are inert and `requirePermission` silently lets everyone through — the
+     * RBAC smoke test caught exactly that: a Support user could open the
+     * finance ledger.
+     */
+    authInterrupts: true,
   },
 
   /**

@@ -1,0 +1,127 @@
+import type { Metadata } from 'next';
+import { Suspense } from 'react';
+
+import { QueueBadge } from '@/components/console/queue-badge';
+import { ConsoleShell } from '@/components/layout/console-shell';
+import { SELLER_ACTIONABLE } from '@/domain/enums';
+import { requireSeller } from '@/server/auth/session';
+import { collections } from '@/server/db/collections';
+
+export const metadata: Metadata = {
+  title: { template: '%s · Seller console', default: 'Seller console' },
+  robots: { index: false, follow: false },
+};
+
+/**
+ * Seller console shell.
+ *
+ * The layout body itself reads NOTHING dynamic. Under Cache Components anything
+ * that touches cookies makes its whole subtree dynamic, so a layout that awaits
+ * the session would stop every page beneath it from prerendering its shell.
+ *
+ * Instead the nav is static and prerenders, while the two per-user pieces — the
+ * store name and the queue counts — are Suspense islands that stream in. Each
+ * page calls `requireSeller()` inside its own boundary, so authorisation is
+ * still enforced on every screen; it just is not enforced HERE, where it would
+ * cost the whole console its static shell.
+ */
+export default function SellerLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <ConsoleShell
+      homeHref="/seller"
+      title={
+        <Suspense fallback={<span className="text-faint">Your store</span>}>
+          <StoreName />
+        </Suspense>
+      }
+      subtitle="Seller console"
+      groups={[
+        {
+          label: 'Trade',
+          items: [
+            { href: '/seller', label: 'Dashboard' },
+            {
+              href: '/seller/orders',
+              label: 'Orders',
+              badge: (
+                <Suspense fallback={null}>
+                  <OrderQueueBadge />
+                </Suspense>
+              ),
+            },
+            {
+              href: '/seller/returns',
+              label: 'Returns',
+              badge: (
+                <Suspense fallback={null}>
+                  <ReturnQueueBadge />
+                </Suspense>
+              ),
+            },
+          ],
+        },
+        {
+          label: 'Catalogue',
+          items: [
+            { href: '/seller/products', label: 'Products' },
+            { href: '/seller/inventory', label: 'Inventory' },
+          ],
+        },
+        {
+          label: 'Business',
+          items: [
+            { href: '/seller/earnings', label: 'Earnings' },
+            { href: '/seller/analytics', label: 'Analytics' },
+            { href: '/seller/settings', label: 'Settings' },
+          ],
+        },
+      ]}
+      accessory={
+        <Suspense fallback={null}>
+          <WhoAmI />
+        </Suspense>
+      }
+    >
+      {children}
+    </ConsoleShell>
+  );
+}
+
+async function StoreName() {
+  const user = await requireSeller();
+  const sellers = await collections.sellers();
+  const seller = await sellers.findOne({ _id: user.sellerId }, { projection: { displayName: 1 } });
+  return <>{seller?.displayName ?? 'Your store'}</>;
+}
+
+async function OrderQueueBadge() {
+  const user = await requireSeller();
+  const sellerOrders = await collections.sellerOrders();
+  const count = await sellerOrders.countDocuments({
+    sellerId: user.sellerId,
+    status: { $in: SELLER_ACTIONABLE },
+  });
+  return <QueueBadge count={count} />;
+}
+
+async function ReturnQueueBadge() {
+  const user = await requireSeller();
+  const returns = await collections.returns();
+  const count = await returns.countDocuments({
+    sellerId: user.sellerId,
+    status: 'RETURN_REQUESTED',
+  });
+  return <QueueBadge count={count} />;
+}
+
+async function WhoAmI() {
+  const user = await requireSeller();
+  return (
+    <span className="text-muted text-xs">
+      {user.fullName}{' '}
+      <span className="text-faint">
+        · {user.activeRole === 'SELLER' ? 'Owner' : 'Staff'}
+      </span>
+    </span>
+  );
+}

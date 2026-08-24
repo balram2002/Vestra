@@ -1,170 +1,122 @@
 # Progress
 
-Living checklist mirroring the build phases. Updated as features land.
+Living checklist. Updated as work lands, not as it is planned.
 
-**Status:** Phases 1–3 substantially complete. Storefront is navigable end to
-end against real MongoDB data. Checkout stops at the delivery step; seller and
-admin consoles are not started.
+**Verification commands.** `npm run verify` (typecheck + lint + build), then with
+a server running: `npm run smoke` (purchase funnel) and `npm run smoke:rbac`
+(role access).
 
-**Green as of last commit:** `next build` (187 pages), `tsc --noEmit`, `eslint` —
-all clean. Inventory concurrency and auth verified by script (see Verification).
-
-Legend: `[x]` done · `[~]` partial · `[ ]` not started
+Latest run: **build 253/253 routes · typecheck clean · lint clean · funnel 11/11
+· RBAC 19/19**
 
 ---
 
-## Phase 1 — Architecture, routing, tokens, auth foundation
+## Phase 1-2 — Foundation, data layer, auth · **done**
 
-- [x] Reference project inspected (`C:\Projects\Shopix\frontend`, structure only)
-- [x] Node 24 / MongoDB environment verified and documented in `AGENTS.md`
-- [x] Next 16 bundled docs consulted; deviations recorded
-- [x] Git initialised, committing per phase
-- [x] Design tokens — colour, type, spacing, radii, shadows, motion, dark mode
-- [x] Semantic token aliases exposed as Tailwind utilities (`bg-canvas`, `text-ink`…)
 - [x] Domain model: entities, enums, state machines, attribute vocabulary
-- [x] Pricing engine, coupon evaluation, paise-based money handling
-- [x] scrypt password hashing with upgradeable work factor
-- [x] jose sessions, split so `proxy.ts` verifies without touching Mongo
-- [x] RBAC grant table; permissions re-derived server-side per request
-- [x] `proxy.ts` route protection (replaces `middleware.ts`)
-- [x] Login, register, forgot-password pages + sign-in/register/sign-out actions
-- [x] `unauthorized.tsx`, `forbidden.tsx`, `not-found.tsx`, `error.tsx`
-- [ ] Password reset email delivery (needs notification infrastructure)
-- [ ] Email/phone verification
-
-## Phase 2 — Design system, layout, service layer, data
-
-- [x] MongoDB client (pooled, HMR-safe, lazy)
-- [x] 40+ collections; index definitions treated as schema
-- [x] Atomic inventory repository — reserve / release / commit / restock / write-off
-- [x] Saga runner + journal for cross-document units of work
+- [x] Money as integer paise; pricing, tax and coupon engines
+- [x] Design tokens; type scale rebuilt at 15px base with display sizes to 80px
+- [x] MongoDB data layer — pooled client, typed collections, documents ARE domain entities
+- [x] Indexes as schema: unique constraints, TTL sweeps, partial filters for nullable uniques
+- [x] Atomic single-document inventory movements (no transactions needed)
+- [x] Compensating-action saga runner with journal + stuck-saga recovery scan
 - [x] Gapless per-financial-year sequence counters
-- [x] Deterministic seed — 42 categories, 20 brands, 15 stores, 786 products,
-      6,271 variants, 5,180 reviews, 6 coupons, 11 CMS pages, homepage sections
-- [x] `npm run seed` CLI with a Node resolver hook for the `@/` alias
-- [x] `/api/media` SVG image route (deterministic, immutably cached)
-- [x] UI primitives — button, badge, input, skeleton
-- [x] Skeletons matching final layout (product card, grid, rail, page shells)
-- [x] Header with data-driven mega menu, mobile drawer, footer
-- [x] Catalogue service — `"use cache"` + `cacheTag` per product/category/brand
-- [x] Listing service — one query path for category, search, brand, store
-- [x] Cart service with live re-derivation and explicit issue detection
-- [x] Wishlist service (guest + user, merged on sign-in)
-- [x] CMS/content service
-- [x] Top progress bar (custom, delay-gated)
-- [x] Toaster wired to design tokens
-- [ ] `useLinkStatus()` per-link pending indicators
-- [ ] TanStack Query layer for client-heavy surfaces
-- [ ] Zustand stores (not yet needed — state is URL- and server-driven)
-- [ ] View Transitions / shared-element transitions
+- [x] scrypt passwords, jose sessions, RBAC grant table
+- [x] `proxy.ts` route protection (replaces `middleware.ts`)
+- [x] Deterministic seed: 42 categories, 20 brands, 15 stores, 770 products,
+      6,384 variants, 5,300+ reviews, 1,400 orders, coupons, CMS content
 
-## Phase 3 — Storefront core
+## Phase 3 — Storefront core · **done**
 
-- [x] Home — rendered entirely from CMS section data, no hardcoded layout
-- [x] Category listing with facets, sort, pagination, SEO copy
-- [x] Search with facets and a distinct no-query state
-- [x] PDP — gallery, variant selection, reviews, fit signal, related, JSON-LD
-- [x] Product card / grid / rail
-- [x] Bag — multi-seller grouping, per-line issues, save for later
-- [x] Wishlist
-- [x] Brand pages + brand index
-- [x] Store pages + seller directory
-- [x] Policy and help pages (CMS-backed, real copy)
-- [x] Account home, addresses, orders (empty states)
-- [x] Loading skeletons and empty states on every built route
-- [ ] Pincode serviceability check on PDP
-- [ ] Size chart drawer (button present, opens a placeholder toast)
-- [ ] Search suggestions / autocomplete
-- [ ] Recently viewed
-- [ ] Add-address form (list renders; the add button is disabled)
+- [x] Home composed from CMS sections; hero, category strip, rails, banner grid
+- [x] Category, search, brand and store listing with facets, sort, pagination
+- [x] PDP: gallery + buy box as one island (colour is shared state), reviews
+- [x] Bag with per-line issue resolution; wishlist; guest-to-account merge
+- [x] Real photography via a family-pooled source, SVG generator as fallback
+- [x] Skeletons matched to final layout; route progress; per-link pending state
 
-## Phase 4 — Checkout, payments, orders
+## Phase 4 — Checkout, payments, orders, returns · **done**
 
-- [~] Checkout step 1 — address selection and delivery speed (live)
-- [ ] Payment step, gateway abstraction, mock provider
-- [ ] Order placement saga (reserve → charge → create → confirm)
-- [ ] Webhook handlers with replay defence (`webhookEvents` unique index ready)
-- [ ] Order history, detail, status timeline
-- [ ] Cancellation, returns, exchanges, refunds
-- [ ] Section 10 edge cases end to end
+- [x] Gateway interface + mock provider that genuinely declines and stalls
+- [x] Webhook as the authority: signature, replay index, idempotent apply
+- [x] Order placement saga: revalidate → reserve → create unpaid → open payment
+- [x] Per-line price/tax/seller snapshot frozen at purchase
+- [x] Multi-seller order splitting with per-seller commission and payable
+- [x] Checkout, payment step, confirmation, order history and detail
+- [x] Status timeline that changes shape for exceptional flows
+- [x] Per-item cancellation and returns; liability drives who pays
+- [x] Quality check gates restock vs write-off; refunds through the gateway
 
-## Phase 5 — Seller console
+## Phase 5 — Seller console · **done**
 
-- [ ] Everything
+- [x] Shared console shell; static nav, per-user badges stream in
+- [x] Dashboard: work queues above figures, revenue trend, best sellers
+- [x] Fulfilment queue defaulting to "needs action", one legal next step per row
+- [x] Products, inventory per size with inline stock editing
+- [x] Returns queue with approve / reject / quality check
+- [x] Earnings with the full payout arithmetic written out
+- [x] Analytics and store settings
 
-## Phase 6 — Admin console
+## Phase 6 — Admin console · **done**
 
-- [ ] Everything
-
-## Phase 7 — CMS, notifications, support, audit
-
-- [x] CMS page storage and rendering
-- [ ] Homepage/banner/navigation editing UI
-- [ ] Notification infrastructure + preferences
-- [ ] Help centre ticketing
-- [ ] Audit log writes on sensitive actions
-
-## Phase 8 — SEO, a11y, responsive, performance
-
-- [x] `generateMetadata` on product, category, brand, store, CMS routes
-- [x] JSON-LD — Product, Offer/AggregateOffer, AggregateRating, Review,
-      BreadcrumbList, ItemList, Store
-- [x] Canonicals; filtered and deep-paginated listings set `noindex, follow`
-- [x] Slug-history resolution with 301 redirects
-- [x] `generateStaticParams` on category, product, brand, store, CMS routes
-- [ ] `Organization` + `WebSite` sitewide (builders written, not yet mounted)
-- [ ] Segmented sitemap index + `robots.ts`
-- [ ] Dynamic OG images
-- [ ] Measured CWV audit against the budget
-- [ ] Full accessibility audit
-- [ ] `hreflang` / locale scaffolding
-
-## Phase 9 — QA
-
-- [x] Build, typecheck and lint green
-- [x] Route smoke test — all built routes 200, unknown route 404
-- [x] Inventory concurrency test — 40 racing reservations against 5 units
-- [x] Auth verification — hashing, rejection, role resolution
-- [ ] Vitest unit coverage on pricing, coupons, state machines
-- [ ] Playwright e2e on the full funnel
-- [ ] Manual pass across every role and viewport
+- [x] Role-adaptive dashboard (queues for everyone, figures gated on permission)
+- [x] Orders, payments ledger, returns across the platform
+- [x] Products review queue, category tree
+- [x] Sellers and users directories, contact details masked
+- [x] Coupons, homepage composition, audit log, settings + RBAC matrix
+- [x] `authInterrupts` enabled — without it `forbidden()` was inert and every
+      permission check silently passed
 
 ---
 
-## Verification run at last commit
+## Not yet done
 
-```
-40 concurrent reservations against 5 available units
-  succeeded: 5    refused: 35    oversold: no    conserved: yes
-10 concurrent releases against 5 reserved
-  applied: 5      final available: 5 (not inflated)
+Honest list of what the brief asks for that is not built.
 
-auth: correct password accepted, wrong rejected, malformed hash rejected
-      CUSTOMER -> / (6 perms), SELLER -> /seller (16), ADMIN -> /admin (35)
+### Functional gaps
 
-routes: 14 storefront paths 200, unknown path 404
-        /account /admin /seller -> 307 to /login?next=…
-PDP: JSON-LD Product + Offer + BreadcrumbList present, canonical present
-```
+- [ ] **Shipments and manifests.** Order items transition to SHIPPED, but there
+      is no shipment entity in use, no AWB, label, manifest or courier tracking
+      screen. The domain types and status machine exist; the service does not.
+- [ ] **Exchanges.** Returns and refunds work end to end. Exchange requests have
+      types and states but no service or UI.
+- [ ] **Settlements and invoices.** Earnings are computed and the hold period is
+      modelled, but no settlement run creates payouts and no GST invoice is
+      generated.
+- [ ] **Notifications.** No in-app centre, no email or SMS adapters. Preferences
+      are stored on the user but nothing reads them.
+- [ ] **Support tickets.** Types and seed vocabulary exist; no ticket UI.
+- [ ] **Seller onboarding and KYC submission flow.** Sellers are seeded as
+      approved; there is no application journey.
+- [ ] **Product create/edit for sellers.** The catalogue is read-only in the
+      console — no listing form, no media upload, no approval submission.
+- [ ] **Admin write actions.** Approve a listing, suspend a seller, issue a
+      manual refund: all read-only today, and audit-log writing depends on them.
+- [ ] **Promotions engine.** Coupons work. Promotions (flash sales, bank offers,
+      BXGY) are typed but not evaluated.
+- [ ] **Guest checkout.** Checkout requires an account.
 
----
+### Quality gaps
 
-## Known gaps and decisions
+- [ ] **Automated tests.** Vitest is configured but the pricing, coupon,
+      inventory and saga logic have no unit tests. The two smoke suites are the
+      only automated verification.
+- [ ] **SEO pass.** Metadata, JSON-LD and sitemap exist; canonical handling for
+      filtered listings, `noindex` on deep pagination and a Core Web Vitals
+      measurement have not been done.
+- [ ] **Accessibility pass.** Semantics and focus states were written carefully
+      but nothing has been audited with a screen reader or axe.
+- [ ] **Dark mode** for the consoles.
 
-- **Checkout stops after the delivery step.** The "Continue to payment" control
-  is disabled and says so rather than being a live-looking button that does
-  nothing. Payment, order placement and confirmation are the next milestone.
-- **Orders, shipments, settlements and audit logs are not seeded.** They should
-  be produced by the order service so the generated history matches the code
-  path the app actually uses. Until then `/orders` and both consoles have
-  nothing to show.
-- **Standalone MongoDB, no transactions.** Handled by design — atomic
-  single-document updates plus compensating sagas. Verified above. Moving to a
-  replica set later is a repository-layer change only.
-- **`typedRoutes` is off.** It only validates string literals, and nearly every
-  link here is composed at runtime from a slug or a filter. See `next.config.ts`
-  for the full reasoning.
-- **`/store/[slug]` replaces `/seller/[slug]`** for public store pages, because
-  the brief's two `/seller/*` routes collide. See `AGENTS.md`.
-- **Size guide button** opens an informational toast rather than the chart
-  drawer, which lands with the PDP polish pass.
+### Known caveats
+
+- **Product photography is representative, not real.** Images come from a small
+  pool of verified Unsplash photographs matched by product family, and they do
+  not depict the specific generated product. They must be replaced by seller
+  uploads before launch. `MEDIA_SOURCE=generated` swaps in the first-party SVG
+  renderer, which needs no network.
+- **MongoDB is standalone**, so nothing uses transactions. See AGENTS.md for how
+  correctness is obtained instead. Moving to a replica set is a repository-layer
+  change.
+- **Payments run against the mock gateway.** Razorpay and Stripe adapters are
+  stubbed behind the same interface and throw if selected without credentials.
