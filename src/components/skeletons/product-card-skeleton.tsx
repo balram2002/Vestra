@@ -12,7 +12,7 @@ import { cn } from '@/lib/cn';
 export function ProductCardSkeleton({ className }: { className?: string }) {
   return (
     <div className={cn('flex flex-col', className)} aria-hidden>
-      <Skeleton className="aspect-[3/4] w-full rounded-md" />
+      <Skeleton className="aspect-3/4 w-full rounded-md" />
       <div className="flex flex-col gap-1.5 pt-2.5">
         <div className="flex items-center justify-between gap-2">
           <Skeleton className="h-3 w-20 rounded-xs" />

@@ -1,6 +1,8 @@
 import { COLOR_BY_VALUE } from '@/domain/attributes';
 import { slugify } from '@/lib/slug';
 
+import { photoUrl, scenePhotoUrl, photosEnabled } from './photos';
+
 /**
  * Product imagery.
  *
@@ -21,6 +23,19 @@ import { slugify } from '@/lib/slug';
  * Swapping in real photography later means changing this file and nothing else:
  * every consumer only ever sees a URL string.
  */
+
+/**
+ * Renderer version, baked into every media URL.
+ *
+ * The images are served with a one-year immutable cache, which is correct
+ * only while a given URL always renders the same bytes. Changing the renderer
+ * breaks that promise: the spec is unchanged, so caches keep serving the old
+ * art indefinitely. Bumping this changes every URL, which is the only honest
+ * way to invalidate an immutable asset.
+ *
+ * Bump it whenever `app/api/media/[...spec]/route.ts` changes visually.
+ */
+export const MEDIA_VERSION = 2;
 
 export type MediaShape =
   | 'kurta'
@@ -78,8 +93,11 @@ export interface MediaSpec {
  * `next.config.ts` and so a CDN treats each image as a distinct object.
  */
 export function mediaUrl(spec: MediaSpec): string {
+  if (photosEnabled()) return photoUrl(spec.shape, spec.key, spec.view);
+
   const color = spec.color || 'bone';
-  return `/api/media/p/${spec.shape}/${color}/${spec.view}/${slugify(spec.key) || 'v'}.svg`;
+  const key = `${slugify(spec.key) || 'v'}-r${MEDIA_VERSION}`;
+  return `/api/media/p/${spec.shape}/${color}/${spec.view}/${key}.svg`;
 }
 
 /** Parse a URL built by `mediaUrl`. Used by the route handler. */
@@ -98,7 +116,16 @@ export function parseMediaPath(segments: string[]): MediaSpec | null {
 
 /** Non-product imagery: category tiles, brand logos, banners, avatars. */
 export function tileUrl(kind: string, key: string, color = 'mulberry'): string {
-  return `/api/media/t/${kind}/${color}/${slugify(key) || 'tile'}.svg`;
+  if (photosEnabled()) {
+    // Heroes and banners are wide; category and brand tiles are portrait.
+    const wide = kind.startsWith('hero') || kind === 'banner' || kind === 'grid';
+    const size = wide
+      ? { w: 1600, h: kind === 'hero-m' ? 1200 : 900 }
+      : { w: 800, h: 1000 };
+    return scenePhotoUrl(`${kind}-${key}`, size);
+  }
+
+  return `/api/media/t/${kind}/${color}/${slugify(key) || 'tile'}-r${MEDIA_VERSION}.svg`;
 }
 
 export function hexFor(color: string): string {

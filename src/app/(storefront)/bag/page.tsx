@@ -242,7 +242,7 @@ function BagSkeleton() {
           <div key={i} className="border-line rounded-lg border p-4">
             <div className="skeleton h-4 w-40 rounded-xs" />
             <div className="mt-4 flex gap-3">
-              <div className="skeleton aspect-[3/4] w-24 rounded-md" />
+              <div className="skeleton aspect-3/4 w-24 rounded-md" />
               <div className="flex-1 space-y-2">
                 <div className="skeleton h-4 w-3/4 rounded-xs" />
                 <div className="skeleton h-3 w-1/3 rounded-xs" />

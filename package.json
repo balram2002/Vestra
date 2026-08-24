@@ -14,7 +14,8 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "seed": "node --conditions=react-server --env-file=.env.local --import ./scripts/register-loader.mjs scripts/seed.ts"
+    "seed": "node --conditions=react-server --env-file=.env.local --import ./scripts/register-loader.mjs scripts/seed.ts",
+    "screenshot": "node scripts/screenshot.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
@@ -54,6 +55,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4.1.14",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",

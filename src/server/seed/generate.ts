@@ -748,7 +748,27 @@ function buildProduct({ rng, archetype, category, brand, seller, now }: BuildPro
 
   const prices = variants.map((v) => v.sellingPrice);
   const mrps = variants.map((v) => v.mrp);
-  const unitsSold30d = rng.int(0, 260);
+  /*
+   * Sales follow a long tail, not a uniform spread. Drawing uniformly from
+   * 0..260 put almost every product over the bestseller threshold, so the badge
+   * appeared on every tile and stopped meaning anything. Roughly: two thirds of
+   * a catalogue barely moves, a quarter sells steadily, and a handful carry the
+   * category.
+   */
+  const salesBand = rng.weighted([
+    ['slow', 62],
+    ['steady', 27],
+    ['strong', 8],
+    ['hit', 3],
+  ]);
+  const unitsSold30d =
+    salesBand === 'slow'
+      ? rng.int(0, 18)
+      : salesBand === 'steady'
+        ? rng.int(19, 55)
+        : salesBand === 'strong'
+          ? rng.int(60, 140)
+          : rng.int(150, 420);
 
   const sortedSizes = sortSizes(sizes, category.sizeSystem);
   const colorOptions = Array.from(new Set(variants.map((v) => v.color)));
@@ -820,7 +840,7 @@ function buildProduct({ rng, archetype, category, brand, seller, now }: BuildPro
       fitTrueToSizePercent: ratingCount > 20 ? rng.int(58, 94) : null,
     },
     stats: {
-      views30d: rng.int(40, 18000),
+      views30d: Math.round(unitsSold30d * rng.int(28, 90) + rng.int(20, 900)),
       addToBag30d: rng.int(2, 1400),
       unitsSold30d,
       unitsSoldLifetime: unitsSold30d * rng.int(2, 14),

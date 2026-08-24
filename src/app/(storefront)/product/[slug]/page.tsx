@@ -6,8 +6,7 @@ import { Suspense } from 'react';
 import { Breadcrumbs } from '@/components/commerce/breadcrumbs';
 import { ProductCard } from '@/components/commerce/product-card';
 import { RatingStars } from '@/components/commerce/rating-stars';
-import { ProductBuyBox } from '@/components/product/product-buy-box';
-import { ProductGallery } from '@/components/product/product-gallery';
+import { ProductViewer } from '@/components/product/product-viewer';
 import { ReviewSummary } from '@/components/product/review-summary';
 import { JsonLd } from '@/components/seo/json-ld';
 import { ProductRailSkeleton } from '@/components/skeletons/product-card-skeleton';
@@ -122,83 +121,89 @@ export default async function ProductPage({ params }: PageProps) {
         ])}
       />
 
-      <div className="mt-4 grid gap-8 lg:grid-cols-[minmax(0,1fr)_26rem] lg:gap-12">
-        <ProductGallery media={product.media} title={product.title} />
-
-        <div className="lg:sticky lg:top-28 lg:self-start">
-          <div className="flex items-start justify-between gap-3">
-            <div>
+      <div className="mt-5">
+        <ProductViewer
+          productId={product.id}
+          title={product.title}
+          variants={product.variants}
+          media={product.media}
+          sizeOptions={product.sizeOptions}
+          colorOptions={colorOptions}
+          header={
+            <div className="mb-7">
               {brand ? (
                 <Link
                   href={`/brand/${brand.slug}`}
-                  className="text-accent-ink text-sm font-semibold uppercase tracking-wide hover:underline"
+                  className="text-faint hover:text-ink text-2xs font-medium uppercase tracking-[0.16em] transition-colors"
                 >
                   {brand.name}
                 </Link>
               ) : null}
-              <h1 className="font-display text-ink mt-1 text-xl sm:text-2xl">{product.title}</h1>
+
+              <h1 className="font-display text-ink mt-2 text-2xl leading-tight sm:text-3xl">
+                {product.title}
+              </h1>
+
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                {product.rating.count > 0 ? (
+                  <a href="#reviews" className="inline-flex items-center gap-2">
+                    <RatingStars
+                      rating={product.rating.average}
+                      count={product.rating.count}
+                      size="md"
+                    />
+                    <span className="text-muted text-xs underline-offset-4 hover:underline">
+                      Read reviews
+                    </span>
+                  </a>
+                ) : null}
+                {brand?.isPremium ? <Badge tone="brass" size="sm">Premium</Badge> : null}
+              </div>
             </div>
+          }
+          footer={
+            <div className="mt-8 space-y-5">
+              {/* On a marketplace, who you buy from is part of the offer. */}
+              {seller ? (
+                <div className="border-line rounded-lg border p-4">
+                  <p className="text-faint text-2xs uppercase tracking-[0.14em]">Sold by</p>
+                  <Link
+                    href={`/store/${seller.slug}`}
+                    className="text-ink mt-1 block text-sm font-semibold hover:underline"
+                  >
+                    {seller.displayName}
+                  </Link>
+                  <p className="text-muted mt-1 text-xs">
+                    {seller.rating.average}★ · {seller.rating.onTimeDispatchRate}% dispatched on
+                    time
+                  </p>
+                  <p className="text-muted mt-2.5 text-xs">{seller.policies.shippingNote}</p>
+                </div>
+              ) : null}
 
-            {brand?.isPremium ? <Badge tone="brass">Premium</Badge> : null}
-          </div>
-
-          {product.rating.count > 0 ? (
-            <a href="#reviews" className="mt-2 inline-flex items-center gap-2">
-              <RatingStars rating={product.rating.average} count={product.rating.count} size="md" />
-              <span className="text-muted text-xs underline-offset-4 hover:underline">
-                Read reviews
-              </span>
-            </a>
-          ) : null}
-
-          <div className="border-line mt-5 border-t pt-5">
-            <ProductBuyBox
-              productId={product.id}
-              variants={product.variants}
-              sizeOptions={product.sizeOptions}
-              colorOptions={colorOptions}
-            />
-          </div>
-
-          {/* Sold-by block: on a marketplace, who you are buying from is part
-              of the offer, not a footnote. */}
-          {seller ? (
-            <div className="border-line mt-6 rounded-md border p-4">
-              <p className="text-faint text-2xs uppercase tracking-wider">Sold by</p>
-              <Link
-                href={`/store/${seller.slug}`}
-                className="text-ink mt-0.5 block text-sm font-semibold hover:underline"
-              >
-                {seller.displayName}
-              </Link>
-              <p className="text-muted mt-1 text-xs">
-                {seller.rating.average}★ · {seller.rating.onTimeDispatchRate}% dispatched on time
-              </p>
-              <p className="text-muted mt-2 text-xs">{seller.policies.shippingNote}</p>
+              <dl className="border-line space-y-4 border-t pt-5 text-sm">
+                <div>
+                  <dt className="text-ink font-semibold">Returns</dt>
+                  <dd className="text-muted mt-1">
+                    {product.returnable
+                      ? `${product.returnWindowDays}-day returns${product.exchangeable ? ' and exchanges' : ''} on unworn items with tags intact.`
+                      : 'This item cannot be returned once delivered.'}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-ink font-semibold">Highlights</dt>
+                  <dd className="text-muted mt-1.5">
+                    <ul className="list-disc space-y-1.5 pl-4">
+                      {product.highlights.map((highlight) => (
+                        <li key={highlight}>{highlight}</li>
+                      ))}
+                    </ul>
+                  </dd>
+                </div>
+              </dl>
             </div>
-          ) : null}
-
-          <dl className="border-line mt-6 space-y-3 border-t pt-5 text-sm">
-            <div>
-              <dt className="text-ink font-semibold">Returns</dt>
-              <dd className="text-muted mt-0.5">
-                {product.returnable
-                  ? `${product.returnWindowDays}-day returns${product.exchangeable ? ' and exchanges' : ''} on unworn items with tags intact.`
-                  : 'This item cannot be returned once delivered.'}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-ink font-semibold">Highlights</dt>
-              <dd className="text-muted mt-0.5">
-                <ul className="list-disc space-y-1 pl-4">
-                  {product.highlights.map((highlight) => (
-                    <li key={highlight}>{highlight}</li>
-                  ))}
-                </ul>
-              </dd>
-            </div>
-          </dl>
-        </div>
+          }
+        />
       </div>
 
       {/* -------------------------------------------------------- details */}

@@ -48,7 +48,7 @@ export function CartLineItem({ line }: { line: CartLine }) {
     >
       <Link
         href={`/product/${line.productSlug}`}
-        className="bg-sunken relative aspect-[3/4] w-20 shrink-0 overflow-hidden rounded-md sm:w-24"
+        className="bg-sunken relative aspect-3/4 w-20 shrink-0 overflow-hidden rounded-md sm:w-24"
       >
         <Image
           src={line.image}

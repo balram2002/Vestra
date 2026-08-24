@@ -137,28 +137,42 @@
     'Helvetica Neue', Arial, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  --text-2xs: 0.6875rem;
-  --text-2xs--line-height: 1rem;
-  --text-xs: 0.75rem;
-  --text-xs--line-height: 1.125rem;
-  --text-sm: 0.8125rem;
-  --text-sm--line-height: 1.25rem;
-  --text-base: 0.875rem;
-  --text-base--line-height: 1.375rem;
-  --text-md: 0.9375rem;
-  --text-md--line-height: 1.5rem;
-  --text-lg: 1.0625rem;
-  --text-lg--line-height: 1.625rem;
-  --text-xl: 1.25rem;
-  --text-xl--line-height: 1.75rem;
-  --text-2xl: 1.5rem;
-  --text-2xl--line-height: 2rem;
-  --text-3xl: 1.875rem;
-  --text-3xl--line-height: 2.25rem;
-  --text-4xl: 2.375rem;
-  --text-4xl--line-height: 2.75rem;
-  --text-5xl: 3rem;
-  --text-5xl--line-height: 3.25rem;
+  /*
+   * Scale rationale: 15px base, not 14. Below 15 a long product description
+   * reads as fine print, and the whole shop feels cramped and dated. The
+   * display end is deliberately far from the body end — a flat scale is what
+   * makes a page look like a template.
+   */
+  --text-2xs: 0.75rem;
+  --text-2xs--line-height: 1.0625rem;
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.1875rem;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.375rem;
+  --text-base: 0.9375rem;
+  --text-base--line-height: 1.5rem;
+  --text-md: 1rem;
+  --text-md--line-height: 1.625rem;
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.75rem;
+  --text-xl: 1.375rem;
+  --text-xl--line-height: 1.875rem;
+  --text-xl--letter-spacing: -0.01em;
+  --text-2xl: 1.75rem;
+  --text-2xl--line-height: 2.125rem;
+  --text-2xl--letter-spacing: -0.015em;
+  --text-3xl: 2.25rem;
+  --text-3xl--line-height: 2.5rem;
+  --text-3xl--letter-spacing: -0.02em;
+  --text-4xl: 3rem;
+  --text-4xl--line-height: 3.125rem;
+  --text-4xl--letter-spacing: -0.025em;
+  --text-5xl: 4rem;
+  --text-5xl--line-height: 4rem;
+  --text-5xl--letter-spacing: -0.03em;
+  --text-6xl: 5rem;
+  --text-6xl--line-height: 4.85rem;
+  --text-6xl--letter-spacing: -0.035em;
 
   /* --------------------------------------------------------------- geometry */
   --radius-xs: 2px;

@@ -53,6 +53,13 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       // Seller-uploaded media would land on the asset CDN in production.
       { protocol: 'https', hostname: 'cdn.vestra.example' },
+      /*
+       * Representative product photography for the demo dataset. See
+       * `server/seed/photos.ts` — these stand in for seller uploads and are
+       * replaced by them before launch. `MEDIA_SOURCE=generated` drops this
+       * dependency entirely and falls back to the first-party SVG renderer.
+       */
+      { protocol: 'https', hostname: 'images.unsplash.com' },
     ],
   },
 
