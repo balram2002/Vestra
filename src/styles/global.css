@@ -165,6 +165,23 @@
   100% { transform: scale(1); opacity: 1; }
 }
 
+/*
+ * Navigation progress bar. Eases towards 90% and holds: the bar must never
+ * complete before the page actually has.
+ */
+@keyframes route-progress {
+  0%   { transform: translateX(-100%); }
+  40%  { transform: translateX(-40%); }
+  75%  { transform: translateX(-18%); }
+  100% { transform: translateX(-8%); }
+}
+
+/* Drawer entry. Used by the mobile navigation and the filter rail. */
+@keyframes slide-in {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
 @keyframes vestra-cart-fly {
   0% { transform: scale(1) translate(0, 0); opacity: 1; }
   100% { transform: scale(0.2) translate(var(--fly-x, 0), var(--fly-y, -160px)); opacity: 0; }

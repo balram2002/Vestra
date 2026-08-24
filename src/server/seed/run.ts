@@ -20,6 +20,7 @@ import {
   generateSellers,
   generateStaff,
 } from './generate';
+import { generateCmsPages } from './pages';
 
 /**
  * Seed the database.
@@ -139,6 +140,7 @@ export async function seedDatabase(
   const coupons = generateCoupons(categories, sellers, marketingUser.id, now);
   const homeSections = generateHomeSections(now);
   const banners = generateBanners(now);
+  const cmsPages = generateCmsPages(marketingUser.id, now);
 
   /* ------------------------------------------------- derived aggregates */
 
@@ -228,6 +230,7 @@ export async function seedDatabase(
   counts.coupons = await insert(COLLECTIONS.coupons, coupons);
   counts.homeSections = await insert(COLLECTIONS.homeSections, homeSections);
   counts.banners = await insert(COLLECTIONS.banners, banners);
+  counts.cmsPages = await insert(COLLECTIONS.cmsPages, cmsPages);
 
   counts.variants = products.reduce((sum, p) => sum + p.variants.length, 0);
 

@@ -17,7 +17,21 @@ const nextConfig: NextConfig = {
    */
   cacheComponents: true,
 
-  typedRoutes: true,
+  /*
+   * `typedRoutes` is deliberately OFF.
+   *
+   * It validates `href` against the generated route union, which only accepts
+   * string LITERALS. Almost every link in this app is composed at runtime — a
+   * slug read from Mongo, or a filter URL built by `lib/product-query` — and
+   * those arrive as `string`, which the union rejects no matter how correct the
+   * value is. Enabling it would mean casting at every call site, and a cast on
+   * every href is not type safety, it is the appearance of it.
+   *
+   * Route correctness is instead guaranteed where the values actually come
+   * from: slug lookups check `slug` and `slugHistory` and call `notFound()`
+   * when neither matches.
+   */
+  typedRoutes: false,
 
   reactStrictMode: true,
 
