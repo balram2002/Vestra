@@ -1,9 +1,11 @@
-import { Check, MapPin, Plus } from 'lucide-react';
+import { MapPin, Plus } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
 
+import { CheckoutForm } from '@/components/checkout/checkout-form';
+import { CheckoutSteps } from '@/components/checkout/checkout-steps';
 import { Button } from '@/components/ui/button';
 import { SHIPPING } from '@/config/business';
 import { formatMoney } from '@/lib/format';
@@ -17,15 +19,12 @@ export const metadata: Metadata = {
 };
 
 /**
- * Checkout — delivery step.
+ * Checkout.
  *
- * The funnel is deliberately linear and each step is its own URL, so the back
- * button works, a refresh does not lose progress, and an abandoned checkout can
- * be resumed exactly where it stopped.
- *
- * This step covers the delivery address and the shipping quote. Payment,
- * order placement and confirmation are the next milestone; the stepper shows
- * that plainly rather than presenting a button that would not work.
+ * The bag is re-derived here rather than trusted from the previous page, so an
+ * item that sold out during the walk from bag to checkout is caught before any
+ * payment is opened — and the shopper is sent back to fix it rather than being
+ * charged for something that no longer exists.
  */
 export default function CheckoutPage() {
   return (
@@ -43,8 +42,6 @@ async function CheckoutFlow() {
   const user = await requireUser();
   const cart = await getCartView({ kind: 'user', userId: user.id });
 
-  // Reaching checkout with an empty or blocked bag means something changed
-  // since the bag page. Send them back rather than showing a broken form.
   if (cart.groups.length === 0 || !cart.checkoutReady) {
     redirect('/bag');
   }
@@ -54,24 +51,32 @@ async function CheckoutFlow() {
     await addressCol.find({ userId: user.id }).sort({ isDefault: -1 }).toArray(),
   );
 
+  // COD is offered only when every seller in the bag supports it and the total
+  // is inside the platform cap — one seller opting out disables it for the
+  // whole order, because the order ships as several parcels.
+  const sellers = await collections.sellers();
+  const sellerDocs = toEntities(
+    await sellers.find({ _id: { $in: cart.groups.map((g) => g.sellerId) } }).toArray(),
+  );
+  const codAvailable =
+    sellerDocs.length > 0 &&
+    sellerDocs.every((s) => s.policies.codEnabled) &&
+    cart.pricing.payable <= SHIPPING.maxCodOrderValue;
+
   return (
     <>
-      <Stepper current={1} />
+      <CheckoutSteps current={1} />
 
-      <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <section>
-          <h2 className="text-ink text-sm font-semibold uppercase tracking-wider">
-            Delivery address
-          </h2>
-
+      <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-14">
+        <div>
           {addresses.length === 0 ? (
-            <div className="border-line mt-3 rounded-lg border border-dashed p-6 text-center">
+            <div className="border-line rounded-lg border border-dashed p-8 text-center">
               <MapPin className="text-faint mx-auto size-7" aria-hidden />
-              <p className="text-ink mt-3 text-sm font-medium">No saved addresses</p>
+              <p className="text-ink mt-3 text-md font-medium">No saved addresses</p>
               <p className="text-muted mt-1 text-sm">
-                Add where you would like this delivered.
+                Add where you would like this delivered before you pay.
               </p>
-              <Button asChild variant="secondary" size="sm" className="mt-4">
+              <Button asChild variant="secondary" size="sm" className="mt-5">
                 <Link href="/account/addresses">
                   <Plus className="size-4" />
                   Add an address
@@ -79,61 +84,17 @@ async function CheckoutFlow() {
               </Button>
             </div>
           ) : (
-            <ul className="mt-3 space-y-2">
-              {addresses.map((address) => (
-                <li key={address.id}>
-                  <label className="border-line hover:border-accent-line has-[:checked]:border-accent has-[:checked]:bg-accent-soft flex cursor-pointer gap-3 rounded-lg border p-4 transition-colors">
-                    <input
-                      type="radio"
-                      name="addressId"
-                      value={address.id}
-                      defaultChecked={address.isDefault}
-                      className="accent-[--accent-solid] mt-1 size-4 shrink-0"
-                    />
-                    <div className="min-w-0 text-sm">
-                      <p className="text-ink font-medium">
-                        {address.fullName}
-                        <span className="text-faint ml-2 text-2xs font-normal uppercase tracking-wider">
-                          {address.label}
-                        </span>
-                      </p>
-                      <p className="text-muted mt-0.5">
-                        {address.line1}
-                        {address.line2 ? `, ${address.line2}` : ''}
-                        {address.landmark ? `, ${address.landmark}` : ''}
-                      </p>
-                      <p className="text-muted">
-                        {address.city}, {address.state} {address.pincode}
-                      </p>
-                      <p className="text-faint mt-1 text-xs">{address.phone}</p>
-                    </div>
-                  </label>
-                </li>
-              ))}
-            </ul>
+            <CheckoutForm
+              addresses={addresses}
+              payable={cart.pricing.payable}
+              codAvailable={codAvailable}
+            />
           )}
-
-          <h2 className="text-ink mt-8 text-sm font-semibold uppercase tracking-wider">
-            Delivery speed
-          </h2>
-          <ul className="mt-3 space-y-2">
-            <DeliveryOption
-              defaultChecked
-              title="Standard"
-              detail={`${SHIPPING.standardDays.min}–${SHIPPING.standardDays.max} working days`}
-              price={cart.pricing.shippingFee === 0 ? 'Free' : formatMoney(SHIPPING.standardFee)}
-            />
-            <DeliveryOption
-              title="Express"
-              detail={`${SHIPPING.expressDays.min}–${SHIPPING.expressDays.max} working days`}
-              price={formatMoney(SHIPPING.expressFee)}
-            />
-          </ul>
-        </section>
+        </div>
 
         <aside className="lg:sticky lg:top-28 lg:self-start">
           <div className="border-line rounded-lg border p-5">
-            <h2 className="text-ink text-sm font-semibold uppercase tracking-wider">
+            <h2 className="text-faint text-2xs font-medium uppercase tracking-[0.14em]">
               Order summary
             </h2>
 
@@ -143,37 +104,36 @@ async function CheckoutFlow() {
             </p>
 
             <dl className="mt-4 space-y-2.5 text-sm">
-              <div className="flex justify-between">
-                <dt className="text-muted">Items</dt>
-                <dd className="text-ink tabular">{formatMoney(cart.pricing.subtotal)}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-muted">Delivery</dt>
-                <dd className="text-ink tabular">
-                  {cart.pricing.shippingFee === 0 ? 'Free' : formatMoney(cart.pricing.shippingFee)}
-                </dd>
-              </div>
-              <div className="border-line flex justify-between border-t pt-3">
-                <dt className="text-ink font-semibold">Total payable</dt>
-                <dd className="text-ink tabular text-md font-semibold">
-                  {formatMoney(cart.pricing.payable)}
-                </dd>
+              <Row label="Items" value={formatMoney(cart.pricing.subtotal)} />
+              {cart.pricing.couponDiscount > 0 ? (
+                <Row
+                  label="Coupon"
+                  value={`− ${formatMoney(cart.pricing.couponDiscount)}`}
+                  tone="success"
+                />
+              ) : null}
+              <Row
+                label="Delivery"
+                value={
+                  cart.pricing.shippingFee - cart.pricing.shippingDiscount === 0
+                    ? 'Free'
+                    : formatMoney(cart.pricing.shippingFee - cart.pricing.shippingDiscount)
+                }
+              />
+              <div className="border-line border-t pt-3">
+                <Row label="Total payable" value={formatMoney(cart.pricing.payable)} emphasis />
+                <p className="text-faint mt-1 text-2xs">Inclusive of all taxes</p>
               </div>
             </dl>
 
-            {/*
-              Payment, order placement and confirmation are the next milestone.
-              The control is disabled and says so, rather than being a button
-              that looks live and silently does nothing.
-            */}
-            <Button size="cta" className="mt-5" disabled>
-              Continue to payment
-            </Button>
-
-            <p className="text-faint mt-3 text-center text-2xs">
-              Payment is not enabled in this build yet — the delivery step above is live and your
-              bag is saved.
-            </p>
+            <ul className="border-line text-faint mt-5 space-y-1.5 border-t pt-4 text-2xs">
+              {cart.groups.map((group) => (
+                <li key={group.sellerId} className="flex justify-between gap-3">
+                  <span className="truncate">{group.sellerName}</span>
+                  <span className="tabular shrink-0">{formatMoney(group.subtotal)}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         </aside>
       </div>
@@ -181,90 +141,42 @@ async function CheckoutFlow() {
   );
 }
 
-function DeliveryOption({
-  title,
-  detail,
-  price,
-  defaultChecked,
+function Row({
+  label,
+  value,
+  tone,
+  emphasis,
 }: {
-  title: string;
-  detail: string;
-  price: string;
-  defaultChecked?: boolean;
+  label: string;
+  value: string;
+  tone?: 'success';
+  emphasis?: boolean;
 }) {
   return (
-    <li>
-      <label className="border-line hover:border-accent-line has-[:checked]:border-accent has-[:checked]:bg-accent-soft flex cursor-pointer items-center gap-3 rounded-lg border p-4 transition-colors">
-        <input
-          type="radio"
-          name="shipping"
-          defaultChecked={defaultChecked}
-          className="accent-[--accent-solid] size-4 shrink-0"
-        />
-        <span className="flex-1 text-sm">
-          <span className="text-ink block font-medium">{title}</span>
-          <span className="text-muted text-xs">{detail}</span>
-        </span>
-        <span className="text-ink tabular text-sm font-medium">{price}</span>
-      </label>
-    </li>
-  );
-}
-
-/**
- * The funnel, shown in full.
- *
- * Steps ahead of the current one are visible but plainly not reached yet — a
- * shopper who can see there are two steps left behaves differently from one
- * who cannot.
- */
-function Stepper({ current }: { current: number }) {
-  const steps = ['Bag', 'Delivery', 'Payment', 'Confirmation'];
-
-  return (
-    <ol className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-      {steps.map((step, index) => {
-        const done = index < current;
-        const active = index === current;
-
-        return (
-          <li key={step} className="flex items-center gap-2">
-            <span
-              className={[
-                'flex size-5 items-center justify-center rounded-full text-2xs font-semibold',
-                done ? 'bg-success-500 text-white' : '',
-                active ? 'bg-accent text-on-inverse' : '',
-                !done && !active ? 'bg-sunken text-faint' : '',
-              ].join(' ')}
-              aria-hidden
-            >
-              {done ? <Check className="size-3" /> : index + 1}
-            </span>
-            <span
-              className={active ? 'text-ink font-medium' : 'text-faint'}
-              aria-current={active ? 'step' : undefined}
-            >
-              {step}
-            </span>
-            {index < steps.length - 1 ? (
-              <span className="bg-line mx-1 h-px w-6" aria-hidden />
-            ) : null}
-          </li>
-        );
-      })}
-    </ol>
+    <div className="flex items-baseline justify-between gap-3">
+      <dt className={emphasis ? 'text-ink font-semibold' : 'text-muted'}>{label}</dt>
+      <dd
+        className={[
+          'tabular',
+          emphasis ? 'text-ink text-md font-semibold' : 'text-ink',
+          tone === 'success' ? 'text-success-600' : '',
+        ].join(' ')}
+      >
+        {value}
+      </dd>
+    </div>
   );
 }
 
 function CheckoutSkeleton() {
   return (
-    <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]" aria-hidden>
+    <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,1fr)_22rem]" aria-hidden>
       <div className="space-y-3">
         <div className="skeleton h-4 w-40 rounded-xs" />
         <div className="skeleton h-28 w-full rounded-lg" />
         <div className="skeleton h-28 w-full rounded-lg" />
       </div>
-      <div className="skeleton h-64 rounded-lg" />
+      <div className="skeleton h-72 rounded-lg" />
     </div>
   );
 }
