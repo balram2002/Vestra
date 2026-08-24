@@ -35,7 +35,12 @@ export function RatingStars({
   if (count === 0) return null;
 
   // Below 3.5 the badge stops being a recommendation, so it drops the green.
-  const tone = rating >= 3.5 ? 'bg-success-500 text-white' : 'bg-warning-500 text-white';
+  /*
+   * The 600 steps, not 500. White on warning-500 measures 4.23:1 and on
+   * brass-500 3.72:1 — both fail WCAG AA at the 12px this badge renders at.
+   * The 600 steps clear 4.5:1 and are visually indistinguishable at this size.
+   */
+  const tone = rating >= 3.5 ? 'bg-success-600 text-white' : 'bg-warning-600 text-white';
 
   return (
     <span className={cn('inline-flex items-center gap-1.5', className)}>

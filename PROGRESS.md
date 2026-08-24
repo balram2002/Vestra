@@ -2,12 +2,19 @@
 
 Living checklist. Updated as work lands, not as it is planned.
 
-**Verification commands.** `npm run verify` (typecheck + lint + build), then with
-a server running: `npm run smoke` (purchase funnel) and `npm run smoke:rbac`
-(role access).
+**Verification commands.** `npm run verify` (typecheck + lint + build), then
+with a server running (`npm run restart && npm run start`):
 
-Latest run: **build 258/258 routes · typecheck clean · lint clean · funnel 11/11
-· RBAC 19/19 · admin writes 6/6**
+| Command | Checks |
+|---|---|
+| `npm run smoke` | the purchase funnel, end to end in a browser |
+| `npm run smoke:rbac` | 6 identities against 19 routes |
+| `npm run smoke:admin` | admin writes, verified by their side effects in Mongo |
+| `npm run audit:a11y` | axe-core, 12 routes × 2 widths |
+| `npm run audit:contrast` | WCAG ratios, parsed from `tokens.css` |
+
+Latest run: **build 262/262 routes · typecheck clean · lint clean · funnel 11/11
+· RBAC 19/19 · admin writes 6/6 · a11y 0 violations · contrast 3/3**
 
 ---
 
@@ -86,6 +93,26 @@ Latest run: **build 258/258 routes · typecheck clean · lint clean · funnel 11
 - [x] Seeded 635 notifications and 34 tickets derived from real orders; listing
       statuses varied so the review queue is not permanently empty
 
+## Phase 8 — SEO and accessibility · **partly done**
+
+- [x] `robots.ts` — private surfaces and the unbounded `/search` space
+      disallowed; non-production deployments blocked entirely
+- [x] Segmented `sitemap.ts` (20k URLs per file) plus a real sitemap INDEX at
+      `/sitemap-index.xml`, because `generateSitemaps` publishes segments but no
+      index and `robots.txt` was pointing at a 404
+- [x] Honest priority and change frequency; products carry their real
+      `updatedAt` and selling products outrank the tail
+- [x] Accessibility audited with axe rather than asserted: **26 serious
+      violations → 0**, across 12 routes at desktop and mobile
+- [x] `aria-pressed` on filter LINKS replaced with `aria-current` (37 nodes)
+- [x] Contrast: `text-tertiary` measured 3.78:1 and failed everywhere it was
+      used — 1,030 nodes. Darkened to 4.77:1. Premium and low-rating badges
+      moved from the 500 to the 600 steps
+- [x] `scripts/check-contrast.mjs` parses `tokens.css` rather than restating it,
+      so it cannot pass while the real tokens drift
+- [ ] Core Web Vitals measured under load
+- [ ] Dynamic OG images per product and category
+
 ---
 
 ## Not yet done
@@ -122,11 +149,12 @@ Honest list of what the brief asks for that is not built.
 - [ ] **Automated tests.** Vitest is configured but the pricing, coupon,
       inventory and saga logic have no unit tests. The two smoke suites are the
       only automated verification.
-- [ ] **SEO pass.** Metadata, JSON-LD and sitemap exist; canonical handling for
-      filtered listings, `noindex` on deep pagination and a Core Web Vitals
-      measurement have not been done.
-- [ ] **Accessibility pass.** Semantics and focus states were written carefully
-      but nothing has been audited with a screen reader or axe.
+- [ ] **Core Web Vitals.** Not measured. LCP, CLS and INP targets are designed
+      for (priority hero image, skeletons that reserve exact space, Server
+      Components by default) but no number has been taken.
+- [ ] **Screen reader pass.** axe is clean, which catches the mechanical faults;
+      it does not tell you whether the page makes sense read aloud.
+- [ ] **Dynamic OG images** via `next/og` per product and category.
 - [ ] **Dark mode** for the consoles.
 
 ### Known caveats

@@ -45,7 +45,7 @@ const BADGE_STYLE: Record<ProductBadgeKind, string> = {
   NEW: 'bg-canvas text-ink',
   TRENDING: 'bg-ink text-canvas',
   BACK_IN_STOCK: 'bg-success-600 text-white',
-  PREMIUM: 'bg-brass-500 text-white',
+  PREMIUM: 'bg-brass-600 text-white',
   DEAL: 'bg-ember-600 text-white',
   SPONSORED: 'bg-canvas/85 text-muted',
 };

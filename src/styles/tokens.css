@@ -22,7 +22,13 @@
   --color-bone-200: #e8e4dd;
   --color-bone-300: #d6d1c8;
   --color-bone-400: #aba598;
-  --color-bone-500: #807a6e;
+  /*
+   * Darkened from #807a6e, which measured 3.78:1 on bone-100 and failed WCAG AA
+   * everywhere `text-faint` was used — 1,030 nodes across every route in the
+   * axe audit. This is 4.77:1 on the worst surface it sits on, still visibly
+   * lighter than `text-muted` (bone-600). Verified by scripts/check-contrast.mjs.
+   */
+  --color-bone-500: #6f6a60;
   --color-bone-600: #5e5950;
   --color-bone-700: #45413a;
   --color-bone-800: #2b2823;

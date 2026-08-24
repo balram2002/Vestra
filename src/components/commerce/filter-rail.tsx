@@ -26,6 +26,11 @@ import {
  * The cost is a server round trip per toggle. With the listing query cached and
  * the shell prerendered that lands well inside the interaction budget, and it
  * buys correctness that a client store has to work hard to match.
+ *
+ * Filters are LINKS, not buttons: the filter state lives in the URL so a view
+ * can be shared and bookmarked. That makes the active one `aria-current`, never
+ * `aria-pressed` — `aria-pressed` is only valid on a button, and axe flagged 37
+ * nodes here as `aria-allowed-attr` violations because of it.
  */
 export function FilterRail({
   facets,
@@ -98,7 +103,7 @@ function FacetGroup({
                 <li key={value.value}>
                   <Link
                     href={toggleParam(params, facet.key, value.value, basePath)}
-                    aria-pressed={active}
+                    aria-current={active ? 'true' : undefined}
                     title={`${value.label} (${value.count})`}
                     className={cn(
                       'flex size-7 items-center justify-center rounded-full border transition-[box-shadow,border-color]',
@@ -130,7 +135,7 @@ function FacetGroup({
                 <li key={value.value}>
                   <Link
                     href={toggleParam(params, facet.key, value.value, basePath)}
-                    aria-pressed={active}
+                    aria-current={active ? 'true' : undefined}
                     className={cn(
                       'flex h-8 min-w-9 items-center justify-center rounded-sm border px-2 text-xs transition-colors',
                       active
@@ -152,7 +157,7 @@ function FacetGroup({
                 <li key={value.value}>
                   <Link
                     href={toggleParam(params, facet.key, value.value, basePath)}
-                    aria-pressed={active}
+                    aria-current={active ? 'true' : undefined}
                     className="group/item flex items-center gap-2 text-sm"
                   >
                     <span
@@ -242,7 +247,7 @@ function PriceGroup({
             <li key={band.label}>
               <Link
                 href={active ? withParams(params, { minPrice: null, maxPrice: null }, basePath) : href}
-                aria-pressed={active}
+                aria-current={active ? 'true' : undefined}
                 className={cn(
                   'block text-sm transition-colors',
                   active ? 'text-accent-ink font-medium' : 'text-muted hover:text-ink',

@@ -57,6 +57,9 @@ export interface Category {
   returnable: boolean;
   metaTitle: string | null;
   metaDescription: string | null;
+  createdAt: string;
+  /** Drives `lastModified` in the sitemap, so crawlers recrawl on a real edit. */
+  updatedAt: string;
 }
 
 export interface Brand {
@@ -78,6 +81,8 @@ export interface Brand {
   categoryIds: string[];
   metaTitle: string | null;
   metaDescription: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /* ----------------------------------------------------------------- product */

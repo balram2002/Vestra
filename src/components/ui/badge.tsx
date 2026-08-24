@@ -45,7 +45,7 @@ const badgeVariants = cva(
       { solid: true, tone: 'warning', class: 'bg-warning-600 text-white border-transparent' },
       { solid: true, tone: 'danger', class: 'bg-danger-600 text-white border-transparent' },
       { solid: true, tone: 'accent', class: 'bg-accent text-on-inverse border-transparent' },
-      { solid: true, tone: 'brass', class: 'bg-brass-500 text-white border-transparent' },
+      { solid: true, tone: 'brass', class: 'bg-brass-600 text-white border-transparent' },
     ],
     defaultVariants: { tone: 'neutral', size: 'md', solid: false },
   },

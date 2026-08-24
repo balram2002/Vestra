@@ -187,7 +187,7 @@ export function generateCategories(now: Date): Category[] {
     metaDescription: node.description,
     createdAt: daysAgo(400, now),
     updatedAt: daysAgo(30, now),
-  })) as Category[];
+  }));
 }
 
 export function generateBrands(now: Date): Brand[] {
@@ -211,7 +211,7 @@ export function generateBrands(now: Date): Brand[] {
     metaDescription: seed.description.slice(0, 155),
     createdAt: daysAgo(500, now),
     updatedAt: daysAgo(20, now),
-  })) as Brand[];
+  }));
 }
 
 /* --------------------------------------------------------------- sellers */

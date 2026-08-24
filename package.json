@@ -20,7 +20,9 @@
     "smoke:rbac": "node scripts/smoke-rbac.mjs",
     "verify": "npm run typecheck && npm run lint && npm run build",
     "smoke:admin": "node scripts/smoke-admin.mjs",
-    "restart": "powershell -NoProfile -File scripts/restart-server.ps1"
+    "restart": "powershell -NoProfile -File scripts/restart-server.ps1",
+    "audit:a11y": "node scripts/audit-a11y.mjs",
+    "audit:contrast": "node scripts/check-contrast.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
@@ -59,6 +61,7 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@eslint/eslintrc": "^3.3.1",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4.1.14",
@@ -70,6 +73,7 @@
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.1",
     "@vitejs/plugin-react": "^5.0.4",
+    "axe-core": "^4.13.0",
     "eslint": "^9.37.0",
     "eslint-config-next": "16.3.2",
     "jsdom": "^27.0.0",
