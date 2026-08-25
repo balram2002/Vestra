@@ -119,6 +119,23 @@ it is how the order page and the tracking panel end up telling two stories.
   a pure function of the number — no server-side map, correct after a restart.
   If you change that layout, `decodeAwb` and the seeder both move with it.
 
+## Exchanges
+
+**An exchange is a variant swap, not a return plus a re-order.** The order item
+stays; only the variant it will be fulfilled with changes. That is what keeps
+the customer's original price, coupon share and tax snapshot intact.
+
+- **The replacement is reserved at request time and released the moment the
+  exchange dies.** Every exit path — reject, quality-check failure — must call
+  `inventory.release`, or that unit stays invisible to shoppers forever.
+- **Only equal-priced variants.** A different price means collecting or
+  refunding money mid-flow; the customer is told to return and re-order.
+- **Nothing ships before the quality check passes.** Otherwise a customer can
+  hold both items.
+- **Reverse legs read a different vocabulary.** On a RETURN shipment
+  "delivered" means it reached the SELLER. `applyEvent` branches on
+  `shipment.direction`; do not add a fourth direction without extending it.
+
 ## Conventions
 
 - **Money is always integer paise.** Never store, sum or transport float

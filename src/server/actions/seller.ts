@@ -10,6 +10,11 @@ import { requireSeller } from '../auth/session';
 import { collections, toEntities, toEntity } from '../db/collections';
 import * as inventory from '../repositories/inventory';
 import { transitionItem } from '../services/orders';
+import {
+  approveExchange,
+  completeExchangeQualityCheck,
+  rejectExchange,
+} from '../services/exchanges';
 import { approveReturn, rejectReturn, recordQualityCheck } from '../services/returns';
 import {
   cancelShipment,
@@ -348,6 +353,74 @@ export async function submitQualityCheck(input: {
   );
 
   revalidatePath('/seller/returns');
+  revalidatePath('/seller/inventory');
+  return outcome.ok ? { ok: true } : { ok: false, error: outcome.error };
+}
+
+/* --------------------------------------------------------------- exchanges */
+
+/**
+ * Approve or decline a size swap.
+ *
+ * Approving books the reverse pickup; it does NOT ship the replacement, which
+ * waits on the quality check. Declining releases the replacement unit that has
+ * been held since the customer asked, so it goes back on sale immediately.
+ */
+export async function decideExchange(input: {
+  exchangeId: string;
+  decision: 'APPROVE' | 'REJECT';
+  reason?: string;
+}): Promise<ActionResult> {
+  const user = await requireSeller();
+
+  const exchanges = await collections.exchanges();
+  const request = toEntity(
+    await exchanges.findOne({ _id: input.exchangeId, sellerId: user.sellerId }),
+  );
+  if (!request) return { ok: false, error: 'Exchange not found.' };
+
+  const result =
+    input.decision === 'APPROVE'
+      ? await approveExchange(request.id, 'SELLER')
+      : await rejectExchange(
+          request.id,
+          input.reason?.trim() || 'Did not meet our exchange policy.',
+          'SELLER',
+        );
+
+  revalidatePath('/seller/returns');
+  revalidatePath('/seller/shipments');
+  return result.ok ? { ok: true } : { ok: false, error: result.error };
+}
+
+/**
+ * Record the quality check on a returned item that is being exchanged.
+ *
+ * A pass restocks the returned unit and dispatches the replacement in one step,
+ * because from the seller's side those are the same physical action.
+ */
+export async function submitExchangeQualityCheck(input: {
+  exchangeId: string;
+  result: 'PASSED' | 'FAILED' | 'PARTIAL';
+  note?: string;
+}): Promise<ActionResult> {
+  const user = await requireSeller();
+
+  const exchanges = await collections.exchanges();
+  const request = toEntity(
+    await exchanges.findOne({ _id: input.exchangeId, sellerId: user.sellerId }),
+  );
+  if (!request) return { ok: false, error: 'Exchange not found.' };
+
+  const outcome = await completeExchangeQualityCheck(
+    request.id,
+    input.result,
+    input.note ?? null,
+    user.id,
+  );
+
+  revalidatePath('/seller/returns');
+  revalidatePath('/seller/shipments');
   revalidatePath('/seller/inventory');
   return outcome.ok ? { ok: true } : { ok: false, error: outcome.error };
 }

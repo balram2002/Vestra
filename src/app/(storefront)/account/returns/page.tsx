@@ -8,6 +8,7 @@ import { StatusBadge } from '@/components/ui/badge';
 import { FULFILLMENT_STATUS_META, RETURN_REASON_LABEL, REFUND_STATUS_META } from '@/domain/enums';
 import { formatDate, formatMoney } from '@/lib/format';
 import { requireUser } from '@/server/auth/session';
+import { listExchanges } from '@/server/services/exchanges';
 import { listRefunds, listReturns } from '@/server/services/returns';
 
 export const metadata: Metadata = {
@@ -29,16 +30,20 @@ export default function AccountReturnsPage() {
 
 async function Returns() {
   const user = await requireUser();
-  const [returns, refunds] = await Promise.all([listReturns(user.id), listRefunds(user.id)]);
+  const [returns, refunds, exchanges] = await Promise.all([
+    listReturns(user.id),
+    listRefunds(user.id),
+    listExchanges(user.id),
+  ]);
 
-  if (returns.length === 0 && refunds.length === 0) {
+  if (returns.length === 0 && refunds.length === 0 && exchanges.length === 0) {
     return (
       <div className="border-line mt-6 rounded-lg border border-dashed p-12 text-center">
         <RotateCcw className="text-faint mx-auto size-8" aria-hidden strokeWidth={1.5} />
-        <p className="text-ink mt-4 text-lg font-medium">No returns</p>
+        <p className="text-ink mt-4 text-lg font-medium">Nothing sent back</p>
         <p className="text-muted mx-auto mt-1.5 max-w-sm text-sm">
-          You have not sent anything back. You can raise a return from any delivered order inside
-          its return window.
+          No returns or exchanges yet. You can raise either from any delivered order while it is
+          still inside its window.
         </p>
         <Link
           href="/orders"
@@ -52,6 +57,54 @@ async function Returns() {
 
   return (
     <div className="mt-6 space-y-8">
+      {exchanges.length > 0 ? (
+        <section>
+          <h2 className="font-display text-ink text-lg">Exchanges</h2>
+
+          <ul className="mt-3 space-y-3">
+            {exchanges.map((request) => (
+              <li key={request.id} className="border-line rounded-lg border p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-ink tabular text-sm font-semibold">
+                      {request.exchangeNumber}
+                    </p>
+                    <p className="text-faint mt-0.5 text-xs">
+                      Order{' '}
+                      <Link href={`/orders/${request.orderId}`} className="hover:underline">
+                        {request.orderNumber}
+                      </Link>{' '}
+                      - raised {formatDate(request.requestedAt)}
+                    </p>
+                  </div>
+                  <StatusBadge meta={FULFILLMENT_STATUS_META[request.status]} size="sm" />
+                </div>
+
+                <div className="border-line mt-3 flex flex-wrap items-center gap-2 border-t pt-3 text-sm">
+                  <span className="border-line-strong text-muted rounded-sm border px-2 py-0.5 text-xs">
+                    {request.fromSize} · {request.fromColorLabel}
+                  </span>
+                  <span className="text-faint" aria-hidden>
+                    →
+                  </span>
+                  <span className="bg-ink text-canvas rounded-sm px-2 py-0.5 text-xs font-medium">
+                    {request.toSize} · {request.toColorLabel}
+                  </span>
+                </div>
+
+                {request.rejectionReason ? (
+                  <p className="text-danger-700 mt-2 text-sm">{request.rejectionReason}</p>
+                ) : (
+                  <p className="text-muted mt-2 text-sm">
+                    {FULFILLMENT_STATUS_META[request.status].description}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       {returns.length > 0 ? (
         <section>
           <h2 className="font-display text-ink text-lg">Returns</h2>

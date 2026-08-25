@@ -128,14 +128,27 @@ async function ShipmentQueueBadge() {
   return <QueueBadge count={count} />;
 }
 
+/**
+ * Returns and exchanges share a screen, so they share a count. An exchange
+ * waiting on a decision is holding reserved stock, which makes it at least as
+ * urgent as a return.
+ */
 async function ReturnQueueBadge() {
   const user = await requireSeller();
-  const returns = await collections.returns();
-  const count = await returns.countDocuments({
-    sellerId: user.sellerId,
-    status: 'RETURN_REQUESTED',
-  });
-  return <QueueBadge count={count} />;
+  const [returns, exchanges] = await Promise.all([
+    collections.returns(),
+    collections.exchanges(),
+  ]);
+
+  const [returnCount, exchangeCount] = await Promise.all([
+    returns.countDocuments({ sellerId: user.sellerId, status: 'RETURN_REQUESTED' }),
+    exchanges.countDocuments({
+      sellerId: user.sellerId,
+      status: { $in: ['EXCHANGE_REQUESTED', 'EXCHANGE_APPROVED'] },
+    }),
+  ]);
+
+  return <QueueBadge count={returnCount + exchangeCount} />;
 }
 
 async function WhoAmI() {

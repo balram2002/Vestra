@@ -1,5 +1,6 @@
 'use server';
 
+import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 
@@ -9,6 +10,7 @@ import { currentOwner, requireUser } from '../auth/session';
 import { gateway } from '../payments';
 import { collections, toEntity } from '../db/collections';
 import { cancelItems, placeOrder, settlePayment } from '../services/orders';
+import { requestExchange } from '../services/exchanges';
 import { requestReturn } from '../services/returns';
 
 /**
@@ -159,4 +161,44 @@ export async function submitReturn(input: {
 
   const result = await requestReturn(user.id, parsed.data);
   return result.ok ? { ok: true } : { ok: false, error: result.error };
+}
+
+/**
+ * Ask for a different size or colour instead of a refund.
+ *
+ * Only the ORDER and the ITEM come from the client; which variants are even
+ * offerable is decided server-side by `exchangeOptionsFor`, and re-checked
+ * inside `requestExchange`. A tampered `toVariantId` therefore cannot reach a
+ * variant of a different product, a different price, or one out of stock.
+ */
+export async function submitExchange(input: {
+  orderId: string;
+  orderItemId: string;
+  toVariantId: string;
+  quantity?: number;
+  reason: string;
+  note?: string;
+}): Promise<ActionResult> {
+  const user = await requireUser();
+
+  const schema = z.object({
+    orderId: z.string().min(1),
+    orderItemId: z.string().min(1),
+    toVariantId: z.string().min(1),
+    quantity: z.number().int().min(1).max(10).default(1),
+    reason: z.enum(RETURN_REASONS),
+    note: z.string().max(500).optional(),
+  });
+
+  const parsed = schema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? 'Check your selection.' };
+  }
+
+  const result = await requestExchange(user.id, parsed.data);
+  if (!result.ok) return { ok: false, error: result.error };
+
+  revalidatePath(`/orders/${parsed.data.orderId}`);
+  revalidatePath('/account/returns');
+  return { ok: true };
 }

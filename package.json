@@ -23,7 +23,8 @@
     "restart": "powershell -NoProfile -File scripts/restart-server.ps1",
     "audit:a11y": "node scripts/audit-a11y.mjs",
     "audit:contrast": "node scripts/check-contrast.mjs",
-    "smoke:shipping": "node scripts/smoke-shipping.mjs"
+    "smoke:shipping": "node scripts/smoke-shipping.mjs",
+    "smoke:exchange": "node scripts/smoke-exchange.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",

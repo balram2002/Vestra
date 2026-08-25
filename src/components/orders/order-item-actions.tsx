@@ -12,7 +12,7 @@ import {
   RETURN_REASON_LABEL,
   type FulfillmentStatus,
 } from '@/domain/enums';
-import { cancelOrderItems, submitReturn } from '@/server/actions/checkout';
+import { cancelOrderItems, submitExchange, submitReturn } from '@/server/actions/checkout';
 
 /**
  * Per-item cancel and return.
@@ -33,6 +33,7 @@ export function OrderItemActions({
   returnable,
   returnWindowOpen,
   productTitle,
+  exchangeOptions,
 }: {
   orderId: string;
   itemId: string;
@@ -46,14 +47,22 @@ export function OrderItemActions({
    */
   returnWindowOpen: boolean;
   productTitle: string;
+  /**
+   * Sizes this item can be swapped for, resolved on the SERVER: same product,
+   * same price, in stock. Empty when nothing qualifies, which is why the
+   * exchange option simply does not appear rather than appearing and failing.
+   */
+  exchangeOptions?: Array<{ variantId: string; size: string; colorLabel: string; available: number }>;
 }) {
-  const [open, setOpen] = useState<'cancel' | 'return' | null>(null);
+  const [open, setOpen] = useState<'cancel' | 'return' | 'exchange' | null>(null);
   const [reason, setReason] = useState('');
   const [note, setNote] = useState('');
+  const [toVariantId, setToVariantId] = useState('');
   const [pending, startTransition] = useTransition();
 
   const canCancel = isCustomerCancellable(status);
   const canReturn = status === 'DELIVERED' && returnable && returnWindowOpen;
+  const canExchange = canReturn && (exchangeOptions?.length ?? 0) > 0;
 
   if (!canCancel && !canReturn) return null;
 
@@ -63,26 +72,36 @@ export function OrderItemActions({
       return;
     }
 
+    if (open === 'exchange' && !toVariantId) {
+      toast.error('Choose the size you want instead');
+      return;
+    }
+
     startTransition(async () => {
       const result =
         open === 'cancel'
           ? await cancelOrderItems({ orderId, itemIds: [itemId], reason, note })
-          : await submitReturn({
-              orderId,
-              items: [{ orderItemId: itemId, quantity: 1 }],
-              reason,
-              note,
-            });
+          : open === 'exchange'
+            ? await submitExchange({ orderId, orderItemId: itemId, toVariantId, reason, note })
+            : await submitReturn({
+                orderId,
+                items: [{ orderItemId: itemId, quantity: 1 }],
+                reason,
+                note,
+              });
 
       if (result.ok) {
         toast.success(
           open === 'cancel'
             ? 'Item cancelled. Your refund is on its way.'
-            : 'Return requested. We will arrange a pickup.',
+            : open === 'exchange'
+              ? 'Exchange requested. We will collect this and send the new size.'
+              : 'Return requested. We will arrange a pickup.',
         );
         setOpen(null);
         setReason('');
         setNote('');
+        setToVariantId('');
       } else {
         toast.error(result.error ?? 'That did not work.');
       }
@@ -108,21 +127,58 @@ export function OrderItemActions({
             </button>
           ) : null}
 
+          {/*
+            Return and exchange are separate buttons, not one that asks later.
+            They are different decisions with different outcomes — money back
+            versus a different size — and a shopper who wants a bigger size
+            should not have to discover that inside a dialog labelled "Return".
+            Exchange only appears when a same-priced size is actually in stock.
+          */}
+          {canExchange ? (
+            <button
+              type="button"
+              onClick={() => setOpen('exchange')}
+              className="border-line-strong text-muted hover:border-ink hover:text-ink rounded-sm border px-3 py-1.5 text-xs transition-colors"
+            >
+              Exchange size
+            </button>
+          ) : null}
+
           {canReturn ? (
             <button
               type="button"
               onClick={() => setOpen('return')}
               className="border-line-strong text-muted hover:border-ink hover:text-ink rounded-sm border px-3 py-1.5 text-xs transition-colors"
             >
-              Return or exchange
+              Return item
             </button>
           ) : null}
         </div>
       ) : (
         <div className="border-line bg-sunken rounded-md border p-3">
           <p className="text-ink text-xs font-medium">
-            {open === 'cancel' ? 'Cancel' : 'Return'} “{productTitle}”
+            {open === 'cancel' ? 'Cancel' : open === 'exchange' ? 'Exchange' : 'Return'} “
+            {productTitle}”
           </p>
+
+          {open === 'exchange' ? (
+            <label className="mt-2.5 block">
+              <span className="text-muted text-2xs">Send me this instead</span>
+              <select
+                value={toVariantId}
+                onChange={(event) => setToVariantId(event.target.value)}
+                className="border-line-strong bg-raised text-ink mt-1 h-9 w-full rounded-sm border px-2 text-sm"
+              >
+                <option value="">Choose a size…</option>
+                {(exchangeOptions ?? []).map((option) => (
+                  <option key={option.variantId} value={option.variantId}>
+                    {option.size} · {option.colorLabel}
+                    {option.available <= 3 ? ` — only ${option.available} left` : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
 
           <label className="mt-2.5 block">
             <span className="sr-only">Reason</span>
@@ -159,9 +215,20 @@ export function OrderItemActions({
             </p>
           ) : null}
 
+          {open === 'exchange' ? (
+            <p className="text-faint mt-2 text-2xs">
+              We reserve your new size now, collect this one, and dispatch the replacement once it
+              passes our quality check. Same price, nothing more to pay.
+            </p>
+          ) : null}
+
           <div className="mt-3 flex gap-2">
             <Button size="sm" onClick={submit} loading={pending}>
-              {open === 'cancel' ? 'Cancel item' : 'Request return'}
+              {open === 'cancel'
+                ? 'Cancel item'
+                : open === 'exchange'
+                  ? 'Request exchange'
+                  : 'Request return'}
             </Button>
             <Button
               size="sm"
@@ -169,6 +236,7 @@ export function OrderItemActions({
               onClick={() => {
                 setOpen(null);
                 setReason('');
+                setToVariantId('');
               }}
               disabled={pending}
             >

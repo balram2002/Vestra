@@ -13,6 +13,7 @@ import { StatusBadge } from '@/components/ui/badge';
 import { FULFILLMENT_STATUS_META } from '@/domain/enums';
 import { formatDate, formatMoney } from '@/lib/format';
 import { requireUser } from '@/server/auth/session';
+import { exchangeOptionsFor } from '@/server/services/exchanges';
 import { getOrder } from '@/server/services/orders';
 
 export const metadata: Metadata = {
@@ -57,6 +58,26 @@ async function OrderDetail({
   if (!detail) notFound();
 
   const { order, sellerOrders, items, payment, shipments, returnWindowOpen } = detail;
+
+  /*
+   * Which sizes each delivered item could be swapped for.
+   *
+   * Resolved here, on the server, rather than fetched by the buttons: the
+   * picker must never offer a variant the request would then refuse, and doing
+   * it per-item on the client would mean one round trip per line. Only items
+   * that are actually exchangeable are looked up, so a fully shipped order
+   * costs nothing extra.
+   */
+  const exchangeable = items.filter(
+    (item) => item.status === 'DELIVERED' && item.exchangeable && (returnWindowOpen[item.id] ?? false),
+  );
+  const exchangeOptions = Object.fromEntries(
+    await Promise.all(
+      exchangeable.map(
+        async (item) => [item.id, await exchangeOptionsFor(item.id, user.id)] as const,
+      ),
+    ),
+  );
 
   return (
     <>
@@ -203,6 +224,7 @@ async function OrderDetail({
                           returnable={item.returnable}
                           returnWindowOpen={returnWindowOpen[item.id] ?? false}
                           productTitle={item.productTitle}
+                          exchangeOptions={exchangeOptions[item.id]}
                         />
                       </div>
                     </li>

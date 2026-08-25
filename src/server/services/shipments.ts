@@ -477,6 +477,331 @@ export async function getManifest(manifestId: string): Promise<Manifest | null> 
   return toEntity(await manifests.findOne({ _id: manifestId }));
 }
 
+/* ------------------------------------------------------- reverse logistics */
+
+export interface ReturnPickupInput {
+  orderId: string;
+  sellerOrderId: string;
+  sellerId: string;
+  items: Array<{ orderItemId: string; quantity: number }>;
+  pickupAddress: OrderAddress;
+  /** The return or exchange number, sent as the courier's client reference. */
+  reference: string;
+}
+
+/**
+ * Book a courier to collect from the CUSTOMER.
+ *
+ * The direction is reversed in every sense: the customer's address is the
+ * pickup and the seller's is the destination. Marked `RETURN` so the status
+ * mapper reads the courier's reverse vocabulary, where "delivered" means the
+ * parcel reached the seller rather than the shopper.
+ */
+export async function createReturnPickup(
+  input: ReturnPickupInput,
+): Promise<{ ok: boolean; error?: string; shipmentId?: string }> {
+  const orders = await collections.orders();
+  const order = toEntity(await orders.findOne({ _id: input.orderId }));
+  if (!order) return { ok: false, error: 'Order not found.' };
+
+  const locations = await collections.sellerLocations();
+  const dropoff = toEntity(
+    // Sellers can nominate a different address for returns than for dispatch.
+    (await locations.findOne({ sellerId: input.sellerId, isReturnAddress: true })) ??
+      (await locations.findOne({ sellerId: input.sellerId })),
+  );
+  if (!dropoff) return { ok: false, error: 'The seller has no return address configured.' };
+
+  const itemCol = await collections.orderItems();
+  const items = toEntities(
+    await itemCol.find({ _id: { $in: input.items.map((i) => i.orderItemId) } }).toArray(),
+  );
+  if (items.length === 0) return { ok: false, error: 'Nothing to collect.' };
+
+  const shipmentNumber = await nextShipmentNumber();
+  const iso = new Date().toISOString();
+  const provider = shipping();
+
+  const weightGrams = input.items.reduce((sum, line) => sum + 220 * line.quantity, 0);
+  const declaredValue = items.reduce((sum, item) => sum + item.lineTotal, 0);
+
+  let providerShipmentId: string | null = null;
+  let awb: string | null = null;
+
+  try {
+    const created = await provider.createReturnShipment({
+      shipmentNumber,
+      orderNumber: order.orderNumber,
+      sellerOrderNumber: input.reference,
+      paymentMode: 'PREPAID',
+      codAmount: 0,
+      declaredValue,
+      weightGrams,
+      dimensionsCm: { length: 30, width: 24, height: 10 },
+      // Reversed on purpose.
+      pickup: {
+        name: input.pickupAddress.fullName,
+        phone: input.pickupAddress.phone,
+        email: null,
+        line1: input.pickupAddress.line1,
+        line2: input.pickupAddress.line2,
+        city: input.pickupAddress.city,
+        state: input.pickupAddress.state,
+        pincode: input.pickupAddress.pincode,
+        country: input.pickupAddress.country,
+      },
+      delivery: {
+        name: dropoff.contactName,
+        phone: dropoff.phone,
+        email: null,
+        line1: dropoff.line1,
+        line2: dropoff.line2,
+        city: dropoff.city,
+        state: dropoff.state,
+        pincode: dropoff.pincode,
+        country: dropoff.country,
+      },
+      items: items.map((item) => ({
+        orderItemId: item.id,
+        sku: item.sku,
+        name: item.productTitle,
+        quantity: input.items.find((i) => i.orderItemId === item.id)?.quantity ?? 1,
+        unitPrice: item.unitSellingPrice,
+        discount: 0,
+        lineTotal: item.lineTotal,
+        taxRatePercent: item.taxRatePercent,
+        hsnCode: item.hsnCode,
+        weightGrams: 220,
+      })),
+      expectedShipDate: null,
+      promiseDeliveryDate: null,
+    });
+    providerShipmentId = created.providerShipmentId;
+    awb = created.awb;
+  } catch (error) {
+    if (!(error instanceof ShippingProviderError)) throw error;
+    console.error('[vestra:shipping] reverse pickup failed', error);
+  }
+
+  const shipment: Shipment = {
+    id: entityId('shp'),
+    shipmentNumber,
+    orderId: order.id,
+    orderNumber: order.orderNumber,
+    sellerOrderId: input.sellerOrderId,
+    sellerId: input.sellerId,
+    items: input.items,
+    status: 'CREATED',
+    direction: 'RETURN',
+    provider: provider.name,
+    providerShipmentId,
+    awb,
+    carrier: null,
+    carrierServiceType: null,
+    trackingUrl: awb ? `/track/${awb}` : null,
+    labelUrl: null,
+    manifestId: null,
+    invoiceId: null,
+    pickupLocationId: dropoff.id,
+    pickupScheduledAt: null,
+    pickedUpAt: null,
+    // On a reverse leg this is where the parcel is GOING, i.e. the seller.
+    deliveryAddress: {
+      id: dropoff.id,
+      label: 'OTHER',
+      fullName: dropoff.contactName,
+      phone: dropoff.phone,
+      alternatePhone: null,
+      line1: dropoff.line1,
+      line2: dropoff.line2,
+      landmark: null,
+      city: dropoff.city,
+      state: dropoff.state,
+      pincode: dropoff.pincode,
+      country: dropoff.country,
+    },
+    estimatedDeliveryFrom: null,
+    estimatedDeliveryTo: null,
+    deliveredAt: null,
+    deliveryAttempts: 0,
+    failureReason: providerShipmentId ? null : 'Courier unreachable; pickup will be retried.',
+    weightGrams,
+    dimensionsCm: { length: 30, width: 24, height: 10 },
+    declaredValue,
+    codAmount: 0,
+    events: [
+      {
+        id: entityId('shev'),
+        shipmentId: '',
+        status: 'CREATED',
+        title: 'Pickup requested',
+        description: 'A courier will collect the item from your address.',
+        location: input.pickupAddress.city,
+        providerStatusCode: null,
+        occurredAt: iso,
+      },
+    ],
+    createdAt: iso,
+    updatedAt: iso,
+  };
+  shipment.events[0].shipmentId = shipment.id;
+
+  const shipments = await collections.shipments();
+  await shipments.insertOne({ _id: shipment.id, ...shipment });
+
+  return { ok: providerShipmentId !== null, shipmentId: shipment.id };
+}
+
+export interface ReplacementShipmentInput {
+  exchangeId: string;
+  orderId: string;
+  sellerOrderId: string;
+  sellerId: string;
+  orderItemId: string;
+  variantId: string;
+  quantity: number;
+  reference: string;
+}
+
+/**
+ * Send the replacement out on an exchange.
+ *
+ * A forward parcel like any other, except it carries a different variant from
+ * the one the order item records — so the label and the packing list are built
+ * from the REPLACEMENT variant, not the original line.
+ */
+export async function createReplacementShipment(
+  input: ReplacementShipmentInput,
+): Promise<{ ok: boolean; error?: string; shipmentId?: string }> {
+  const orders = await collections.orders();
+  const order = toEntity(await orders.findOne({ _id: input.orderId }));
+  if (!order) return { ok: false, error: 'Order not found.' };
+
+  const itemCol = await collections.orderItems();
+  const item = toEntity(await itemCol.findOne({ _id: input.orderItemId }));
+  if (!item) return { ok: false, error: 'Order item not found.' };
+
+  const products = await collections.products();
+  const product = toEntity(await products.findOne({ 'variants.id': input.variantId }));
+  const variant = product?.variants.find((v) => v.id === input.variantId);
+  if (!variant) return { ok: false, error: 'The replacement variant no longer exists.' };
+
+  const locations = await collections.sellerLocations();
+  const pickup = toEntity(
+    await locations.findOne({ sellerId: input.sellerId, isPickupEnabled: true }),
+  );
+  if (!pickup) return { ok: false, error: 'The seller has no pickup address configured.' };
+
+  const shipmentNumber = await nextShipmentNumber();
+  const iso = new Date().toISOString();
+  const provider = shipping();
+
+  let providerShipmentId: string | null = null;
+  try {
+    const created = await provider.createShipment({
+      shipmentNumber,
+      orderNumber: order.orderNumber,
+      sellerOrderNumber: input.reference,
+      // A replacement is never collected on: the original order already paid.
+      paymentMode: 'PREPAID',
+      codAmount: 0,
+      declaredValue: item.unitSellingPrice * input.quantity,
+      weightGrams: 220 * input.quantity,
+      dimensionsCm: { length: 30, width: 24, height: 10 },
+      pickup: {
+        name: pickup.contactName,
+        phone: pickup.phone,
+        email: null,
+        line1: pickup.line1,
+        line2: pickup.line2,
+        city: pickup.city,
+        state: pickup.state,
+        pincode: pickup.pincode,
+        country: pickup.country,
+      },
+      delivery: toContact(order.shippingAddress),
+      items: [
+        {
+          orderItemId: item.id,
+          sku: variant.sku,
+          name: `${item.productTitle} (${variant.size})`,
+          quantity: input.quantity,
+          unitPrice: item.unitSellingPrice,
+          discount: 0,
+          lineTotal: item.unitSellingPrice * input.quantity,
+          taxRatePercent: item.taxRatePercent,
+          hsnCode: item.hsnCode,
+          weightGrams: 220,
+        },
+      ],
+      expectedShipDate: iso,
+      promiseDeliveryDate: null,
+    });
+    providerShipmentId = created.providerShipmentId;
+  } catch (error) {
+    if (!(error instanceof ShippingProviderError)) throw error;
+    return { ok: false, error: 'The courier is not reachable right now. Try again shortly.' };
+  }
+
+  const shipment: Shipment = {
+    id: entityId('shp'),
+    shipmentNumber,
+    orderId: order.id,
+    orderNumber: order.orderNumber,
+    sellerOrderId: input.sellerOrderId,
+    sellerId: input.sellerId,
+    items: [{ orderItemId: input.orderItemId, quantity: input.quantity }],
+    status: 'CREATED',
+    direction: 'EXCHANGE_FORWARD',
+    provider: provider.name,
+    providerShipmentId,
+    awb: null,
+    carrier: null,
+    carrierServiceType: null,
+    trackingUrl: null,
+    labelUrl: null,
+    manifestId: null,
+    invoiceId: null,
+    pickupLocationId: pickup.id,
+    pickupScheduledAt: null,
+    pickedUpAt: null,
+    deliveryAddress: order.shippingAddress,
+    estimatedDeliveryFrom: null,
+    estimatedDeliveryTo: null,
+    deliveredAt: null,
+    deliveryAttempts: 0,
+    failureReason: null,
+    weightGrams: 220 * input.quantity,
+    dimensionsCm: { length: 30, width: 24, height: 10 },
+    declaredValue: item.unitSellingPrice * input.quantity,
+    codAmount: 0,
+    events: [
+      {
+        id: entityId('shev'),
+        shipmentId: '',
+        status: 'CREATED',
+        title: 'Replacement packed',
+        description: `Size ${variant.size} is being dispatched.`,
+        location: pickup.city,
+        providerStatusCode: null,
+        occurredAt: iso,
+      },
+    ],
+    createdAt: iso,
+    updatedAt: iso,
+  };
+  shipment.events[0].shipmentId = shipment.id;
+
+  const shipments = await collections.shipments();
+  await shipments.insertOne({ _id: shipment.id, ...shipment });
+
+  // Generate the label immediately: the seller already has the parcel in hand,
+  // and an exchange replacement should not wait in the "needs label" queue.
+  await generateLabel(shipment.id);
+
+  return { ok: true, shipmentId: shipment.id };
+}
+
 /* -------------------------------------------------------------- tracking */
 
 /**
@@ -520,22 +845,92 @@ export async function applyEvent(
 
   await shipments.updateOne({ _id: shipment.id }, update);
 
-  // Carry the parcel's state onto the lines it contains. `allowForwardSkip` is
-  // set because a courier scan is an OBSERVATION, not a decision: if they never
-  // scanned the parcel in transit, the item must still follow it out for
-  // delivery rather than stall a step behind.
-  const fulfillment = SHIPMENT_TO_FULFILLMENT[event.status];
-  if (fulfillment) {
-    for (const line of shipment.items) {
-      await transitionItem(line.orderItemId, fulfillment, 'COURIER', event.title, {
-        allowForwardSkip: true,
+  /*
+   * What a scan MEANS depends on which way the parcel is travelling, and this
+   * is the one place that difference is resolved.
+   *
+   * On a FORWARD leg, the parcel's state is the item's state. On a RETURN leg
+   * it is not: "delivered" means the parcel reached the SELLER, and mapping
+   * that onto the order item would tell the customer their refund shipment was
+   * delivered to them. An EXCHANGE_FORWARD leg carries a replacement, so its
+   * delivery closes the exchange rather than the original line.
+   */
+  if (shipment.direction === 'FORWARD') {
+    // `allowForwardSkip` because a courier scan is an OBSERVATION, not a
+    // decision: if they never scanned the parcel in transit, the item must
+    // still follow it out for delivery rather than stall a step behind.
+    const fulfillment = SHIPMENT_TO_FULFILLMENT[event.status];
+    if (fulfillment) {
+      for (const line of shipment.items) {
+        await transitionItem(line.orderItemId, fulfillment, 'COURIER', event.title, {
+          allowForwardSkip: true,
+        });
+      }
+    }
+    await notifyCustomer(shipment, event);
+  } else if (shipment.direction === 'RETURN') {
+    await handleReverseArrival(shipment, event);
+  } else if (shipment.direction === 'EXCHANGE_FORWARD' && event.status === 'DELIVERED') {
+    const { completeExchange } = await import('./exchanges');
+    const exchanges = await collections.exchanges();
+    const linked = toEntity(await exchanges.findOne({ forwardShipmentId: shipment.id }));
+    if (linked) await completeExchange(linked.id);
+    await notifyCustomer(shipment, event);
+  }
+
+  return { applied: true };
+}
+
+/**
+ * A reverse parcel reaching the seller is not a delivery to anybody the
+ * customer cares about — it is the moment the quality check becomes possible.
+ * The seller is told; the customer is told only that we have it.
+ */
+async function handleReverseArrival(shipment: Shipment, event: TrackingEvent): Promise<void> {
+  if (event.status !== 'DELIVERED') return;
+
+  const iso = new Date().toISOString();
+
+  const returns = await collections.returns();
+  const request = toEntity(await returns.findOne({ shipmentId: shipment.id }));
+  if (request) {
+    await returns.updateOne(
+      { _id: request.id },
+      { $set: { receivedAt: event.occurredAt, updatedAt: iso } },
+    );
+  }
+
+  const sellers = await collections.sellers();
+  const seller = toEntity(await sellers.findOne({ _id: shipment.sellerId }));
+  if (seller) {
+    const users = await collections.users();
+    const owner = await users.findOne({ _id: seller.ownerUserId });
+    if (owner) {
+      notifyQuietly({
+        userId: owner._id,
+        category: 'RETURN',
+        title: `A returned parcel has arrived`,
+        body: `Order ${shipment.orderNumber} is back with you. Record the quality check to release the refund.`,
+        href: '/seller/returns',
+        entityType: 'shipment',
+        entityId: shipment.id,
       });
     }
   }
 
-  await notifyCustomer(shipment, event);
-
-  return { applied: true };
+  const orders = await collections.orders();
+  const order = toEntity(await orders.findOne({ _id: shipment.orderId }));
+  if (order?.userId) {
+    notifyQuietly({
+      userId: order.userId,
+      category: 'RETURN',
+      title: `We have received your return`,
+      body: 'The seller is checking the item. Your refund follows once it passes.',
+      href: `/orders/${order.id}`,
+      entityType: 'shipment',
+      entityId: shipment.id,
+    });
+  }
 }
 
 /**

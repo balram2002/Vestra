@@ -11,12 +11,13 @@ with a server running (`npm run restart && npm run start`):
 | `npm run smoke:rbac` | 6 identities against 19 routes |
 | `npm run smoke:admin` | admin writes, verified by their side effects in Mongo |
 | `npm run smoke:shipping` | courier webhook defences, labels, parcel ownership |
+| `npm run smoke:exchange` | a size swap end to end, asserted on stock movements |
 | `npm run audit:a11y` | axe-core, 12 routes × 2 widths |
 | `npm run audit:contrast` | WCAG ratios, parsed from `tokens.css` |
 
 Latest run: **build 266/266 routes · typecheck clean · lint clean · 34 unit tests
-· funnel 11/11 · RBAC 19/19 · admin writes 6/6 · fulfilment 25/25 · a11y 0 violations
-· contrast 3/3**
+· funnel 11/11 · RBAC 19/19 · admin writes 6/6 · fulfilment 25/25 · exchange 20/20
+· a11y 0 violations · contrast 3/3**
 
 ---
 
@@ -152,14 +153,43 @@ caller still cannot.
 
 ---
 
+## Phase 10 — Exchanges · **done**
+
+A size swap, which is the common case in fashion, and deliberately NOT modelled
+as a return followed by a new order — that shape loses the customer their
+price, their coupon and their place in the queue.
+
+- [x] `requestExchange` reserves the replacement AT REQUEST TIME. An exchange
+      promises a specific size; without the hold, the last M sells to somebody
+      else while the customer's parcel is still in the courier's van and the
+      exchange fails after they have already given their item back
+- [x] Price frozen from the original line. Only equal-priced variants qualify —
+      anything else would mean collecting money or refunding it mid-flow, which
+      is a return wearing an exchange costume, and the customer is told to do
+      exactly that instead
+- [x] The replacement ships only after the returned item passes quality check,
+      so nobody can hold both
+- [x] Rejection at any stage releases the held unit immediately
+- [x] Reverse pickup and replacement dispatch reuse the shipment layer:
+      `createReturnPickup` (direction RETURN, addressed to the seller) and
+      `createReplacementShipment` (EXCHANGE_FORWARD, labelled straight away)
+- [x] `applyEvent` now branches on direction — a "delivered" scan on a reverse
+      leg means the parcel reached the SELLER, and mapping it onto the order
+      item would have told the customer their return was delivered to them
+- [x] Customer: a separate "Exchange size" button with a server-resolved size
+      picker, so it can never offer a variant the request would refuse
+- [x] Seller: exchanges sit ABOVE returns in the queue, because an undecided
+      exchange is holding sellable stock out of the catalogue
+- [x] `/account/returns` covers both; the seller badge counts both
+
+---
+
 ## Not yet done
 
 Honest list of what the brief asks for that is not built.
 
 ### Functional gaps
 
-- [ ] **Exchanges.** Returns and refunds work end to end. Exchange requests have
-      types and states but no service or UI.
 - [ ] **Settlements and invoices.** Earnings are computed and the hold period is
       modelled, but no settlement run creates payouts and no GST invoice is
       generated.
