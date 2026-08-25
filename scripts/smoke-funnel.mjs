@@ -14,6 +14,7 @@
  */
 
 import { chromium } from '@playwright/test';
+import { MongoClient } from 'mongodb';
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:3000';
 const EMAIL = 'ananya.iyer@example.com';
@@ -27,6 +28,21 @@ function record(name, ok, detail = '') {
   if (!ok) failed = true;
   const mark = ok ? 'PASS' : 'FAIL';
   console.log(`  ${mark}  ${name}${detail ? ` — ${detail}` : ''}`);
+}
+
+/*
+ * Start from an empty bag.
+ *
+ * A run that fails part way leaves items behind, and the next run then
+ * inherits them — including any that have since sold out, which correctly
+ * blocks checkout and incorrectly looks like a broken funnel. Clearing first
+ * makes each run independent of the last.
+ */
+const mongo = await MongoClient.connect(process.env.MONGODB_URI ?? 'mongodb://127.0.0.1:27017');
+const db = mongo.db(process.env.MONGODB_DB ?? 'vestra');
+const shopper = await db.collection('users').findOne({ email: EMAIL });
+if (shopper) {
+  await db.collection('carts').deleteMany({ userId: shopper._id });
 }
 
 const browser = await chromium.launch();
@@ -149,6 +165,7 @@ try {
   record('run completed', false, error instanceof Error ? error.message : String(error));
 } finally {
   await browser.close();
+  await mongo.close();
 }
 
 console.log('');

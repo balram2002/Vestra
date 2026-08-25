@@ -1,3 +1,4 @@
+import { Plus } from 'lucide-react';
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -22,10 +23,21 @@ export default function SellerProductsPage({
 }) {
   return (
     <>
-      <h1 className="font-display text-ink text-xl">Products</h1>
-      <p className="text-muted mt-1 text-sm">
-        Every style you list, with the stock and price shoppers actually see.
-      </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-display text-ink text-xl">Products</h1>
+          <p className="text-muted mt-1 text-sm">
+            Every style you list, with the stock and price shoppers actually see.
+          </p>
+        </div>
+        <Link
+          href="/seller/products/new"
+          className="bg-ink text-canvas inline-flex shrink-0 items-center gap-1.5 rounded-md px-3.5 py-2 text-xs font-medium"
+        >
+          <Plus className="size-3.5" aria-hidden />
+          New listing
+        </Link>
+      </div>
 
       <Suspense fallback={<div className="skeleton mt-6 h-96 rounded-lg" aria-hidden />}>
         <ProductTable searchParams={searchParams} />
@@ -64,8 +76,13 @@ async function ProductTable({
             ) : null}
           </div>
           <div className="min-w-0">
+            {/*
+              Links to the EDITOR, not the storefront. A seller clicking a row
+              in their own console wants to change the listing; the public page
+              is one click further on, from the editor itself.
+            */}
             <Link
-              href={`/product/${product.slug}`}
+              href={`/seller/products/${product.id}`}
               className="text-ink block truncate text-xs font-medium hover:underline"
             >
               {product.title}

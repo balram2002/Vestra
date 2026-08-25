@@ -12,12 +12,13 @@ with a server running (`npm run restart && npm run start`):
 | `npm run smoke:admin` | admin writes, verified by their side effects in Mongo |
 | `npm run smoke:shipping` | courier webhook defences, labels, parcel ownership |
 | `npm run smoke:exchange` | a size swap end to end, asserted on stock movements |
+| `npm run smoke:listing` | a seller authoring a listing from empty form to sizes |
 | `npm run audit:a11y` | axe-core, 12 routes × 2 widths |
 | `npm run audit:contrast` | WCAG ratios, parsed from `tokens.css` |
 
-Latest run: **build 269/269 routes · typecheck clean · lint clean · 44 unit tests
+Latest run: **build 271/271 routes · typecheck clean · lint clean · 44 unit tests
 · funnel 11/11 · RBAC 19/19 · admin writes 6/6 · fulfilment 25/25 · exchange 20/20
-· a11y 0 violations · contrast 3/3**
+· listing 20/20 · a11y 0 violations · contrast 3/3**
 
 ---
 
@@ -222,6 +223,44 @@ reporting a bug in an action that worked.
 
 ---
 
+## Phase 12 — Seller listing authoring · **done**
+
+The catalogue was read-only in the seller console. Sellers could see their
+products and change stock; they could not create one.
+
+- [x] Draft-first: saving is always possible, completeness is checked at
+      SUBMIT. A form that refuses to save until it is perfect loses work
+- [x] Blockers shown inline BEFORE submitting, phrased as the thing to do
+      ("Add at least one photo"), not the field that is empty
+- [x] Attributes derived from the chosen category, so picking Kurtas asks
+      about sleeve and neck and picking Sneakers does not — from the same
+      vocabulary the storefront filters on
+- [x] Size/colour matrix with a generator, because typing 24 rows by hand is
+      how sellers end up listing one row called "Free size". Rupees in the
+      form, integer paise in the database, converted at that boundary
+- [x] Variants are never deleted — a dropped row is deactivated, because live
+      carts and historical order items point at it forever
+- [x] Real uploads behind a swappable `MediaStore`: bytes are checked against
+      known magic numbers rather than trusting the declared type, dimensions
+      are read from the header so grids can reserve space, and ids are
+      content-addressed so the same photo twice is stored once
+- [x] Editing a LIVE listing sends it back for review only when something
+      material changed (title, brand, category). Copy fixes do not, or sellers
+      stop fixing typos
+- [x] Renaming preserves the old slug in `slugHistory`, so inbound links live
+- [x] Duplicate for a new colourway; take down and put back up without losing
+      reviews; archive
+
+**Three test defects this surfaced**, all in the tests rather than the app:
+`smoke:admin` asserted against fixed sleeps that had grown too short;
+`smoke:funnel` inherited a bag from the previous run, so a sold-out leftover
+correctly blocked checkout and looked like a broken funnel; and the new
+authoring test indexed into every number input on the page, putting an MRP into
+the return-window field. All three now wait for outcomes and target elements by
+accessible name.
+
+---
+
 ## Not yet done
 
 Honest list of what the brief asks for that is not built.
@@ -235,8 +274,6 @@ Honest list of what the brief asks for that is not built.
       view is read-only.
 - [ ] **Seller onboarding and KYC submission flow.** Sellers are seeded as
       approved; there is no application journey.
-- [ ] **Product create/edit for sellers.** The catalogue is read-only in the
-      console — no listing form, no media upload, no approval submission.
 - [ ] **Manual refunds from the console.** Approvals, suspensions and toggles
       are done; issuing a refund by hand is not.
 - [ ] **Promotions engine.** Coupons work. Promotions (flash sales, bank offers,

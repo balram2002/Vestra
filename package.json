@@ -24,7 +24,8 @@
     "audit:a11y": "node scripts/audit-a11y.mjs",
     "audit:contrast": "node scripts/check-contrast.mjs",
     "smoke:shipping": "node scripts/smoke-shipping.mjs",
-    "smoke:exchange": "node scripts/smoke-exchange.mjs"
+    "smoke:exchange": "node scripts/smoke-exchange.mjs",
+    "smoke:listing": "node scripts/smoke-listing.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
