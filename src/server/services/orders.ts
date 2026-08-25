@@ -3,6 +3,7 @@ import 'server-only';
 import { FINANCE, ORDERS, PRICING, SHIPPING } from '@/config/business';
 import {
   canTransition,
+  FORWARD_FLOW,
   FULFILLMENT_STATUS_META,
   isCustomerCancellable,
   type CancellationReason,
@@ -16,6 +17,7 @@ import type {
   Payment,
   PaymentMethod,
   SellerOrder,
+  Shipment,
   TaxLine,
 } from '@/domain/types';
 import { entityId } from '@/lib/ids';
@@ -756,6 +758,11 @@ export interface OrderDetail {
   items: OrderItem[];
   payment: Payment | null;
   /**
+   * Parcels, keyed by seller order id. A seller may split one order across
+   * several boxes, so this is a list per seller order rather than one shipment.
+   */
+  shipments: Record<string, Shipment[]>;
+  /**
    * Whether each item is still inside its return window, keyed by item id.
    *
    * Derived HERE rather than in the component: reading the clock during render
@@ -772,17 +779,24 @@ export async function getOrder(orderId: string, userId: string): Promise<OrderDe
   const order = toEntity(await orders.findOne({ _id: orderId, userId }));
   if (!order) return null;
 
-  const [sellerOrderCol, itemCol, paymentCol] = await Promise.all([
+  const [sellerOrderCol, itemCol, paymentCol, shipmentCol] = await Promise.all([
     collections.sellerOrders(),
     collections.orderItems(),
     collections.payments(),
+    collections.shipments(),
   ]);
 
-  const [sellerOrders, items, payment] = await Promise.all([
+  const [sellerOrders, items, payment, shipmentDocs] = await Promise.all([
     sellerOrderCol.find({ orderId }).toArray(),
     itemCol.find({ orderId }).toArray(),
     order.paymentId ? paymentCol.findOne({ _id: order.paymentId }) : Promise.resolve(null),
+    shipmentCol.find({ orderId }).sort({ createdAt: 1 }).toArray(),
   ]);
+
+  const shipments: Record<string, Shipment[]> = {};
+  for (const shipment of toEntities(shipmentDocs)) {
+    (shipments[shipment.sellerOrderId] ??= []).push(shipment);
+  }
 
   const itemEntities = toEntities(items);
   const now = Date.now();
@@ -797,6 +811,7 @@ export async function getOrder(orderId: string, userId: string): Promise<OrderDe
     sellerOrders: toEntities(sellerOrders),
     items: itemEntities,
     payment: toEntity(payment),
+    shipments,
     returnWindowOpen,
   };
 }
@@ -956,12 +971,30 @@ export async function transitionItem(
   to: FulfillmentStatus,
   actor: OrderEvent['actor'],
   note?: string,
+  options: { allowForwardSkip?: boolean } = {},
 ): Promise<{ ok: boolean; error?: string }> {
   const items = await collections.orderItems();
   const item = toEntity(await items.findOne({ _id: itemId }));
   if (!item) return { ok: false, error: 'Item not found.' };
 
-  if (!canTransition(item.status, to)) {
+  /*
+   * Couriers skip scans. A same-city parcel routinely goes from "picked up"
+   * straight to "out for delivery" with no in-transit scan between them, and a
+   * strict adjacency check would reject that — leaving the item stuck on
+   * SHIPPED while the parcel it is inside says out for delivery. The customer
+   * then sees the order page and the tracking panel disagree.
+   *
+   * So a COURIER-sourced move is allowed to jump ahead along the forward path,
+   * but never to move backwards and never to leave it. Every other caller —
+   * seller, admin, customer — still goes through the strict adjacency rule,
+   * because those are decisions rather than observations.
+   */
+  const forwardSkip =
+    options.allowForwardSkip &&
+    FORWARD_FLOW.indexOf(item.status) !== -1 &&
+    FORWARD_FLOW.indexOf(to) > FORWARD_FLOW.indexOf(item.status);
+
+  if (!forwardSkip && !canTransition(item.status, to)) {
     return {
       ok: false,
       error: `Cannot move from ${FULFILLMENT_STATUS_META[item.status].label} to ${FULFILLMENT_STATUS_META[to].label}.`,

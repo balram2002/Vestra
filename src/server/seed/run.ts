@@ -22,6 +22,7 @@ import {
 } from './generate';
 import { generateEngagement } from './engagement';
 import { generateOrders } from './orders';
+import { generateShipments } from './shipments';
 import { generateCmsPages } from './pages';
 
 /**
@@ -146,6 +147,26 @@ export async function seedDatabase(
     now,
     count: 1400,
   });
+
+  log('Generating parcels and manifests...');
+  const fulfilment = generateShipments({
+    orders: history.orders,
+    sellerOrders: history.sellerOrders,
+    items: history.items,
+    locations,
+    now,
+  });
+
+  // Stamp each item with the parcel that carried it, so the order page can join
+  // the two without a second lookup.
+  for (const item of history.items) {
+    const shipmentId = fulfilment.itemShipmentIds[item.id];
+    if (shipmentId) item.shipmentId = shipmentId;
+  }
+  for (const sellerOrder of history.sellerOrders) {
+    const own = fulfilment.shipments.filter((s) => s.sellerOrderId === sellerOrder.id);
+    if (own.length > 0) sellerOrder.shipmentIds = own.map((s) => s.id);
+  }
 
   log('Generating notifications and support tickets...');
   const engagement = generateEngagement({
@@ -275,6 +296,8 @@ export async function seedDatabase(
   counts.sellerOrders = await insert(COLLECTIONS.sellerOrders, history.sellerOrders);
   counts.orderItems = await insert(COLLECTIONS.orderItems, history.items);
   counts.payments = await insert(COLLECTIONS.payments, history.payments);
+  counts.shipments = await insert(COLLECTIONS.shipments, fulfilment.shipments);
+  counts.manifests = await insert(COLLECTIONS.manifests, fulfilment.manifests);
   counts.notifications = await insert(COLLECTIONS.notifications, engagement.notifications);
   counts.supportTickets = await insert(COLLECTIONS.supportTickets, engagement.tickets);
   counts.homeSections = await insert(COLLECTIONS.homeSections, homeSections);

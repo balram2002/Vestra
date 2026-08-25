@@ -7,6 +7,7 @@ import { Suspense } from 'react';
 
 import { Breadcrumbs } from '@/components/commerce/breadcrumbs';
 import { OrderStatusTimeline } from '@/components/commerce/order-status-timeline';
+import { ShipmentTracker } from '@/components/commerce/shipment-tracker';
 import { OrderItemActions } from '@/components/orders/order-item-actions';
 import { StatusBadge } from '@/components/ui/badge';
 import { FULFILLMENT_STATUS_META } from '@/domain/enums';
@@ -55,7 +56,7 @@ async function OrderDetail({
   const detail = await getOrder(id, user.id);
   if (!detail) notFound();
 
-  const { order, sellerOrders, items, payment, returnWindowOpen } = detail;
+  const { order, sellerOrders, items, payment, shipments, returnWindowOpen } = detail;
 
   return (
     <>
@@ -136,6 +137,17 @@ async function OrderDetail({
                     events={own.flatMap((item) => item.timeline)}
                   />
                 </div>
+
+                {/*
+                  Courier tracking, once there is a parcel to track. Kept
+                  distinct from the order timeline above: that one is about the
+                  seller's commitments, this one is about where the box is.
+                */}
+                {(shipments[sellerOrder.id] ?? []).map((shipment) => (
+                  <div key={shipment.id} className="border-line border-t px-5 py-5">
+                    <ShipmentTracker shipment={shipment} />
+                  </div>
+                ))}
 
                 <ul className="border-line border-t px-5">
                   {own.map((item) => (

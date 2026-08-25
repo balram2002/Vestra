@@ -130,3 +130,25 @@ export async function nextTicketNumber(at: Date = new Date()): Promise<string> {
   const value = await nextSequence(`ticket:${fy}`);
   return `HD${fy}${pad(value, 6)}`;
 }
+
+/**
+ * Our own shipment reference, distinct from the courier's AWB.
+ *
+ * The two are deliberately separate: an AWB belongs to whichever courier was
+ * assigned and changes if a parcel is re-booked after a failed pickup, while
+ * this number identifies the parcel to us for its whole life. It is also what
+ * we send as the provider's client reference, so it is the join key on every
+ * inbound tracking webhook.
+ */
+export async function nextShipmentNumber(at: Date = new Date()): Promise<string> {
+  const fy = financialYear(at);
+  const value = await nextSequence(`shipment:${fy}`);
+  return `SH${fy}${pad(value, 7)}`;
+}
+
+/** One manifest per seller pickup run. */
+export async function nextManifestNumber(at: Date = new Date()): Promise<string> {
+  const fy = financialYear(at);
+  const value = await nextSequence(`manifest:${fy}`);
+  return `MF${fy}${pad(value, 6)}`;
+}

@@ -50,6 +50,15 @@ export default function SellerLayout({ children }: { children: React.ReactNode }
               ),
             },
             {
+              href: '/seller/shipments',
+              label: 'Shipments',
+              badge: (
+                <Suspense fallback={null}>
+                  <ShipmentQueueBadge />
+                </Suspense>
+              ),
+            },
+            {
               href: '/seller/returns',
               label: 'Returns',
               badge: (
@@ -100,6 +109,21 @@ async function OrderQueueBadge() {
   const count = await sellerOrders.countDocuments({
     sellerId: user.sellerId,
     status: { $in: SELLER_ACTIONABLE },
+  });
+  return <QueueBadge count={count} />;
+}
+
+/**
+ * Parcels still sitting with the seller: booked but unlabelled, or labelled but
+ * never handed over. Anything already with the courier is not the seller's
+ * problem and would only inflate the number.
+ */
+async function ShipmentQueueBadge() {
+  const user = await requireSeller();
+  const shipments = await collections.shipments();
+  const count = await shipments.countDocuments({
+    sellerId: user.sellerId,
+    status: { $in: ['CREATED', 'LABEL_GENERATED', 'PICKUP_SCHEDULED'] },
   });
   return <QueueBadge count={count} />;
 }

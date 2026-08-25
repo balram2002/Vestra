@@ -3,7 +3,7 @@
 import { Menu, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 
 import { cn } from '@/lib/cn';
 
@@ -37,6 +37,84 @@ export interface ConsoleNavGroup {
   items: ConsoleNavItem[];
 }
 
+interface NavProps {
+  groups: ConsoleNavGroup[];
+  homeHref: string;
+  onNavigate: () => void;
+}
+
+/**
+ * The nav, rendered without knowing where we are.
+ *
+ * `pathname` is null while the URL is still unknown, which is the case during
+ * prerender of a dynamic route such as `/seller/shipments/[id]`. Every link is
+ * present and clickable in that state — only the highlight is missing.
+ */
+function NavGroups({
+  groups,
+  homeHref,
+  onNavigate,
+  pathname,
+}: NavProps & { pathname: string | null }) {
+  return (
+    <>
+      {groups.map((group) => (
+        <div key={group.label} className="mb-5">
+          <p className="text-faint px-2.5 pb-1.5 text-2xs font-medium uppercase tracking-[0.14em]">
+            {group.label}
+          </p>
+
+          <ul className="space-y-0.5">
+            {group.items.map((item) => {
+              // Exact match for the index route, prefix match for the rest,
+              // so /seller does not stay highlighted on /seller/orders.
+              const active =
+                pathname === null
+                  ? false
+                  : item.href === homeHref
+                    ? pathname === item.href
+                    : pathname === item.href || pathname.startsWith(`${item.href}/`);
+
+              return (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    onClick={onNavigate}
+                    aria-current={active ? 'page' : undefined}
+                    className={cn(
+                      'flex items-center justify-between gap-2 rounded-md px-2.5 py-2 text-sm transition-colors',
+                      active
+                        ? 'bg-ink text-canvas font-medium'
+                        : 'text-muted hover:bg-sunken hover:text-ink',
+                    )}
+                  >
+                    <span className="truncate">{item.label}</span>
+                    {item.badge ? <span className="shrink-0">{item.badge}</span> : null}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
+    </>
+  );
+}
+
+/**
+ * The same nav, once the URL is known.
+ *
+ * `usePathname` is URL data, which under Cache Components cannot be read
+ * outside a Suspense boundary on a route whose path is not known at build
+ * time. Isolating the hook here — rather than calling it in `ConsoleShell` —
+ * means the boundary contains only the highlight, so the console still
+ * prerenders its shell on dynamic routes instead of blocking on the request.
+ */
+function ActiveNavGroups(props: NavProps) {
+  const pathname = usePathname();
+  return <NavGroups {...props} pathname={pathname} />;
+}
+
 export function ConsoleShell({
   groups,
   title,
@@ -53,8 +131,9 @@ export function ConsoleShell({
   accessory?: React.ReactNode;
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const close = () => setOpen(false);
+  const navProps: NavProps = { groups, homeHref, onNavigate: close };
 
   return (
     <div className="bg-canvas min-h-dvh lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]">
@@ -80,7 +159,7 @@ export function ConsoleShell({
 
           <button
             type="button"
-            onClick={() => setOpen(false)}
+            onClick={close}
             className="text-muted hover:text-ink lg:hidden"
             aria-label="Close navigation"
           >
@@ -89,43 +168,9 @@ export function ConsoleShell({
         </div>
 
         <nav className="flex-1 overflow-y-auto px-2.5 py-4" aria-label="Console">
-          {groups.map((group) => (
-            <div key={group.label} className="mb-5">
-              <p className="text-faint px-2.5 pb-1.5 text-2xs font-medium uppercase tracking-[0.14em]">
-                {group.label}
-              </p>
-
-              <ul className="space-y-0.5">
-                {group.items.map((item) => {
-                  // Exact match for the index route, prefix match for the rest,
-                  // so /seller does not stay highlighted on /seller/orders.
-                  const active =
-                    item.href === homeHref
-                      ? pathname === item.href
-                      : pathname === item.href || pathname.startsWith(`${item.href}/`);
-
-                  return (
-                    <li key={item.href}>
-                      <Link
-                        href={item.href}
-                        onClick={() => setOpen(false)}
-                        aria-current={active ? 'page' : undefined}
-                        className={cn(
-                          'flex items-center justify-between gap-2 rounded-md px-2.5 py-2 text-sm transition-colors',
-                          active
-                            ? 'bg-ink text-canvas font-medium'
-                            : 'text-muted hover:bg-sunken hover:text-ink',
-                        )}
-                      >
-                        <span className="truncate">{item.label}</span>
-                        {item.badge ? <span className="shrink-0">{item.badge}</span> : null}
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ))}
+          <Suspense fallback={<NavGroups {...navProps} pathname={null} />}>
+            <ActiveNavGroups {...navProps} />
+          </Suspense>
         </nav>
 
         <div className="border-line border-t p-3">
@@ -142,7 +187,7 @@ export function ConsoleShell({
         <button
           type="button"
           aria-label="Close navigation"
-          onClick={() => setOpen(false)}
+          onClick={close}
           className="fixed inset-0 z-30 bg-black/40 lg:hidden"
         />
       ) : null}

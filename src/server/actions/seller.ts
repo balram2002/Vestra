@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
+import { SHIPPING } from '@/config/business';
 import { FULFILLMENT_STATUSES, type FulfillmentStatus } from '@/domain/enums';
 
 import { requireSeller } from '../auth/session';
@@ -10,6 +11,15 @@ import { collections, toEntities, toEntity } from '../db/collections';
 import * as inventory from '../repositories/inventory';
 import { transitionItem } from '../services/orders';
 import { approveReturn, rejectReturn, recordQualityCheck } from '../services/returns';
+import {
+  cancelShipment,
+  createManifest,
+  createShipmentForSellerOrder,
+  generateLabel,
+  markPickedUp,
+  schedulePickup,
+  syncTracking,
+} from '../services/shipments';
 
 /**
  * Seller console mutations.
@@ -39,6 +49,12 @@ const advanceSchema = z.object({
  * as a unit. Per-line divergence happens through cancellation and returns, not
  * here. Each line still goes through `transitionItem`, so the state machine —
  * not this action — decides whether the move is legal.
+ *
+ * From PACKED onward the move is NOT a status flip: it is real logistics work.
+ * Packing books a parcel and burns an AWB, pickup schedules a courier, and
+ * dispatch is a hand-over. Those steps are delegated to the shipment service so
+ * that the order's status is a consequence of what the courier did, never an
+ * assertion the seller typed in.
  */
 export async function advanceSellerOrder(input: {
   sellerOrderId: string;
@@ -55,6 +71,10 @@ export async function advanceSellerOrder(input: {
     await sellerOrders.findOne({ _id: parsed.data.sellerOrderId, sellerId: user.sellerId }),
   );
   if (!sellerOrder) return { ok: false, error: 'Order not found.' };
+
+  if (parsed.data.to === 'PACKED') return packAndLabel(sellerOrder.id);
+  if (parsed.data.to === 'READY_FOR_PICKUP') return bookPickup(sellerOrder.id);
+  if (parsed.data.to === 'SHIPPED') return handOver(sellerOrder.id);
 
   const itemCol = await collections.orderItems();
   const items = toEntities(await itemCol.find({ sellerOrderId: sellerOrder.id }).toArray());
@@ -81,9 +101,9 @@ export async function advanceSellerOrder(input: {
   }
 
   const iso = new Date().toISOString();
+  // PACKED, READY_FOR_PICKUP and SHIPPED returned above: past packing, the
+  // courier stamps those, not this action.
   const stamps: Record<string, string> = {};
-  if (parsed.data.to === 'PACKED') stamps.packedAt = iso;
-  if (parsed.data.to === 'SHIPPED') stamps.shippedAt = iso;
   if (parsed.data.to === 'DELIVERED') stamps.deliveredAt = iso;
 
   await sellerOrders.updateOne(
@@ -93,6 +113,158 @@ export async function advanceSellerOrder(input: {
 
   revalidatePath('/seller/orders');
   revalidatePath('/seller');
+  return { ok: true };
+}
+
+/* --------------------------------------------------------------- shipping */
+
+function refreshFulfilmentViews(): void {
+  revalidatePath('/seller/orders');
+  revalidatePath('/seller/shipments');
+  revalidatePath('/seller');
+}
+
+/**
+ * Pack: book the parcel with the courier and burn an AWB.
+ *
+ * The item statuses are NOT set here. `generateLabel` records a
+ * LABEL_GENERATED scan, and the shipment service maps that onto PACKED for
+ * every line in the parcel. One write path for status, whatever triggered it.
+ */
+async function packAndLabel(sellerOrderId: string): Promise<ActionResult> {
+  const shipments = await collections.shipments();
+  const existing = toEntity(
+    await shipments.findOne({ sellerOrderId, status: { $ne: 'CANCELLED' } }),
+  );
+
+  let shipmentId = existing?.id;
+
+  if (!shipmentId) {
+    const created = await createShipmentForSellerOrder(sellerOrderId);
+    if (!created.ok) return { ok: false, error: created.error };
+    shipmentId = created.shipmentId;
+  }
+
+  const label = await generateLabel(shipmentId!);
+  if (!label.ok) return { ok: false, error: label.error };
+
+  await stampSellerOrder(sellerOrderId, 'PACKED', { packedAt: new Date().toISOString() });
+  refreshFulfilmentViews();
+  return { ok: true };
+}
+
+async function bookPickup(sellerOrderId: string): Promise<ActionResult> {
+  const shipments = await collections.shipments();
+  const pending = toEntities(
+    await shipments.find({ sellerOrderId, status: 'LABEL_GENERATED' }).toArray(),
+  );
+  if (pending.length === 0) {
+    return { ok: false, error: 'Generate a shipping label before booking a pickup.' };
+  }
+
+  // Past the cut-off the courier will not come today, so book tomorrow rather
+  // than promising a slot that silently rolls over.
+  const now = new Date();
+  const pickupDate = new Date(now);
+  if (now.getHours() >= SHIPPING.dispatchCutoffHour) pickupDate.setDate(pickupDate.getDate() + 1);
+
+  const result = await schedulePickup(
+    pending.map((shipment) => shipment.id),
+    pickupDate.toISOString(),
+  );
+  if (!result.ok) return { ok: false, error: result.error };
+
+  await stampSellerOrder(sellerOrderId, 'READY_FOR_PICKUP', {});
+  refreshFulfilmentViews();
+  return { ok: true };
+}
+
+async function handOver(sellerOrderId: string): Promise<ActionResult> {
+  const shipments = await collections.shipments();
+  const ready = toEntities(
+    await shipments
+      .find({ sellerOrderId, status: { $in: ['LABEL_GENERATED', 'PICKUP_SCHEDULED'] } })
+      .toArray(),
+  );
+  if (ready.length === 0) {
+    return { ok: false, error: 'There is no labelled parcel waiting to be handed over.' };
+  }
+
+  for (const shipment of ready) {
+    const result = await markPickedUp(shipment.id);
+    if (!result.ok) return { ok: false, error: result.error };
+  }
+
+  await stampSellerOrder(sellerOrderId, 'SHIPPED', { shippedAt: new Date().toISOString() });
+  refreshFulfilmentViews();
+  return { ok: true };
+}
+
+async function stampSellerOrder(
+  sellerOrderId: string,
+  status: FulfillmentStatus,
+  stamps: Record<string, string>,
+): Promise<void> {
+  const sellerOrders = await collections.sellerOrders();
+  await sellerOrders.updateOne(
+    { _id: sellerOrderId },
+    { $set: { status, updatedAt: new Date().toISOString(), ...stamps } },
+  );
+}
+
+/** Re-poll the courier. Offered wherever tracking is shown but looks stale. */
+export async function refreshTracking(input: { shipmentId: string }): Promise<ActionResult> {
+  const user = await requireSeller();
+
+  const shipments = await collections.shipments();
+  const shipment = toEntity(
+    await shipments.findOne({ _id: input.shipmentId, sellerId: user.sellerId }),
+  );
+  if (!shipment) return { ok: false, error: 'Shipment not found.' };
+
+  await syncTracking(shipment.id);
+  refreshFulfilmentViews();
+  revalidatePath(`/seller/shipments/${shipment.id}`);
+  return { ok: true };
+}
+
+export async function cancelShipmentAction(input: {
+  shipmentId: string;
+  reason: string;
+}): Promise<ActionResult> {
+  const user = await requireSeller();
+
+  const shipments = await collections.shipments();
+  const shipment = toEntity(
+    await shipments.findOne({ _id: input.shipmentId, sellerId: user.sellerId }),
+  );
+  if (!shipment) return { ok: false, error: 'Shipment not found.' };
+
+  const reason = input.reason.trim();
+  if (reason.length < 3) return { ok: false, error: 'Give a reason for cancelling the parcel.' };
+
+  const result = await cancelShipment(shipment.id, reason);
+  if (!result.ok) return { ok: false, error: result.error };
+
+  refreshFulfilmentViews();
+  return { ok: true };
+}
+
+/**
+ * Close a manifest for the parcels going out on this run. The courier signs one
+ * sheet instead of scanning every parcel at the door.
+ */
+export async function closeManifest(input: { shipmentIds: string[] }): Promise<ActionResult> {
+  const user = await requireSeller();
+
+  if (input.shipmentIds.length === 0) {
+    return { ok: false, error: 'Select at least one parcel.' };
+  }
+
+  const result = await createManifest(user.sellerId, input.shipmentIds);
+  if (!result.ok) return { ok: false, error: result.error };
+
+  refreshFulfilmentViews();
   return { ok: true };
 }
 

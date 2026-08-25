@@ -3,6 +3,7 @@ import { notFound, permanentRedirect } from 'next/navigation';
 import { Suspense } from 'react';
 
 import { Breadcrumbs } from '@/components/commerce/breadcrumbs';
+import { FilterDrawer } from '@/components/commerce/filter-drawer';
 import { FilterRail } from '@/components/commerce/filter-rail';
 import { ListingToolbar } from '@/components/commerce/listing-toolbar';
 import { Pagination } from '@/components/commerce/pagination';
@@ -104,38 +105,47 @@ async function BrandListing({
   const result = await listProducts(query);
   const basePath = `/brand/${slug}`;
 
+  const rail = (
+    <FilterRail
+      facets={result.facets.filter((f) => f.key !== 'brand')}
+      priceFacet={result.priceFacet}
+      params={raw}
+      basePath={basePath}
+      appliedCount={result.appliedFilterCount}
+    />
+  );
+
   return (
-    <div className="mt-6 flex gap-8">
-      <div className="hidden w-60 shrink-0 lg:block">
-        <FilterRail
-          facets={result.facets.filter((f) => f.key !== 'brand')}
-          priceFacet={result.priceFacet}
-          params={raw}
-          basePath={basePath}
-          appliedCount={result.appliedFilterCount}
-        />
+    <>
+      {/* Same rail, docked on desktop and in a drawer below lg. */}
+      <div className="mt-6 lg:hidden">
+        <FilterDrawer appliedCount={result.appliedFilterCount}>{rail}</FilterDrawer>
       </div>
 
-      <div className="min-w-0 flex-1">
-        <ListingToolbar
-          total={result.total}
-          activeSort={query.sort ?? 'popularity'}
-          params={raw}
-          basePath={basePath}
-        />
-        <div className="mt-5">
-          <ProductGrid
-            products={result.items}
-            emptyAction={{ href: basePath, label: 'Clear all filters' }}
+      <div className="mt-4 flex gap-8 lg:mt-6">
+        <div className="hidden w-60 shrink-0 lg:block">{rail}</div>
+
+        <div className="min-w-0 flex-1">
+          <ListingToolbar
+            total={result.total}
+            activeSort={query.sort ?? 'popularity'}
+            params={raw}
+            basePath={basePath}
+          />
+          <div className="mt-5">
+            <ProductGrid
+              products={result.items}
+              emptyAction={{ href: basePath, label: 'Clear all filters' }}
+            />
+          </div>
+          <Pagination
+            page={result.page}
+            pageCount={result.pageCount}
+            params={raw}
+            basePath={basePath}
           />
         </div>
-        <Pagination
-          page={result.page}
-          pageCount={result.pageCount}
-          params={raw}
-          basePath={basePath}
-        />
       </div>
-    </div>
+    </>
   );
 }

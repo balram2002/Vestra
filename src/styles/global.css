@@ -210,3 +210,17 @@
   body { background: #fff; color: #000; }
   .print-page { break-after: page; }
 }
+
+/*
+ * Filter drawer entry. Declared here rather than inline so it respects the
+ * reduced-motion guard the rest of the system uses -- the drawer still opens,
+ * it just does not travel.
+ */
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}

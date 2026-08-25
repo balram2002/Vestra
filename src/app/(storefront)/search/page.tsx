@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
+import { FilterDrawer } from '@/components/commerce/filter-drawer';
 import { FilterRail } from '@/components/commerce/filter-rail';
 import { ListingToolbar } from '@/components/commerce/listing-toolbar';
 import { Pagination } from '@/components/commerce/pagination';
@@ -64,7 +65,20 @@ async function SearchResults({ searchParams }: { searchParams: Promise<RawSearch
         </h1>
       </header>
 
-      <div className="mt-5 flex gap-8">
+      {/* Same rail, rendered in a drawer below lg. See the category page. */}
+      <div className="mt-5 lg:hidden">
+        <FilterDrawer appliedCount={result.appliedFilterCount}>
+          <FilterRail
+            facets={result.facets}
+            priceFacet={result.priceFacet}
+            params={raw}
+            basePath={basePath}
+            appliedCount={result.appliedFilterCount}
+          />
+        </FilterDrawer>
+      </div>
+
+      <div className="mt-4 flex gap-8 lg:mt-5">
         <div className="hidden w-60 shrink-0 lg:block">
           <FilterRail
             facets={result.facets}

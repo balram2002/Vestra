@@ -19,19 +19,23 @@ const outDir = argv.shift();
 
 let as = null;
 let width = 1440;
+// Full-page shots of a long listing come out 10,000px tall and are useless for
+// review once scaled to fit. `--fold` captures just the viewport instead.
+let fold = false;
 const routes = [];
 
 while (argv.length) {
   const arg = argv.shift();
   if (arg === '--as') as = argv.shift();
   else if (arg === '--width') width = Number.parseInt(argv.shift(), 10);
+  else if (arg === '--fold') fold = true;
   else routes.push(arg);
 }
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:3000';
 
 const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width, height: 1200 } });
+const page = await browser.newPage({ viewport: { width, height: fold ? 844 : 1200 } });
 
 const problems = [];
 page.on('console', (message) => {
@@ -56,9 +60,10 @@ for (const route of routes) {
     await page.waitForTimeout(2600);
 
     const name =
+      (fold ? 'fold_' : '') +
       (width === 1440 ? '' : `${width}_`) +
       (route.replace(/[/?=&]/g, '_').replace(/^_/, '') || 'home');
-    await page.screenshot({ path: `${outDir}/${name}.png`, fullPage: true });
+    await page.screenshot({ path: `${outDir}/${name}.png`, fullPage: !fold });
 
     const fresh = problems.slice(before);
     console.log(`  ${route}${fresh.length ? `   [${fresh.length} console errors]` : ''}`);

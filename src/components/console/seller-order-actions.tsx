@@ -25,12 +25,26 @@ const NEXT: Partial<Record<FulfillmentStatus, FulfillmentStatus>> = {
   READY_FOR_PICKUP: 'SHIPPED',
 };
 
+/**
+ * Named for what the click actually does, not for the status it lands on.
+ * From PACKED onward each of these performs real logistics work — booking the
+ * parcel, burning an AWB, calling a courier — so "Mark packed" would have
+ * understated it and left sellers surprised by an AWB they did not ask for.
+ */
 const LABEL: Partial<Record<FulfillmentStatus, string>> = {
   CONFIRMED: 'Accept',
   PROCESSING: 'Start packing',
-  PACKED: 'Mark packed',
+  PACKED: 'Generate label',
   READY_FOR_PICKUP: 'Book pickup',
-  SHIPPED: 'Mark shipped',
+  SHIPPED: 'Hand over',
+};
+
+const DONE: Partial<Record<FulfillmentStatus, string>> = {
+  CONFIRMED: 'Order accepted',
+  PROCESSING: 'Packing started',
+  PACKED: 'Label generated',
+  READY_FOR_PICKUP: 'Pickup booked',
+  SHIPPED: 'Handed to courier',
 };
 
 export function SellerOrderActions({
@@ -57,7 +71,7 @@ export function SellerOrderActions({
     startTransition(async () => {
       const result = await advanceSellerOrder({ sellerOrderId, to: next });
       if (result.ok) {
-        toast.success(`Moved to ${FULFILLMENT_STATUS_META[next].label.toLowerCase()}`);
+        toast.success(DONE[next] ?? `Moved to ${FULFILLMENT_STATUS_META[next].label.toLowerCase()}`);
       } else {
         toast.error(result.error ?? 'That did not work.');
       }

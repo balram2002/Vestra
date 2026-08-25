@@ -3,6 +3,7 @@ import { notFound, permanentRedirect } from 'next/navigation';
 import { Suspense } from 'react';
 
 import { Breadcrumbs } from '@/components/commerce/breadcrumbs';
+import { FilterDrawer } from '@/components/commerce/filter-drawer';
 import { FilterRail } from '@/components/commerce/filter-rail';
 import { ListingToolbar } from '@/components/commerce/listing-toolbar';
 import { Pagination } from '@/components/commerce/pagination';
@@ -162,7 +163,24 @@ async function CategoryListing({
         )}
       />
 
-      <div className="mt-5 flex gap-8">
+      {/*
+        The rail is built once and rendered twice: docked on desktop, and inside
+        the drawer on mobile. Re-implementing it for small screens would
+        guarantee the two sets of filters drift apart.
+      */}
+      <div className="mt-5 lg:hidden">
+        <FilterDrawer appliedCount={result.appliedFilterCount}>
+          <FilterRail
+            facets={result.facets}
+            priceFacet={result.priceFacet}
+            params={raw}
+            basePath={basePath}
+            appliedCount={result.appliedFilterCount}
+          />
+        </FilterDrawer>
+      </div>
+
+      <div className="mt-4 flex gap-8 lg:mt-5">
         <div className="hidden w-60 shrink-0 lg:block">
           <FilterRail
             facets={result.facets}

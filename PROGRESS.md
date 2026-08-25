@@ -10,11 +10,13 @@ with a server running (`npm run restart && npm run start`):
 | `npm run smoke` | the purchase funnel, end to end in a browser |
 | `npm run smoke:rbac` | 6 identities against 19 routes |
 | `npm run smoke:admin` | admin writes, verified by their side effects in Mongo |
+| `npm run smoke:shipping` | courier webhook defences, labels, parcel ownership |
 | `npm run audit:a11y` | axe-core, 12 routes × 2 widths |
 | `npm run audit:contrast` | WCAG ratios, parsed from `tokens.css` |
 
-Latest run: **build 262/262 routes · typecheck clean · lint clean · funnel 11/11
-· RBAC 19/19 · admin writes 6/6 · a11y 0 violations · contrast 3/3**
+Latest run: **build 266/266 routes · typecheck clean · lint clean · 34 unit tests
+· funnel 11/11 · RBAC 19/19 · admin writes 6/6 · fulfilment 25/25 · a11y 0 violations
+· contrast 3/3**
 
 ---
 
@@ -115,15 +117,47 @@ Latest run: **build 262/262 routes · typecheck clean · lint clean · funnel 11
 
 ---
 
+## Phase 9 — Shipments and the Eshopbox integration · **done**
+
+- [x] Courier-agnostic `ShippingProvider` contract — serviceability, shipment,
+      label/AWB, pickup, manifest, tracking, cancellation, reverse pickup
+- [x] Eshopbox adapter against the real API shapes: token minted from the
+      refresh token and cached for its 24h life, stampede-collapsed refresh,
+      retries confined to timeouts/429/5xx, rupee conversion at the boundary
+- [x] Simulated courier behind the same interface, and deliberately awkward:
+      unserviceable pincodes, prepaid-only areas, one failed delivery in
+      sixteen, one RTO in fifty. Those are the paths with the most fragile UI
+- [x] Tracking derived from the AWB itself (issue time and zone are encoded in
+      it), so it survives restarts and needs no cron
+- [x] Tracking webhook with the same four defences as the payment webhook:
+      signature, replay index, out-of-order rejection, always-2xx once stored
+- [x] `applyEvent` is the single write path for parcel status — webhook,
+      polling reconciler and seller actions all go through it
+- [x] Seller fulfilment now performs real logistics: "Generate label" books the
+      parcel and burns an AWB, "Book pickup" calls the courier, "Hand over" is a
+      hand-over. Order status became a consequence, not an assertion
+- [x] Seller shipment queue, parcel detail, manifest close, cancellation
+- [x] 4×6 thermal label with real Code 128 barcodes, on its own print layout
+- [x] Customer tracking timeline on the order page, exceptions kept visible
+- [x] 2,024 parcels and 1,545 manifests backfilled into the seeded history,
+      with scan times nudged into the hours a courier actually works
+
+**Two defects this work surfaced and fixed.** The seeded AWB collided on the
+unique index because the zone and filler digits were drawn from the same end of
+the hash and 4 divides 100 — 400 possible suffixes were really 100. And couriers
+skip scans: a same-city parcel goes from picked up straight to out for delivery,
+which the strict adjacency rule rejected, leaving order items a step behind the
+parcel they were inside. Courier-sourced moves may now skip forward; every other
+caller still cannot.
+
+---
+
 ## Not yet done
 
 Honest list of what the brief asks for that is not built.
 
 ### Functional gaps
 
-- [ ] **Shipments and manifests.** Order items transition to SHIPPED, but there
-      is no shipment entity in use, no AWB, label, manifest or courier tracking
-      screen. The domain types and status machine exist; the service does not.
 - [ ] **Exchanges.** Returns and refunds work end to end. Exchange requests have
       types and states but no service or UI.
 - [ ] **Settlements and invoices.** Earnings are computed and the hold period is
@@ -146,9 +180,12 @@ Honest list of what the brief asks for that is not built.
 
 ### Quality gaps
 
-- [ ] **Automated tests.** Vitest is configured but the pricing, coupon,
-      inventory and saga logic have no unit tests. The two smoke suites are the
-      only automated verification.
+- [ ] **Automated tests — partly done.** 34 unit tests now cover the pricing
+      engine's allocation and GST-slab rules, the shipment state machine, and
+      the Code 128 table (checked against the specification, because a
+      transposed digit produces a barcode that looks right and fails at the
+      scanner). Coupon evaluation, inventory movements and the saga runner are
+      still only covered by the smoke suites.
 - [ ] **Core Web Vitals.** Not measured. LCP, CLS and INP targets are designed
       for (priority hero image, skeletons that reserve exact space, Server
       Components by default) but no number has been taken.

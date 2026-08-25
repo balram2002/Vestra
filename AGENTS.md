@@ -89,6 +89,36 @@ layer; nothing above it changes.
   fail the build. Derive time-dependent values in the service layer (see
   `returnWindowOpen` in `services/orders.ts`).
 
+## Shipping
+
+**The courier owns the parcel's status, and the parcel's status owns the
+items'.** Nothing marks an order item delivered directly. A scan moves the
+shipment through `applyEvent` in `services/shipments.ts`, and that carries the
+state onto the lines inside it. It is the single write path for parcel status —
+webhook, polling reconciler and seller actions all route through it. Bypassing
+it is how the order page and the tracking panel end up telling two stories.
+
+- **Eshopbox is behind `ShippingProvider`.** Nothing above `server/shipping/`
+  knows which courier is in use. Adding a second one is a new implementation of
+  that interface, not a change to fulfilment.
+- **`ESHOPBOX_MODE=simulation` is the default everywhere but production.** The
+  simulated courier is not an always-succeeds stub: it refuses some pincodes,
+  makes others prepaid-only, fails one delivery in sixteen and sends one parcel
+  in fifty back RTO. Those are the branches with the most fragile UI, so a stub
+  that never produced them would mean they shipped untested.
+- **Courier scans are OBSERVATIONS, not decisions.** They may skip forward along
+  the flow (`allowForwardSkip`), because a same-city parcel really does go from
+  picked up to out for delivery with nothing between. Sellers, admins and
+  customers still go through the strict adjacency rule.
+- **Late and duplicate scans are normal.** `shouldAdvance` refuses to move a
+  parcel backwards or past a terminal state; the webhook's unique index makes
+  redelivery a no-op.
+- **The webhook is never trusted unsigned.** It can mark an order DELIVERED,
+  which starts the return clock and releases the seller's money.
+- **AWBs encode their own issue time and zone**, which is what lets tracking be
+  a pure function of the number — no server-side map, correct after a restart.
+  If you change that layout, `decodeAwb` and the seeder both move with it.
+
 ## Conventions
 
 - **Money is always integer paise.** Never store, sum or transport float
