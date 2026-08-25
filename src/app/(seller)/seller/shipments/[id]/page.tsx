@@ -87,6 +87,7 @@ async function ShipmentDetail({ params }: { params: Promise<{ id: string }> }) {
               shipmentId={shipment.id}
               status={shipment.status}
               hasLabel={Boolean(shipment.awb)}
+              invoiceId={shipment.invoiceId}
             />
           </section>
         </div>

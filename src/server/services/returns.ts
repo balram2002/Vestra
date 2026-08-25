@@ -147,6 +147,7 @@ export async function requestReturn(
       refundAmount: Math.max(0, goodsTotal - reverseFee),
       liability,
       reverseShippingFee: reverseFee,
+      settlementId: null,
       rejectionReason: null,
       requestedAt: iso,
       approvedAt: null,
@@ -314,6 +315,20 @@ export async function recordQualityCheck(
     await inventory.restock(item.variantId, item.quantity);
   }
   await setItemStatus(request, 'RETURNED', 'SELLER');
+
+  /*
+   * Raise a credit note against the original tax invoice.
+   *
+   * A return does not amend the invoice — under GST it cannot. The credit note
+   * is the counter-document, and without it the seller's outward supply stays
+   * overstated by the value of goods that came back.
+   */
+  const { issueCreditNote } = await import('./invoices');
+  await issueCreditNote(
+    request.sellerOrderId,
+    request.items.map((item) => ({ orderItemId: item.orderItemId, quantity: item.quantity })),
+    `Return ${request.returnNumber}: ${RETURN_REASON_LABEL[request.reason]}`,
+  );
 
   const refund = await initiateRefund(request, actorUserId);
   return { ok: true, refundId: refund?.id };

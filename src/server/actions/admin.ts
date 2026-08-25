@@ -6,6 +6,12 @@ import { z } from 'zod';
 import { PRODUCT_STATUS_META, SELLER_STATUS_META } from '@/domain/enums';
 
 import { requirePermission } from '../auth/session';
+import {
+  getSettlement,
+  holdSettlement,
+  markSettlementPaid,
+  runSettlement,
+} from '../services/settlements';
 import { collections, toEntity } from '../db/collections';
 import * as audit from '../services/audit';
 import { notifyQuietly } from '../services/notifications';
@@ -298,5 +304,105 @@ export async function setSectionActive(input: {
   // shop keeps rendering the old composition.
   revalidatePath('/admin/cms');
   revalidatePath('/');
+  return { ok: true };
+}
+
+/* ------------------------------------------------------------- settlements */
+
+/**
+ * Run a payout for one seller.
+ *
+ * Gated on `finance:payout` rather than a general admin permission: this moves
+ * money, and the roles that approve listings are not the roles that pay for
+ * them. The run itself is idempotent — it claims the seller orders it settles,
+ * so a double click produces an empty second run rather than a double payment.
+ */
+export async function runSellerSettlement(input: { sellerId: string }): Promise<ActionResult> {
+  const actor = await requirePermission('finance:payout');
+
+  const result = await runSettlement(input.sellerId);
+  if (!result.ok) return { ok: false, error: result.error };
+
+  const settlement = result.settlementId ? await getSettlement(result.settlementId) : null;
+
+  await audit.record({
+    actor,
+    action: 'settlement.run',
+    entityType: 'settlement',
+    entityId: result.settlementId ?? input.sellerId,
+    entityLabel: settlement?.settlementNumber ?? input.sellerId,
+    changes: [
+      { field: 'orderCount', before: null, after: result.orderCount ?? 0 },
+      { field: 'netPayable', before: null, after: result.netPayable ?? 0 },
+    ],
+    severity: 'NOTICE',
+  });
+
+  revalidatePath('/admin/settlements');
+  revalidatePath('/seller/settlements');
+  return { ok: true };
+}
+
+/**
+ * Record that the bank transfer went out.
+ *
+ * The UTR is required because it is what a seller quotes when the money has
+ * not arrived; "marked paid" with no reference is unverifiable.
+ */
+export async function markSettlementTransferred(input: {
+  settlementId: string;
+  utr: string;
+}): Promise<ActionResult> {
+  const actor = await requirePermission('finance:payout');
+
+  const before = await getSettlement(input.settlementId);
+  if (!before) return { ok: false, error: 'Settlement not found.' };
+
+  const result = await markSettlementPaid(input.settlementId, input.utr);
+  if (!result.ok) return { ok: false, error: result.error };
+
+  await audit.record({
+    actor,
+    action: 'settlement.paid',
+    entityType: 'settlement',
+    entityId: before.id,
+    entityLabel: before.settlementNumber,
+    changes: [
+      { field: 'status', before: before.status, after: 'PAID' },
+      { field: 'utr', before: before.utr, after: input.utr.trim() },
+    ],
+    severity: 'NOTICE',
+  });
+
+  revalidatePath('/admin/settlements');
+  revalidatePath('/seller/settlements');
+  return { ok: true };
+}
+
+export async function holdSettlementPayout(input: {
+  settlementId: string;
+  reason: string;
+}): Promise<ActionResult> {
+  const actor = await requirePermission('finance:payout');
+
+  const before = await getSettlement(input.settlementId);
+  if (!before) return { ok: false, error: 'Settlement not found.' };
+
+  const result = await holdSettlement(input.settlementId, input.reason);
+  if (!result.ok) return { ok: false, error: result.error };
+
+  await audit.record({
+    actor,
+    action: 'settlement.hold',
+    entityType: 'settlement',
+    entityId: before.id,
+    entityLabel: before.settlementNumber,
+    changes: [{ field: 'status', before: before.status, after: 'ON_HOLD' }],
+    note: input.reason,
+    severity: 'WARNING',
+  });
+
+  revalidatePath('/admin/settlements');
+  revalidatePath('/seller/settlements');
   return { ok: true };
 }

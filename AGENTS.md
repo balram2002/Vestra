@@ -136,6 +136,21 @@ the customer's original price, coupon share and tax snapshot intact.
   "delivered" means it reached the SELLER. `applyEvent` branches on
   `shipment.direction`; do not add a fourth direction without extending it.
 
+## Money out: invoices and settlements
+
+- **The SELLER is the supplier of record.** Invoices carry their GSTIN and run
+  on a per-seller, per-financial-year series. Never introduce a shared series.
+- **Invoice numbers are consumed exactly once.** `issueInvoice` is idempotent
+  and returns the existing document; gaps in a series are a compliance problem.
+- **An invoice is never edited.** A return raises a CREDIT NOTE against it.
+- **Every figure comes from the order item's frozen snapshot**, so a reprint a
+  year later is identical to the original.
+- **A settlement claims what it settles** (`settlementId` on the seller order
+  and on the return). That claim, not a flag, is what makes a run idempotent.
+- **Only delivered money past the hold is paid.** Revenue is at risk of a
+  return until the window closes, and clawing money back from sellers is where
+  marketplace relationships end.
+
 ## Conventions
 
 - **Money is always integer paise.** Never store, sum or transport float

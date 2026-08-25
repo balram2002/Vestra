@@ -80,6 +80,7 @@ export default function SellerLayout({ children }: { children: React.ReactNode }
           label: 'Business',
           items: [
             { href: '/seller/earnings', label: 'Earnings' },
+            { href: '/seller/settlements', label: 'Settlements' },
             { href: '/seller/analytics', label: 'Analytics' },
             { href: '/seller/settings', label: 'Settings' },
           ],

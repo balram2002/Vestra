@@ -1,6 +1,6 @@
 'use client';
 
-import { Printer, RefreshCw, X } from 'lucide-react';
+import { Printer, Receipt, RefreshCw, X } from 'lucide-react';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 
@@ -20,10 +20,13 @@ export function ShipmentActions({
   shipmentId,
   status,
   hasLabel,
+  invoiceId,
 }: {
   shipmentId: string;
   status: ShipmentStatus;
   hasLabel: boolean;
+  /** Raised at dispatch, so it is absent until the label exists. */
+  invoiceId?: string | null;
 }) {
   const [pending, startTransition] = useTransition();
   const [confirming, setConfirming] = useState(false);
@@ -68,6 +71,18 @@ export function ShipmentActions({
           >
             <Printer className="size-3.5" aria-hidden />
             Print label
+          </a>
+        ) : null}
+
+        {invoiceId ? (
+          <a
+            href={`/invoice/${invoiceId}`}
+            target="_blank"
+            rel="noreferrer"
+            className="border-line-strong text-ink hover:border-ink inline-flex items-center gap-1.5 rounded-md border px-3 py-2 text-xs font-medium transition-colors"
+          >
+            <Receipt className="size-3.5" aria-hidden />
+            Tax invoice
           </a>
         ) : null}
 

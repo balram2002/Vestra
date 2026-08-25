@@ -22,6 +22,7 @@ import {
 } from './generate';
 import { generateEngagement } from './engagement';
 import { generateOrders } from './orders';
+import { generateReturns } from './returns';
 import { generateShipments } from './shipments';
 import { generateCmsPages } from './pages';
 
@@ -147,6 +148,33 @@ export async function seedDatabase(
     now,
     count: 1400,
   });
+
+  log('Generating returns and refunds...');
+  const postPurchase = generateReturns({
+    orders: history.orders,
+    sellerOrders: history.sellerOrders,
+    items: history.items,
+    now,
+  });
+  for (const item of history.items) {
+    const returnId = postPurchase.itemReturnIds[item.id];
+    if (returnId) {
+      item.returnId = returnId;
+      continue;
+    }
+
+    /*
+     * A line claiming to be returned with no return behind it is broken data:
+     * the order says "Returned" and there is nothing to open. That happens when
+     * the generated return timeline would have run past the seed clock, so the
+     * request was not created. Put the line back to DELIVERED rather than
+     * leaving the two disagreeing.
+     */
+    if (item.status === 'RETURNED' || item.status === 'REFUNDED') {
+      item.status = 'DELIVERED';
+      item.returnedQuantity = 0;
+    }
+  }
 
   log('Generating parcels and manifests...');
   const fulfilment = generateShipments({
@@ -296,6 +324,11 @@ export async function seedDatabase(
   counts.sellerOrders = await insert(COLLECTIONS.sellerOrders, history.sellerOrders);
   counts.orderItems = await insert(COLLECTIONS.orderItems, history.items);
   counts.payments = await insert(COLLECTIONS.payments, history.payments);
+  // Generated all along but never persisted, which left the returns queue and
+  // /account/returns permanently empty and made every settlement show a zero
+  // return debit.
+  counts.returns = await insert(COLLECTIONS.returns, postPurchase.returns);
+  counts.refunds = await insert(COLLECTIONS.refunds, postPurchase.refunds);
   counts.shipments = await insert(COLLECTIONS.shipments, fulfilment.shipments);
   counts.manifests = await insert(COLLECTIONS.manifests, fulfilment.manifests);
   counts.notifications = await insert(COLLECTIONS.notifications, engagement.notifications);
@@ -308,6 +341,45 @@ export async function seedDatabase(
 
   log('Building indexes...');
   const indexFailures = await ensureIndexes();
+
+  /*
+   * Settlements are produced by the REAL service rather than generated.
+   *
+   * A hand-built settlement fixture would drift from what `runSettlement`
+   * actually produces the first time the arithmetic changes, and the demo
+   * would then show figures the code can no longer generate. Running it for
+   * each seller costs a second and guarantees the two agree.
+   */
+  /*
+   * Invoices, like settlements, come from the real service.
+   *
+   * They are normally raised at dispatch by `generateLabel`, which the seeded
+   * shipments bypass — so without this every historical order has a dead
+   * "Invoice" link. Issuing them here keeps the documents identical to the ones
+   * a live dispatch produces, numbering included.
+   */
+  log('Issuing invoices for dispatched orders...');
+  const { issueInvoice } = await import('../services/invoices');
+  const dispatched = history.sellerOrders.filter((sellerOrder) =>
+    ['PACKED', 'READY_FOR_PICKUP', 'SHIPPED', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'DELIVERED',
+     'RETURN_REQUESTED', 'RETURN_APPROVED', 'RETURN_PICKUP', 'RETURNED', 'REFUND_INITIATED',
+     'REFUNDED'].includes(sellerOrder.status),
+  );
+  let invoiceCount = 0;
+  for (const sellerOrder of dispatched) {
+    const result = await issueInvoice(sellerOrder.id);
+    if (result.ok) invoiceCount += 1;
+  }
+  counts.invoices = invoiceCount;
+
+  log('Running settlements...');
+  const { runSettlement } = await import('../services/settlements');
+  let settlementCount = 0;
+  for (const seller of sellers) {
+    const result = await runSettlement(seller.id);
+    if (result.ok && result.settlementId) settlementCount += 1;
+  }
+  counts.settlements = settlementCount;
 
   return {
     counts,

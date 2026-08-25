@@ -51,15 +51,37 @@ try {
   ]);
 
   await page.goto(`${BASE}/admin/products?status=PENDING_REVIEW`, { waitUntil: 'load' });
-  await page.waitForTimeout(2000);
 
+  /*
+   * Wait for the button to EXIST, not for a fixed number of milliseconds.
+   *
+   * The queue streams in behind a Suspense boundary, so a sleep long enough
+   * today silently becomes too short as the page grows — which is exactly how
+   * this test started reporting a bug in a working action.
+   */
   const approve = page.getByRole('button', { name: 'Approve' }).first();
-  const found = (await approve.count()) > 0;
+  const found = await approve
+    .waitFor({ state: 'visible', timeout: 20000 })
+    .then(() => true)
+    .catch(() => false);
   record('review queue offers an approve action', found);
 
   if (found) {
+    const pendingBefore = await db
+      .collection('products')
+      .countDocuments({ status: { $in: ['SUBMITTED', 'PENDING_REVIEW'] } });
+
     await approve.click();
-    await page.waitForTimeout(3000);
+
+    // Poll for the side effect rather than guessing how long the Server Action
+    // takes. A write that lands in 300ms and one that lands in 4s are both fine.
+    for (let attempt = 0; attempt < 40; attempt++) {
+      const pendingNow = await db
+        .collection('products')
+        .countDocuments({ status: { $in: ['SUBMITTED', 'PENDING_REVIEW'] } });
+      if (pendingNow < pendingBefore) break;
+      await page.waitForTimeout(250);
+    }
 
     // 1. The listing actually changed.
     const after = await db.collection('products').findOne({ status: 'PUBLISHED' }, { sort: { updatedAt: -1 } });

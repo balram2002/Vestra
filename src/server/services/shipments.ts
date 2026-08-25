@@ -291,8 +291,21 @@ export async function generateLabel(
     }
   }
 
+  /*
+   * Raise the tax invoice now, if it has not been already.
+   *
+   * Dispatch is the correct moment: under GST the invoice accompanies the
+   * goods, and the courier's own paperwork needs its number. Doing it at order
+   * placement would raise invoices for orders that are later cancelled before
+   * they ever ship.
+   */
+  const { issueInvoice } = await import('./invoices');
+  await issueInvoice(shipment.sellerOrderId);
+
   const invoices = await collections.invoices();
-  const invoice = toEntity(await invoices.findOne({ sellerOrderId: shipment.sellerOrderId }));
+  const invoice = toEntity(
+    await invoices.findOne({ sellerOrderId: shipment.sellerOrderId, type: 'TAX_INVOICE' }),
+  );
 
   const itemCol = await collections.orderItems();
   const items = toEntities(
@@ -337,6 +350,7 @@ export async function generateLabel(
           carrierServiceType: label.carrierServiceType,
           labelUrl: label.labelUrl,
           trackingUrl: label.trackingUrl,
+          invoiceId: invoice?.id ?? null,
           failureReason: null,
           updatedAt: new Date().toISOString(),
         },

@@ -149,7 +149,25 @@ async function OrderDetail({
                     </p>
                     <p className="text-ink mt-0.5 text-sm font-medium">{sellerOrder.sellerName}</p>
                   </div>
-                  <StatusBadge meta={FULFILLMENT_STATUS_META[sellerOrder.status]} size="sm" />
+                  <div className="flex items-center gap-3">
+                    {/*
+                      The invoice exists only once the parcel has been
+                      dispatched, because that is when it is raised. Showing a
+                      dead "Download invoice" link before then is worse than
+                      showing none.
+                    */}
+                    {sellerOrder.invoiceId ? (
+                      <a
+                        href={`/invoice/${sellerOrder.invoiceId}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-muted hover:text-ink text-2xs underline-offset-2 hover:underline"
+                      >
+                        Invoice
+                      </a>
+                    ) : null}
+                    <StatusBadge meta={FULFILLMENT_STATUS_META[sellerOrder.status]} size="sm" />
+                  </div>
                 </header>
 
                 <div className="px-5 py-6">

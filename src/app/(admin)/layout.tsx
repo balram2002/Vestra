@@ -55,6 +55,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               ),
             },
             { href: '/admin/payments', label: 'Payments' },
+            { href: '/admin/settlements', label: 'Settlements' },
             {
               href: '/admin/support',
               label: 'Support',

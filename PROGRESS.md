@@ -15,7 +15,7 @@ with a server running (`npm run restart && npm run start`):
 | `npm run audit:a11y` | axe-core, 12 routes × 2 widths |
 | `npm run audit:contrast` | WCAG ratios, parsed from `tokens.css` |
 
-Latest run: **build 266/266 routes · typecheck clean · lint clean · 34 unit tests
+Latest run: **build 269/269 routes · typecheck clean · lint clean · 44 unit tests
 · funnel 11/11 · RBAC 19/19 · admin writes 6/6 · fulfilment 25/25 · exchange 20/20
 · a11y 0 violations · contrast 3/3**
 
@@ -184,15 +184,50 @@ price, their coupon and their place in the queue.
 
 ---
 
+## Phase 11 — Invoices and settlements · **done**
+
+The money story stopped at commission: it was computed per order and never
+became a document or a payout.
+
+- [x] GST tax invoices raised per SELLER, not per platform — the seller is the
+      supplier of record, so the series is per seller per financial year and
+      carries their GSTIN. A shared series would break every seller's filings
+- [x] Raised at DISPATCH, which is when the invoice legally accompanies the
+      goods, and idempotent so a reprint never burns a second number (gaps in
+      an invoice series are a compliance problem)
+- [x] Place of supply decides CGST+SGST versus IGST; amounts come from the
+      order item's frozen snapshot, so a reprint a year later is identical
+- [x] Credit notes on return, because under GST an invoice is never amended
+- [x] A4 invoice document, plain by design, linked from the customer's order,
+      the seller's parcel and reachable by staff — one route, authorisation
+      expressed once, a 404 for anyone else
+- [x] Settlement runs: claim delivered orders past the hold, itemise every
+      deduction as a line, produce one net figure. Claiming is what makes the
+      run idempotent — a second click settles nothing rather than paying twice
+- [x] Returns debit the period they LAND in, not the one they sold in
+- [x] Below the minimum payout the balance rolls forward instead of being
+      transferred at a loss
+- [x] Seller statement writes the arithmetic out in full; finance console runs
+      payouts and records the bank UTR, both gated on `finance:payout`
+- [x] `amount-in-words` with Indian lakh/crore grouping, 10 unit tests
+
+**Three data defects this surfaced.** The seeder generated returns and refunds
+but never inserted them, so 180 order items claimed to have been returned with
+nothing behind them — the seller queue, `/account/returns` and the refund
+ledger were all permanently empty, and every settlement showed a zero return
+debit. Seeded GSTINs used a random state code and an unrelated PAN, so an
+invoice showed a Goa GSTIN on a Rajasthan address. And `smoke:admin` was
+asserting against fixed sleeps, which had quietly become too short — it was
+reporting a bug in an action that worked.
+
+---
+
 ## Not yet done
 
 Honest list of what the brief asks for that is not built.
 
 ### Functional gaps
 
-- [ ] **Settlements and invoices.** Earnings are computed and the hold period is
-      modelled, but no settlement run creates payouts and no GST invoice is
-      generated.
 - [ ] **Real notification delivery.** The in-app centre works and preferences
       are honoured, but the email, SMS and push adapters log rather than send —
       deliberately visible as stubs.
@@ -210,12 +245,13 @@ Honest list of what the brief asks for that is not built.
 
 ### Quality gaps
 
-- [ ] **Automated tests — partly done.** 34 unit tests now cover the pricing
+- [ ] **Automated tests — partly done.** 44 unit tests now cover the pricing
       engine's allocation and GST-slab rules, the shipment state machine, and
       the Code 128 table (checked against the specification, because a
       transposed digit produces a barcode that looks right and fails at the
-      scanner). Coupon evaluation, inventory movements and the saga runner are
-      still only covered by the smoke suites.
+      scanner), and the invoice amount-in-words conversion. Coupon evaluation,
+      inventory movements and the saga runner are still only covered by the
+      smoke suites.
 - [ ] **Core Web Vitals.** Not measured. LCP, CLS and INP targets are designed
       for (priority hero image, skeletons that reserve exact space, Server
       Components by default) but no number has been taken.

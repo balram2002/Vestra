@@ -361,6 +361,8 @@ export interface ReturnRequest {
   /** Who pays the reverse-logistics fee. */
   liability: 'SELLER' | 'CUSTOMER' | 'PLATFORM';
   reverseShippingFee: number;
+  /** Set when a settlement run has debited this return from the seller. */
+  settlementId: string | null;
   rejectionReason: string | null;
   requestedAt: string;
   approvedAt: string | null;

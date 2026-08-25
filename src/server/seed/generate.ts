@@ -18,7 +18,7 @@ import type {
   User,
   UserRole,
 } from '@/domain/types';
-import { CATALOG, INVENTORY, RETURNS, SHIPPING } from '@/config/business';
+import { CATALOG, gstStateCode, INVENTORY, RETURNS, SHIPPING } from '@/config/business';
 import { barcode, entityId, skuCode } from '@/lib/ids';
 import { toPaise } from '@/lib/money';
 import { createRng, type Rng } from '@/lib/random';
@@ -259,6 +259,9 @@ export function generateSellers(
       preferences: defaultPreferences(),
     });
 
+    // The PAN sits inside the GSTIN, so it is built once and used twice.
+    const pan = `${seed.code.slice(0, 3).toUpperCase().padEnd(3, 'A')}P${seed.code.slice(0, 1).toUpperCase()}${rng.int(1000, 9999)}K`;
+
     const registeredAddress = {
       name: `${seed.displayName} Warehouse`,
       contactName: `${seed.displayName} Dispatch`,
@@ -299,8 +302,11 @@ export function generateSellers(
       supportEmail: `support@${handle}.example`,
       supportPhone: `1800${rng.int(100000, 999999)}`,
       kyc: {
-        gstin: `${rng.int(10, 37)}${seed.code.slice(0, 5).toUpperCase().padEnd(5, 'A')}${rng.int(1000, 9999)}A1Z${rng.int(1, 9)}`,
-        pan: `${seed.code.slice(0, 3).toUpperCase().padEnd(3, 'A')}P${seed.code.slice(0, 1).toUpperCase()}${rng.int(1000, 9999)}K`,
+        // A GSTIN is <state code><PAN><entity no>Z<check>, so it embeds the PAN
+        // and the state it is registered in. Generating the three independently
+        // produced documents that contradict themselves on their face.
+        gstin: `${gstStateCode(registeredAddress.state)}${pan}${rng.int(1, 9)}Z${rng.int(1, 9)}`,
+        pan,
         businessType: pick(rng, ['PRIVATE_LIMITED', 'LLP', 'PROPRIETORSHIP'] as const),
         registeredAddress,
         documents: [
