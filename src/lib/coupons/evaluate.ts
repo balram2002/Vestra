@@ -34,6 +34,14 @@ export interface CouponContext {
   paymentMethod: PaymentMethod | null;
   /** Segment keys the shopper belongs to, for targeted campaigns. */
   segments: string[];
+  /**
+   * Delivery currently being charged, in paise.
+   *
+   * A free-shipping coupon on a bag that already ships free saves nothing, and
+   * offering it as usable — "Save ₹0" — reads as a broken discount rather than
+   * as good news the shopper already has.
+   */
+  shippingTotal: number;
   now: Date;
 }
 
@@ -138,7 +146,17 @@ export function evaluateCoupon(coupon: Coupon, context: CouponContext): CouponEv
   const eligibleRefIds = eligibleLines.map((line) => line.refId);
 
   if (coupon.type === 'FREE_SHIPPING') {
-    return { applicable: true, discount: 0, eligibleRefIds, waivesShipping: true, reason: null, amountToUnlock: null };
+    if (context.shippingTotal <= 0) {
+      return deny('Your order already ships free.');
+    }
+    return {
+      applicable: true,
+      discount: context.shippingTotal,
+      eligibleRefIds,
+      waivesShipping: true,
+      reason: null,
+      amountToUnlock: null,
+    };
   }
 
   let discount = 0;

@@ -110,3 +110,52 @@ export async function moveItemToBag(variantId: string): Promise<ActionResult> {
   refresh();
   return { ok: true };
 }
+
+/* --------------------------------------------------------------- coupons */
+
+/**
+ * Apply a coupon code.
+ *
+ * The code is STORED on the bag; the discount is not. Every read re-evaluates
+ * it against live rules, so a coupon that expires overnight or hits its usage
+ * limit stops discounting on the next page view rather than persisting a stale
+ * amount into checkout.
+ *
+ * Validation happens here as well as on read, because a code that will never
+ * work should be refused at the moment it is typed, with the reason.
+ */
+export async function applyCoupon(input: { code: string }): Promise<ActionResult> {
+  const code = input.code.trim().toUpperCase();
+  if (code.length < 3) return { ok: false, error: 'Enter a coupon code.' };
+
+  const owner = await currentOwner();
+  const existing = await cart.findCart(owner);
+  if (!existing || existing.items.length === 0) {
+    return { ok: false, error: 'Your bag is empty.' };
+  }
+
+  const result = await cart.setCoupon(owner, code);
+  if (!result.ok) return { ok: false, error: result.error };
+
+  refresh();
+  return { ok: true };
+}
+
+export async function removeCoupon(): Promise<ActionResult> {
+  const owner = await currentOwner();
+  const result = await cart.setCoupon(owner, null);
+  if (!result.ok) return { ok: false, error: result.error };
+
+  refresh();
+  return { ok: true };
+}
+
+/** Spend Vestra Credit on this order, or stop spending it. */
+export async function setUseCredit(input: { use: boolean }): Promise<ActionResult> {
+  const owner = await currentOwner();
+  const result = await cart.setCreditUsage(owner, input.use);
+  if (!result.ok) return { ok: false, error: result.error };
+
+  refresh();
+  return { ok: true };
+}

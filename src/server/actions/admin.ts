@@ -406,3 +406,40 @@ export async function holdSettlementPayout(input: {
   revalidatePath('/seller/settlements');
   return { ok: true };
 }
+
+/* ------------------------------------------------------------- promotions */
+
+/**
+ * Turn an automatic offer on or off.
+ *
+ * Promotions apply with no code typed, so switching one on changes what every
+ * shopper pays immediately. That makes it a `promotion:write` action and an
+ * audited one — "who put the 30% sale live" is a question that gets asked.
+ */
+export async function setPromotionActive(input: {
+  promotionId: string;
+  isActive: boolean;
+}): Promise<ActionResult> {
+  const actor = await requirePermission('promotion:write');
+
+  const promotions = await collections.promotions();
+  const promotion = toEntity(await promotions.findOne({ _id: input.promotionId }));
+  if (!promotion) return { ok: false, error: 'Promotion not found.' };
+
+  const patch = { isActive: input.isActive, updatedAt: new Date().toISOString() };
+  await promotions.updateOne({ _id: promotion.id }, { $set: patch });
+
+  await audit.record({
+    actor,
+    action: input.isActive ? 'promotion.enable' : 'promotion.disable',
+    entityType: 'promotion',
+    entityId: promotion.id,
+    entityLabel: promotion.title,
+    changes: audit.diff(promotion, patch, ['isActive']),
+    severity: 'NOTICE',
+  });
+
+  revalidatePath('/admin/promotions');
+  // The bag reads promotions live, so nothing else needs invalidating.
+  return { ok: true };
+}

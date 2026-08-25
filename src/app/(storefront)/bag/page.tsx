@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 
 import { CartLineItem } from '@/components/commerce/cart-line-item';
+import { CouponPanel } from '@/components/commerce/coupon-panel';
 import { Button } from '@/components/ui/button';
 import { formatMoney } from '@/lib/format';
 import { currentOwner } from '@/server/auth/session';
@@ -117,7 +118,9 @@ async function BagContents() {
 
       {/* --------------------------------------------------------- summary */}
 
-      <aside className="lg:sticky lg:top-28 lg:self-start">
+      <aside className="space-y-4 lg:sticky lg:top-28 lg:self-start">
+        <CouponPanel applied={cart.coupon} offers={cart.availableCoupons} />
+
         <div className="border-line rounded-lg border p-5">
           <h2 className="text-ink text-sm font-semibold uppercase tracking-wider">
             Price details
@@ -137,10 +140,32 @@ async function BagContents() {
               />
             ) : null}
 
+            {/*
+              Each promotion is itemised rather than rolled into one "offers"
+              figure. A shopper who sees "Festive sale − ₹400" understands why
+              the total moved; a shopper who sees "Offers − ₹400" does not.
+            */}
+            {cart.offers.map((offer) => (
+              <Row
+                key={offer.id}
+                label={offer.title}
+                value={`− ${formatMoney(offer.discount)}`}
+                tone="success"
+              />
+            ))}
+
             {cart.pricing.couponDiscount > 0 ? (
               <Row
                 label={cart.pricing.couponCode ? `Coupon ${cart.pricing.couponCode}` : 'Coupon'}
                 value={`− ${formatMoney(cart.pricing.couponDiscount)}`}
+                tone="success"
+              />
+            ) : null}
+
+            {cart.pricing.creditApplied > 0 ? (
+              <Row
+                label="Vestra Credit"
+                value={`− ${formatMoney(cart.pricing.creditApplied)}`}
                 tone="success"
               />
             ) : null}

@@ -102,7 +102,11 @@ export interface Product {
   brandId: string;
   sellerId: string;
   categoryId: string;
-  /** Denormalised ancestor ids so category pages can query one field. */
+  /**
+   * Denormalised ancestor SLUGS, so a department page is one indexed equality
+   * match rather than a recursive category walk. Slugs, not ids: the listing
+   * query matches this against the slug in the URL.
+   */
   categoryPath: string[];
   gender: Gender;
   status: ProductStatus;

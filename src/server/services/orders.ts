@@ -188,7 +188,64 @@ export async function placeOrder(
       },
     },
 
-    /* ------------------------------------------------------- 3. payment */
+    /* ---------------------------------------------------- 3. redemption */
+    {
+      /*
+       * Record the coupon use.
+       *
+       * Without this the coupon engine's per-user and total limits are
+       * unenforceable — the evaluator counts redemptions, and if none are ever
+       * written a "first order only" coupon works for ever.
+       *
+       * The unique index on (couponId, orderId) is what makes it idempotent: a
+       * retried saga cannot record the same use twice.
+       */
+      name: 'record-coupon-redemption',
+      run: async (ctx) => {
+        const code = cart.pricing.couponCode;
+        if (!code || cart.pricing.couponDiscount <= 0) return;
+
+        const coupons = await collections.coupons();
+        const coupon = toEntity(await coupons.findOne({ code }));
+        if (!coupon) return;
+
+        const redemptions = await collections.couponRedemptions();
+        try {
+          await redemptions.insertOne({
+            _id: entityId('rdm'),
+            id: entityId('rdm'),
+            couponId: coupon.id,
+            code: coupon.code,
+            userId,
+            orderId: ctx.orderId,
+            discount: cart.pricing.couponDiscount,
+            redeemedAt: new Date().toISOString(),
+            revokedAt: null,
+          } as never);
+        } catch {
+          // Already recorded for this order: the constraint did its job.
+          return;
+        }
+
+        await coupons.updateOne({ _id: coupon.id }, { $inc: { usedCount: 1 } });
+      },
+      compensate: async (ctx) => {
+        // Give the use back rather than deleting it, so the fact that an
+        // attempt happened is still visible to support.
+        const redemptions = await collections.couponRedemptions();
+        const record = await redemptions.findOne({ orderId: ctx.orderId, revokedAt: null });
+        if (!record) return;
+
+        await redemptions.updateOne(
+          { _id: record._id },
+          { $set: { revokedAt: new Date().toISOString() } },
+        );
+        const coupons = await collections.coupons();
+        await coupons.updateOne({ _id: record.couponId }, { $inc: { usedCount: -1 } });
+      },
+    },
+
+    /* ------------------------------------------------------- 4. payment */
     {
       name: 'open-payment',
       run: async (ctx) => {

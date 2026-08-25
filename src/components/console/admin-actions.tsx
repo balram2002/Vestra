@@ -7,6 +7,7 @@ import { cn } from '@/lib/cn';
 import {
   reviewProduct,
   setCouponActive,
+  setPromotionActive,
   setSectionActive,
   setSellerStatus,
 } from '@/server/actions/admin';
@@ -291,5 +292,32 @@ function Toggle({
       />
       {pending ? '…' : on ? onLabel : offLabel}
     </button>
+  );
+}
+
+export function PromotionToggle({
+  promotionId,
+  title,
+  isActive,
+}: {
+  promotionId: string;
+  title: string;
+  isActive: boolean;
+}) {
+  const { pending, run } = useAction();
+
+  return (
+    <Toggle
+      pending={pending}
+      on={isActive}
+      onLabel="Live"
+      offLabel="Paused"
+      onClick={() =>
+        run(
+          () => setPromotionActive({ promotionId, isActive: !isActive }),
+          isActive ? `${title} paused` : `${title} is live`,
+        )
+      }
+    />
   );
 }

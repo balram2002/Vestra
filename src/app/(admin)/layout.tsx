@@ -101,6 +101,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           label: 'Marketing',
           items: [
             { href: '/admin/coupons', label: 'Coupons' },
+            { href: '/admin/promotions', label: 'Promotions' },
             { href: '/admin/cms', label: 'Homepage' },
           ],
         },

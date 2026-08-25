@@ -2,6 +2,7 @@ import 'server-only';
 
 import { CART, INVENTORY, SHIPPING } from '@/config/business';
 import type {
+  AppliedCoupon,
   Cart,
   CartItem,
   CartLine,
@@ -9,10 +10,18 @@ import type {
   CartSellerGroup,
   CartView,
   Product,
+  Promotion,
   ProductVariant,
 } from '@/domain/types';
 import { entityId } from '@/lib/ids';
-import { calculatePricing, emptyBreakdown, type PricingLineInput } from '@/lib/pricing/calculate';
+import {
+  calculatePricing,
+  emptyBreakdown,
+  type PricingCouponInput,
+  type PricingLineInput,
+} from '@/lib/pricing/calculate';
+import { buildCouponOffers, evaluateCoupon, type CouponContext } from '@/lib/coupons/evaluate';
+import { evaluatePromotions } from '@/lib/promotions/evaluate';
 
 import { collections, toEntities, toEntity } from '../db/collections';
 import type { Owner } from '../auth/session';
@@ -305,6 +314,57 @@ export async function mergeGuestCart(guestToken: string, userId: string): Promis
   await carts.deleteOne({ guestToken });
 }
 
+/* --------------------------------------------------------------- coupons */
+
+/**
+ * Attach or clear a coupon code.
+ *
+ * Only the CODE is stored. The discount is re-derived on every read, so a
+ * coupon that expires or hits its usage limit between now and checkout stops
+ * applying rather than leaving a stale amount on the bag.
+ */
+export async function setCoupon(owner: Owner, code: string | null): Promise<CartMutationResult> {
+  const existing = await findCart(owner);
+  if (!existing) return { ok: false, error: 'Your bag is empty.' };
+
+  if (code !== null) {
+    const coupons = await collections.coupons();
+    const coupon = toEntity(await coupons.findOne({ code }));
+
+    // Refuse an unusable code the moment it is typed, with the reason. Storing
+    // it and letting the bag quietly ignore it is the worse failure.
+    if (!coupon) return { ok: false, error: 'That coupon code does not exist.' };
+    if (!coupon.isActive) return { ok: false, error: 'That coupon is no longer active.' };
+    if (Date.parse(coupon.endsAt) < Date.now()) {
+      return { ok: false, error: 'That coupon has expired.' };
+    }
+    if (Date.parse(coupon.startsAt) > Date.now()) {
+      return { ok: false, error: 'That coupon is not active yet.' };
+    }
+  }
+
+  const carts = await collections.carts();
+  await carts.updateOne(
+    { _id: existing.id },
+    { $set: { couponCode: code, updatedAt: new Date().toISOString() } },
+  );
+
+  return { ok: true };
+}
+
+export async function setCreditUsage(owner: Owner, use: boolean): Promise<CartMutationResult> {
+  const existing = await findCart(owner);
+  if (!existing) return { ok: false, error: 'Your bag is empty.' };
+
+  const carts = await collections.carts();
+  await carts.updateOne(
+    { _id: existing.id },
+    { $set: { useCredit: use, updatedAt: new Date().toISOString() } },
+  );
+
+  return { ok: true };
+}
+
 /* ------------------------------------------------------------------ view */
 
 /** Cheap count for the header badge — no catalogue join. */
@@ -450,12 +510,159 @@ export async function getCartView(owner: Owner): Promise<CartView> {
     if (group.shippingFee === 0) freeShippingSellers.push(group.sellerId);
   }
 
+  /* ------------------------------------------------------ offers */
+
+  /*
+   * Discounts are resolved HERE, on every read, against live rules — never
+   * stored on the bag. A promotion that ended overnight, a coupon that hit its
+   * limit, or a bank offer whose payment method has now been chosen must all
+   * be reflected the next time the bag is opened, not at the moment it was
+   * added.
+   */
+  const now = new Date();
+
+  /*
+   * Offer targeting is expressed in category IDs, but `product.categoryPath`
+   * holds ancestor SLUGS — it is matched against the slug in a listing URL, so
+   * it has to. Resolving one to the other here is what makes a
+   * category-targeted promotion or coupon fire at all; without it the lists
+   * never intersect and every category offer silently does nothing.
+   */
+  const categoryCol = await collections.categories();
+  const ancestorSlugs = [...new Set(lines.flatMap((line) => byProduct.get(line.productId)!.categoryPath))];
+  const ancestorCategories = toEntities(
+    await categoryCol.find({ slug: { $in: ancestorSlugs } }).toArray(),
+  );
+  const idBySlug = new Map(ancestorCategories.map((category) => [category.slug, category.id]));
+
+  const offerContext = lines.map((line) => {
+    const product = byProduct.get(line.productId)!;
+    return {
+      refId: line.item.id,
+      productId: line.productId,
+      sellerId: line.sellerId,
+      brandId: product.brandId,
+      // Both forms, so an offer written against either matches.
+      categoryPath: [
+        ...product.categoryPath,
+        ...product.categoryPath.map((slug) => idBySlug.get(slug)).filter((id): id is string => Boolean(id)),
+      ],
+      quantity: line.quantity,
+      unitSellingPrice: line.sellingPrice,
+      lineSubtotal: line.sellingPrice * line.quantity,
+    };
+  });
+
+  const promotionCol = await collections.promotions();
+  const promotions = toEntities(
+    await promotionCol
+      .find({ isActive: true, endsAt: { $gte: now.toISOString() } })
+      .toArray(),
+  );
+
+  const promotionResult = evaluatePromotions(promotions, {
+    lines: offerContext,
+    paymentMethod: cart.paymentMethod,
+    now,
+  });
+
+  /* ------------------------------------------------------ coupon */
+
+  const [couponCol, redemptionCol, orderCol, userCol] = await Promise.all([
+    collections.coupons(),
+    collections.couponRedemptions(),
+    collections.orders(),
+    collections.users(),
+  ]);
+
+  const visibleCoupons = toEntities(
+    await couponCol.find({ isActive: true, endsAt: { $gte: now.toISOString() } }).toArray(),
+  );
+
+  const userId = 'userId' in owner ? owner.userId : null;
+
+  // "New customer" means never having had an order delivered, not never having
+  // placed one — otherwise an abandoned first attempt burns the offer.
+  const deliveredCount = userId
+    ? await orderCol.countDocuments({ userId, status: 'DELIVERED' })
+    : 0;
+
+  const couponContext: CouponContext = {
+    lines: offerContext,
+    userId,
+    isNewCustomer: deliveredCount === 0,
+    userRedemptionCount: 0,
+    paymentMethod: cart.paymentMethod,
+    segments: [],
+    shippingTotal: groups.reduce((sum, group) => sum + group.shippingFee, 0),
+    now,
+  };
+
+  let appliedCoupon: AppliedCoupon | null = null;
+  let couponInput: PricingCouponInput | null = null;
+
+  if (cart.couponCode) {
+    const coupon = visibleCoupons.find((entry) => entry.code === cart.couponCode);
+    if (coupon) {
+      const redemptions = userId
+        ? await redemptionCol.countDocuments({ couponId: coupon.id, userId, revokedAt: null })
+        : 0;
+      const evaluation = evaluateCoupon(coupon, { ...couponContext, userRedemptionCount: redemptions });
+
+      if (evaluation.applicable) {
+        couponInput = {
+          code: coupon.code,
+          title: coupon.title,
+          fundedBy: coupon.fundedBy,
+          discount: evaluation.discount,
+          eligibleRefIds: evaluation.eligibleRefIds,
+          waivesShipping: evaluation.waivesShipping,
+        };
+        appliedCoupon = {
+          code: coupon.code,
+          title: coupon.title,
+          discount: evaluation.discount,
+          fundedBy: coupon.fundedBy,
+        };
+      } else {
+        // The code stays on the bag but stops discounting, and the reason is
+        // surfaced as an issue — silently dropping it leaves the shopper
+        // wondering where their discount went.
+        lines[0]?.issues.push({
+          kind: 'QUANTITY_LIMIT',
+          blocking: false,
+          message: `${coupon.code} no longer applies: ${evaluation.reason ?? 'it is not valid for this bag.'}`,
+          resolution: 'NONE',
+        });
+      }
+    }
+  }
+
+  const availableCoupons = buildCouponOffers(visibleCoupons, couponContext);
+
+  /* ----------------------------------------------------- credit */
+
+  const creditAvailable = userId
+    ? ((await userCol.findOne({ _id: userId }, { projection: { creditBalance: 1 } }))
+        ?.creditBalance ?? 0)
+    : 0;
+
   const pricing = calculatePricing({
     lines: pricingLines,
     shippingBySeller,
     freeShippingSellers,
+    promotions: promotionResult.applied,
+    coupon: couponInput,
     giftWrapFee: cart.giftWrap ? SHIPPING.giftWrapFee : 0,
+    creditRequested: cart.useCredit ? creditAvailable : 0,
   });
+
+  // Attribute each seller's own offers back to their block in the bag.
+  for (const group of groups) {
+    group.sellerOffers = promotionResult.offers.filter(
+      (offer) => offer.fundedBy === 'SELLER' && sellerFundsOffer(offer.id, promotions, group.sellerId),
+    );
+  }
 
   const allIssues = lines.flatMap((line) => line.issues);
 
@@ -466,15 +673,28 @@ export async function getCartView(owner: Owner): Promise<CartView> {
     totalItems: lines.length,
     totalUnits: lines.reduce((sum, l) => sum + l.quantity, 0),
     pricing,
-    coupon: null,
-    availableCoupons: [],
-    offers: [],
+    coupon: appliedCoupon,
+    availableCoupons,
+    offers: promotionResult.offers,
     issues: allIssues,
     // A single blocking issue anywhere stops the whole bag: the shopper is
     // buying one order, not one line.
     checkoutReady: lines.length > 0 && !allIssues.some((issue) => issue.blocking),
-    creditAvailable: 0,
+    creditAvailable,
   };
+}
+
+/** Whether a seller-funded promotion belongs to this particular seller. */
+function sellerFundsOffer(
+  promotionId: string,
+  promotions: Promotion[],
+  sellerId: string,
+): boolean {
+  const promotion = promotions.find((entry) => entry.id === promotionId);
+  if (!promotion) return false;
+  // An untargeted seller-funded promotion is platform-wide in practice, so it
+  // is not attributed to any one store's block.
+  return promotion.sellerIds.includes(sellerId);
 }
 
 /**

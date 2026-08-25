@@ -22,6 +22,7 @@ import {
 } from './generate';
 import { generateEngagement } from './engagement';
 import { generateOrders } from './orders';
+import { generatePromotions } from './promotions';
 import { generateReturns } from './returns';
 import { generateShipments } from './shipments';
 import { generateCmsPages } from './pages';
@@ -208,6 +209,7 @@ export async function seedDatabase(
   log('Generating offers and content...');
   const marketingUser = staff.find((u) => u.roles.includes('MARKETING_MANAGER')) ?? staff[0]!;
   const coupons = generateCoupons(categories, sellers, marketingUser.id, now);
+  const promotions = generatePromotions(categories, brands, sellers, now);
   const homeSections = generateHomeSections(now);
   const banners = generateBanners(now);
   const cmsPages = generateCmsPages(marketingUser.id, now);
@@ -320,6 +322,7 @@ export async function seedDatabase(
   counts.products = await insert(COLLECTIONS.products, products);
   counts.reviews = await insert(COLLECTIONS.reviews, reviews);
   counts.coupons = await insert(COLLECTIONS.coupons, coupons);
+  counts.promotions = await insert(COLLECTIONS.promotions, promotions);
   counts.orders = await insert(COLLECTIONS.orders, history.orders);
   counts.sellerOrders = await insert(COLLECTIONS.sellerOrders, history.sellerOrders);
   counts.orderItems = await insert(COLLECTIONS.orderItems, history.items);

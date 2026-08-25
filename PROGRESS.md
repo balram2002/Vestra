@@ -13,12 +13,13 @@ with a server running (`npm run restart && npm run start`):
 | `npm run smoke:shipping` | courier webhook defences, labels, parcel ownership |
 | `npm run smoke:exchange` | a size swap end to end, asserted on stock movements |
 | `npm run smoke:listing` | a seller authoring a listing from empty form to sizes |
+| `npm run smoke:offers` | coupons and promotions, asserted on the total not the banner |
 | `npm run audit:a11y` | axe-core, 12 routes × 2 widths |
 | `npm run audit:contrast` | WCAG ratios, parsed from `tokens.css` |
 
-Latest run: **build 271/271 routes · typecheck clean · lint clean · 44 unit tests
+Latest run: **build 272/272 routes · typecheck clean · lint clean · 64 unit tests
 · funnel 11/11 · RBAC 19/19 · admin writes 6/6 · fulfilment 25/25 · exchange 20/20
-· listing 20/20 · a11y 0 violations · contrast 3/3**
+· listing 20/20 · offers 17/17 · a11y 0 violations · contrast 3/3**
 
 ---
 
@@ -261,6 +262,45 @@ accessible name.
 
 ---
 
+## Phase 13 — Coupons wired up, and the promotions engine · **done**
+
+The coupon engine existed, was well tested by nothing, and was **not connected
+to the bag** — `getCartView` returned `coupon: null`, `availableCoupons: []`,
+`offers: []` and `creditAvailable: 0` as literals. Six coupons were seeded and
+none of them could ever be applied. Promotions were typed and indexed but had
+no evaluator, no data and no UI.
+
+- [x] Promotions engine: one offer per line (the best), never stacked — a
+      festival offer plus a flash sale plus a seller offer must not discount an
+      item to nothing
+- [x] Bank offers stay MESSAGING until the instrument is chosen, so the bag
+      never shows a total the shopper cannot actually pay
+- [x] Flash sales stop at their allocation, so scarcity is real and the funder
+      is not exposed to an unbounded discount
+- [x] Buy-X-get-Y discounts UNITS, not lines, and scales with complete groups
+- [x] Coupons, promotions and store credit all wired into `getCartView`, and
+      re-evaluated on every read against live rules — a coupon that expires
+      overnight stops discounting on the next page view
+- [x] Coupon codes are stored on the bag; the DISCOUNT never is
+- [x] Coupon redemptions recorded as a saga step, compensated on rollback —
+      without which the engine's per-user and total limits were unenforceable
+      and a "first order only" coupon worked for ever
+- [x] Offers panel on the bag: type a code, or take one of the offers listed
+      best-first, with the shortfall shown for the ones nearly in reach
+- [x] Admin promotions screen with an audited enable/disable
+- [x] 20 unit tests on the promotions engine
+
+**Two defects found by looking at the rendered bag.** A free-shipping coupon
+was offered as "Save ₹0" on an order that already shipped free — the engine had
+no idea what shipping was, and now refuses with "your order already ships free".
+And **category-targeted offers could never fire**: offers store category IDs
+while `product.categoryPath` stores ancestor SLUGS, because that is what the
+listing query matches against. The type said "ids" and was simply wrong. The
+slugs are now resolved to ids where the offer context is built, and the type
+comment says what the field actually holds.
+
+---
+
 ## Not yet done
 
 Honest list of what the brief asks for that is not built.
@@ -276,19 +316,17 @@ Honest list of what the brief asks for that is not built.
       approved; there is no application journey.
 - [ ] **Manual refunds from the console.** Approvals, suspensions and toggles
       are done; issuing a refund by hand is not.
-- [ ] **Promotions engine.** Coupons work. Promotions (flash sales, bank offers,
-      BXGY) are typed but not evaluated.
 - [ ] **Guest checkout.** Checkout requires an account.
 
 ### Quality gaps
 
-- [ ] **Automated tests — partly done.** 44 unit tests now cover the pricing
+- [ ] **Automated tests — partly done.** 64 unit tests now cover the pricing
       engine's allocation and GST-slab rules, the shipment state machine, and
       the Code 128 table (checked against the specification, because a
       transposed digit produces a barcode that looks right and fails at the
-      scanner), and the invoice amount-in-words conversion. Coupon evaluation,
-      inventory movements and the saga runner are still only covered by the
-      smoke suites.
+      scanner), the promotions engine and the invoice amount-in-words
+      conversion. Coupon evaluation, inventory movements and the saga runner
+      are still only covered by the smoke suites.
 - [ ] **Core Web Vitals.** Not measured. LCP, CLS and INP targets are designed
       for (priority hero image, skeletons that reserve exact space, Server
       Components by default) but no number has been taken.
