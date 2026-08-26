@@ -164,9 +164,26 @@ export async function replyToTicket(input: {
 export async function setTicketStatus(
   ticketId: string,
   status: SupportTicket['status'],
-): Promise<{ ok: boolean }> {
+  agent?: { id: string; name: string },
+): Promise<{ ok: boolean; error?: string }> {
   const tickets = await collections.supportTickets();
+  const ticket = toEntity(await tickets.findOne({ _id: ticketId }));
+  if (!ticket) return { ok: false, error: 'Ticket not found.' };
+
   const iso = new Date().toISOString();
+
+  /*
+   * The agent who acts on an unassigned ticket takes it.
+   *
+   * Assignment by side effect rather than as a separate step, because the
+   * alternative — a queue where everyone can act and nobody owns anything — is
+   * how two agents answer the same customer differently. An already-assigned
+   * ticket keeps its owner.
+   */
+  const assignment =
+    agent && !ticket.assignedToUserId
+      ? { assignedToUserId: agent.id, assignedToName: agent.name }
+      : {};
 
   await tickets.updateOne(
     { _id: ticketId },
@@ -174,6 +191,7 @@ export async function setTicketStatus(
       $set: {
         status,
         updatedAt: iso,
+        ...assignment,
         ...(status === 'RESOLVED' || status === 'CLOSED' ? { resolvedAt: iso } : {}),
       },
     },

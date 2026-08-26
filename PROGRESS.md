@@ -15,12 +15,14 @@ with a server running (`npm run restart && npm run start`):
 | `npm run smoke:listing` | a seller authoring a listing from empty form to sizes |
 | `npm run smoke:offers` | coupons and promotions, asserted on the total not the banner |
 | `npm run smoke:guest` | a purchase with no account, and who can read it afterwards |
+| `npm run smoke:ops` | answering a ticket and refunding an order, incl. permissions |
 | `npm run audit:a11y` | axe-core, 12 routes × 2 widths |
 | `npm run audit:contrast` | WCAG ratios, parsed from `tokens.css` |
 
 Latest run: **build 272/272 routes · typecheck clean · lint clean · 64 unit tests
 · funnel 11/11 · RBAC 19/19 · admin writes 6/6 · fulfilment 25/25 · exchange 20/20
-· listing 20/20 · offers 17/17 · guest 18/18 · a11y 0 violations · contrast 3/3**
+· listing 20/20 · offers 17/17 · guest 18/18 · console ops 23/23 · a11y 0 violations
+· contrast 3/3**
 
 ---
 
@@ -335,6 +337,33 @@ as "Email Your order confirmation and tracking go here".
 
 ---
 
+## Phase 15 — Support replies, manual refunds, admin order detail · **done**
+
+The last two console gaps, plus the screen both of them needed.
+
+- [x] Agents reply on the ticket thread, and INTERNAL NOTES live on the same
+      thread rather than in a second system — the customer view filters them
+      out, and the smoke suite checks that against the customer's actual page
+      rather than against a flag
+- [x] Replying moves the ticket and assigns it. An agent who answers has by
+      definition started work, and a queue where everyone can act and nobody
+      owns anything is how two agents answer the same customer differently
+- [x] Manual refunds for what the return flow cannot express: a lost parcel, a
+      goodwill gesture, a duplicate charge. Deliberately NOT modelled as a fake
+      return, which would corrupt the return metrics sellers are scored on
+- [x] The amount is capped at what the order actually contributed minus what
+      has already been refunded, so neither a typo nor a double click can
+      refund more than was paid
+- [x] Gated on `order:refund` and audited at CRITICAL. Support can read the
+      order and is not offered the control; finance is
+- [x] `/admin/orders/[orderNumber]` — resolves by order number OR id, because
+      support arrives from a phone call holding the number and the console
+      links with the id
+- [x] Requester email is masked in the agent view; a support console on a
+      shared screen is where customer contact details usually leak
+
+---
+
 ## Not yet done
 
 Honest list of what the brief asks for that is not built.
@@ -344,12 +373,8 @@ Honest list of what the brief asks for that is not built.
 - [ ] **Real notification delivery.** The in-app centre works and preferences
       are honoured, but the email, SMS and push adapters log rather than send —
       deliberately visible as stubs.
-- [ ] **Replying to a ticket from the UI.** The service supports it; the agent
-      view is read-only.
 - [ ] **Seller onboarding and KYC submission flow.** Sellers are seeded as
       approved; there is no application journey.
-- [ ] **Manual refunds from the console.** Approvals, suspensions and toggles
-      are done; issuing a refund by hand is not.
 
 ### Quality gaps
 

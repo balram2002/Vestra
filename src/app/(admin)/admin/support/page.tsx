@@ -65,7 +65,12 @@ async function TicketQueue({
       header: 'Ticket',
       render: (ticket) => (
         <div className="min-w-0">
-          <p className="text-ink truncate text-xs font-medium">{ticket.subject}</p>
+          <Link
+            href={`/admin/support/${ticket.id}`}
+            className="text-ink hover:text-accent block truncate text-xs font-medium underline-offset-2 hover:underline"
+          >
+            {ticket.subject}
+          </Link>
           <p className="text-faint truncate text-2xs">
             <span className="tabular">{ticket.ticketNumber}</span> - {ticket.requesterName}
           </p>

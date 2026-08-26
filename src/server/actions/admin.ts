@@ -5,7 +5,10 @@ import { z } from 'zod';
 
 import { PRODUCT_STATUS_META, SELLER_STATUS_META } from '@/domain/enums';
 
+import { toPaise } from '@/lib/money';
+
 import { requirePermission } from '../auth/session';
+import { issueManualRefund } from '../services/returns';
 import {
   getSettlement,
   holdSettlement,
@@ -441,5 +444,62 @@ export async function setPromotionActive(input: {
 
   revalidatePath('/admin/promotions');
   // The bag reads promotions live, so nothing else needs invalidating.
+  return { ok: true };
+}
+
+/* ---------------------------------------------------------------- refunds */
+
+/**
+ * Refund an order by hand.
+ *
+ * For the cases the return flow cannot express — a parcel the courier lost, a
+ * goodwill gesture, a duplicate charge. Gated on `order:refund` because it
+ * moves money, and audited at CRITICAL because "who refunded this and why" is
+ * the first question asked when the numbers are queried.
+ */
+export async function refundOrderManually(input: {
+  orderId: string;
+  /** Rupees from the console; converted to paise here. */
+  amountRupees: number;
+  reason: string;
+}): Promise<ActionResult> {
+  const actor = await requirePermission('order:refund');
+
+  const schema = z.object({
+    orderId: z.string().min(1),
+    amountRupees: z.number().positive('Enter an amount greater than zero'),
+    reason: z.string().trim().min(4, 'Give a reason for this refund'),
+  });
+
+  const parsed = schema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? 'Check the details.' };
+  }
+
+  const result = await issueManualRefund({
+    orderId: parsed.data.orderId,
+    amount: toPaise(parsed.data.amountRupees),
+    reason: parsed.data.reason,
+    actorUserId: actor.id,
+  });
+
+  if (!result.ok) return { ok: false, error: result.error };
+
+  const orders = await collections.orders();
+  const order = toEntity(await orders.findOne({ _id: parsed.data.orderId }));
+
+  await audit.record({
+    actor,
+    action: 'order.refund',
+    entityType: 'order',
+    entityId: parsed.data.orderId,
+    entityLabel: order?.orderNumber ?? parsed.data.orderId,
+    changes: [{ field: 'refundAmount', before: null, after: result.amount ?? 0 }],
+    note: parsed.data.reason,
+    severity: 'CRITICAL',
+  });
+
+  revalidatePath('/admin/refunds');
+  revalidatePath(`/admin/orders/${order?.orderNumber ?? ''}`);
   return { ok: true };
 }

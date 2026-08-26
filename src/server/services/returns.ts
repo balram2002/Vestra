@@ -15,7 +15,7 @@ import { collections, toEntities, toEntity } from '../db/collections';
 import { nextReturnNumber } from '../db/sequences';
 import { gateway } from '../payments';
 import * as inventory from '../repositories/inventory';
-import { NOTIFY } from './notifications';
+import { NOTIFY, notifyQuietly } from './notifications';
 import { getOrder, recomputeOrderStatus } from './orders';
 
 /**
@@ -424,6 +424,123 @@ export async function initiateRefund(
 
   await recomputeOrderStatus(request.orderId);
   return refund;
+}
+
+/**
+ * A refund raised by a human, not by a return.
+ *
+ * Support and finance need this for the cases the return flow cannot express:
+ * a parcel the courier lost, a goodwill gesture after a late delivery, a
+ * duplicate charge. It is deliberately NOT tied to a return request — inventing
+ * a fake return to move money would corrupt the return metrics every seller is
+ * scored on.
+ *
+ * Two guards make it safe to expose in a console:
+ *
+ *  1. The amount is CAPPED at what the order actually contributed, minus
+ *     whatever has already been refunded. A typo cannot refund more than was
+ *     paid, and repeated clicks cannot stack past the total.
+ *  2. It records who did it and why, and the reason is not optional.
+ */
+export async function issueManualRefund(input: {
+  orderId: string;
+  /** Paise. Capped at what remains refundable on the order. */
+  amount: number;
+  reason: string;
+  actorUserId: string;
+  liability?: Refund['liability'];
+}): Promise<{ ok: boolean; error?: string; refundId?: string; amount?: number }> {
+  const reason = input.reason.trim();
+  if (reason.length < 4) return { ok: false, error: 'Give a reason for this refund.' };
+  if (!Number.isFinite(input.amount) || input.amount <= 0) {
+    return { ok: false, error: 'Enter an amount greater than zero.' };
+  }
+
+  const [orders, payments, refunds] = await Promise.all([
+    collections.orders(),
+    collections.payments(),
+    collections.refunds(),
+  ]);
+
+  const order = toEntity(await orders.findOne({ _id: input.orderId }));
+  if (!order) return { ok: false, error: 'Order not found.' };
+
+  // Everything already refunded against this order, whatever raised it.
+  const existing = toEntities(await refunds.find({ orderId: order.id }).toArray());
+  const alreadyRefunded = existing
+    .filter((refund) => refund.status !== 'FAILED')
+    .reduce((sum, refund) => sum + refund.amount, 0);
+
+  const remaining = Math.max(0, order.pricing.payable - alreadyRefunded);
+  if (remaining === 0) {
+    return { ok: false, error: 'This order has already been refunded in full.' };
+  }
+
+  const amount = Math.min(Math.round(input.amount), remaining);
+
+  const payment = order.paymentId
+    ? toEntity(await payments.findOne({ _id: order.paymentId }))
+    : null;
+
+  const iso = new Date().toISOString();
+  const refundId = entityId('rfd');
+  const days =
+    order.paymentMethod === 'COD' ? RETURNS.refundSlaDays.cod : RETURNS.refundSlaDays.prepaid;
+
+  const refund: Refund = {
+    id: refundId,
+    refundNumber: `RF${order.orderNumber.slice(2)}-M${existing.length + 1}`,
+    orderId: order.id,
+    orderNumber: order.orderNumber,
+    sellerOrderId: null,
+    paymentId: payment?.id ?? null,
+    userId: order.userId,
+    // Not attributed to specific lines: this is an order-level adjustment, and
+    // pretending otherwise would distort per-item return rates.
+    items: [],
+    amount,
+    shippingRefund: 0,
+    mode: order.paymentMethod === 'COD' ? 'BANK_TRANSFER' : 'ORIGINAL',
+    status: 'PENDING',
+    reason,
+    liability: input.liability ?? 'PLATFORM',
+    providerRefundId: null,
+    failureReason: null,
+    expectedBy: new Date(Date.now() + days * 86_400_000).toISOString(),
+    initiatedAt: iso,
+    completedAt: null,
+    initiatedByUserId: input.actorUserId,
+    timeline: [event('REFUND_INITIATED', 'Refund initiated by support', 'ADMIN', iso, reason)],
+    createdAt: iso,
+    updatedAt: iso,
+  };
+
+  await refunds.insertOne({ ...refund, _id: refund.id });
+
+  // COD has no captured payment to reverse; finance pays out by bank transfer.
+  if (payment?.providerPaymentId) {
+    const result = await gateway().refund({
+      providerPaymentId: payment.providerPaymentId,
+      amount,
+      reason,
+      idempotencyKey: refundId,
+    });
+    await applyRefundResult(refundId, result);
+  }
+
+  if (order.userId) {
+    notifyQuietly({
+      userId: order.userId,
+      category: 'PAYMENT',
+      title: `A refund is on its way for ${order.orderNumber}`,
+      body: reason,
+      href: `/orders/${order.id}`,
+      entityType: 'refund',
+      entityId: refundId,
+    });
+  }
+
+  return { ok: true, refundId, amount };
 }
 
 export async function applyRefundResult(

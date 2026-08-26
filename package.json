@@ -27,7 +27,8 @@
     "smoke:exchange": "node scripts/smoke-exchange.mjs",
     "smoke:listing": "node scripts/smoke-listing.mjs",
     "smoke:offers": "node scripts/smoke-offers.mjs",
-    "smoke:guest": "node scripts/smoke-guest.mjs"
+    "smoke:guest": "node scripts/smoke-guest.mjs",
+    "smoke:ops": "node scripts/smoke-console-ops.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
