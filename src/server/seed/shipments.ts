@@ -3,6 +3,8 @@ import 'server-only';
 import type { FulfillmentStatus, ShipmentStatus } from '@/domain/enums';
 import type { Manifest, Order, OrderItem, SellerLocation, SellerOrder, Shipment, ShipmentEvent } from '@/domain/types';
 import { entityId } from '@/lib/ids';
+
+import { financialYear } from '../db/sequences';
 import { createRng } from '@/lib/random';
 
 import { describeStatus } from '../shipping/eshopbox/status';
@@ -117,8 +119,8 @@ export function generateShipments(args: {
 
     sequence += 1;
     const shipmentId = entityId('shp');
-    const financialYear = fiscalYearOf(new Date(sellerOrder.placedAt));
-    const shipmentNumber = `SH${financialYear}${String(sequence).padStart(7, '0')}`;
+    const fy = financialYear(new Date(sellerOrder.placedAt));
+    const shipmentNumber = `SH${fy}${String(sequence).padStart(7, '0')}`;
 
     const packedAt = sellerOrder.packedAt ?? sellerOrder.placedAt;
     const awb = allocateAwb(shipmentNumber, new Date(packedAt), issuedAwbs);
@@ -212,7 +214,7 @@ export function generateShipments(args: {
     const closedAt = `${day}T13:30:00.000Z`;
     const manifest: Manifest = {
       id: entityId('mfst'),
-      manifestNumber: `MF${fiscalYearOf(new Date(day))}${String(manifestSequence).padStart(6, '0')}`,
+      manifestNumber: `MF${financialYear(new Date(day))}${String(manifestSequence).padStart(6, '0')}`,
       sellerId,
       pickupLocationId: bucket[0].pickupLocationId,
       shipmentIds: bucket.map((shipment) => shipment.id),
@@ -238,10 +240,7 @@ function addHours(iso: string, hours: number): string {
   return new Date(Date.parse(iso) + hours * 3_600_000).toISOString();
 }
 
-function fiscalYearOf(date: Date): string {
-  const year = date.getMonth() >= 3 ? date.getFullYear() : date.getFullYear() - 1;
-  return `${year}${String(year + 1).slice(2)}`;
-}
+
 
 /**
  * The scans a parcel would have collected, anchored to the order's real

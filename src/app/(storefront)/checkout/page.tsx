@@ -9,7 +9,7 @@ import { CheckoutSteps } from '@/components/checkout/checkout-steps';
 import { Button } from '@/components/ui/button';
 import { SHIPPING } from '@/config/business';
 import { formatMoney } from '@/lib/format';
-import { requireUser } from '@/server/auth/session';
+import { currentOwner, getSessionUser } from '@/server/auth/session';
 import { collections, toEntities } from '@/server/db/collections';
 import { getCartView } from '@/server/services/cart';
 
@@ -39,17 +39,23 @@ export default function CheckoutPage() {
 }
 
 async function CheckoutFlow() {
-  const user = await requireUser();
-  const cart = await getCartView({ kind: 'user', userId: user.id });
+  /*
+   * No `requireUser` here. A guest can buy — being made to create an account
+   * in order to hand over money is the single largest avoidable drop-off in a
+   * checkout, and everything downstream already treats `order.userId` as
+   * nullable.
+   */
+  const [user, owner] = await Promise.all([getSessionUser(), currentOwner()]);
+  const cart = await getCartView(owner);
 
   if (cart.groups.length === 0 || !cart.checkoutReady) {
     redirect('/bag');
   }
 
   const addressCol = await collections.addresses();
-  const addresses = toEntities(
-    await addressCol.find({ userId: user.id }).sort({ isDefault: -1 }).toArray(),
-  );
+  const addresses = user
+    ? toEntities(await addressCol.find({ userId: user.id }).sort({ isDefault: -1 }).toArray())
+    : [];
 
   // COD is offered only when every seller in the bag supports it and the total
   // is inside the platform cap — one seller opting out disables it for the
@@ -69,7 +75,14 @@ async function CheckoutFlow() {
 
       <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-14">
         <div>
-          {addresses.length === 0 ? (
+          {/*
+            The "add an address first" detour applies only to a SIGNED-IN
+            shopper with an empty address book — they have somewhere to save it
+            to. A guest has no address book by definition, and sending them to
+            /account/addresses would bounce them into a sign-in wall from the
+            middle of a checkout.
+          */}
+          {user && addresses.length === 0 ? (
             <div className="border-line rounded-lg border border-dashed p-8 text-center">
               <MapPin className="text-faint mx-auto size-7" aria-hidden />
               <p className="text-ink mt-3 text-md font-medium">No saved addresses</p>
@@ -85,6 +98,7 @@ async function CheckoutFlow() {
             </div>
           ) : (
             <CheckoutForm
+              isGuest={!user}
               addresses={addresses}
               payable={cart.pricing.payable}
               codAvailable={codAvailable}

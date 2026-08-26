@@ -53,9 +53,23 @@ export function Field({
   return (
     <label className="block">
       <span className="text-ink block text-xs font-medium">{label}</span>
-      {hint ? <span className="text-faint mt-0.5 block text-2xs">{hint}</span> : null}
+      {/*
+        The hint and the error are marked `aria-hidden` because this is a
+        WRAPPING label: everything inside it becomes part of the control's
+        accessible name, so a two-line hint would be read out as the field's
+        name. They stay visible to sighted users; the name stays just the label.
+      */}
+      {hint ? (
+        <span aria-hidden className="text-faint mt-0.5 block text-2xs">
+          {hint}
+        </span>
+      ) : null}
       <span className="mt-1.5 block">{children}</span>
-      {error ? <span className="text-danger-600 mt-1 block text-2xs">{error}</span> : null}
+      {error ? (
+        <span role="alert" className="text-danger-600 mt-1 block text-2xs">
+          {error}
+        </span>
+      ) : null}
     </label>
   );
 }

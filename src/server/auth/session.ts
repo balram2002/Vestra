@@ -165,6 +165,44 @@ export async function ensureGuestToken(): Promise<string> {
   return token;
 }
 
+/**
+ * Orders a guest placed from this browser.
+ *
+ * A guest has no account, so there is nothing to scope an order lookup to.
+ * Rather than making order numbers guessable-and-readable — which would let
+ * anyone enumerate strangers' addresses and phone numbers — the ids of orders
+ * placed in this browser are kept in an httpOnly cookie, and that is the only
+ * thing that grants access. Losing the cookie means the order can still be
+ * reached, but only through support or by claiming it with the email it was
+ * placed under.
+ */
+const GUEST_ORDERS_COOKIE = 'vestra_guest_orders';
+
+export async function guestOrderIds(): Promise<string[]> {
+  const store = await cookies();
+  const raw = store.get(GUEST_ORDERS_COOKIE)?.value;
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function rememberGuestOrder(orderId: string): Promise<void> {
+  const store = await cookies();
+  const existing = await guestOrderIds();
+  // Keep the last few, so a shared machine does not accumulate strangers'
+  // orders indefinitely.
+  const next = [orderId, ...existing.filter((id) => id !== orderId)].slice(0, 10);
+  store.set(GUEST_ORDERS_COOKIE, JSON.stringify(next), cookieOptions(60 * 60 * 24 * 30));
+}
+
+export async function ownsGuestOrder(orderId: string): Promise<boolean> {
+  return (await guestOrderIds()).includes(orderId);
+}
+
 export async function clearGuestToken(): Promise<void> {
   const store = await cookies();
   store.delete(GUEST_COOKIE);

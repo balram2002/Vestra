@@ -6,10 +6,10 @@ import { z } from 'zod';
 
 import { PAYMENT_METHODS, CANCELLATION_REASONS, RETURN_REASONS } from '@/domain/enums';
 
-import { currentOwner, requireUser } from '../auth/session';
+import { currentOwner, getSessionUser, rememberGuestOrder, requireUser } from '../auth/session';
 import { gateway } from '../payments';
 import { collections, toEntity } from '../db/collections';
-import { cancelItems, placeOrder, settlePayment } from '../services/orders';
+import { cancelItems, findOrderForViewer, placeOrder, settlePayment } from '../services/orders';
 import { requestExchange } from '../services/exchanges';
 import { requestReturn } from '../services/returns';
 
@@ -26,35 +26,93 @@ export interface ActionResult {
   error?: string;
 }
 
+const guestAddressSchema = z.object({
+  fullName: z.string().trim().min(2, 'Enter the full name'),
+  phone: z
+    .string()
+    .trim()
+    .regex(/^[6-9]\d{9}$/, 'Enter a 10-digit Indian mobile number'),
+  line1: z.string().trim().min(4, 'Enter the address'),
+  line2: z.string().trim().max(120).optional().or(z.literal('')),
+  landmark: z.string().trim().max(120).optional().or(z.literal('')),
+  city: z.string().trim().min(2, 'Enter the city'),
+  state: z.string().trim().min(2, 'Choose the state'),
+  pincode: z.string().trim().regex(/^\d{6}$/, 'Enter a 6-digit pincode'),
+});
+
 const placeSchema = z.object({
-  addressId: z.string().min(1, 'Choose a delivery address'),
+  addressId: z.string().optional(),
+  guest: z
+    .object({
+      email: z.string().trim().email('Enter a valid email address'),
+      address: guestAddressSchema,
+    })
+    .optional(),
   paymentMethod: z.enum(PAYMENT_METHODS),
   orderNote: z.string().max(500).optional(),
   giftWrap: z.boolean().optional(),
 });
 
+/**
+ * Place the order.
+ *
+ * Works signed in or as a guest. The difference is only in where the address
+ * comes from — a guest is not asked to create an account to buy something,
+ * which is the single largest avoidable drop-off in a checkout.
+ */
 export async function submitOrder(input: {
-  addressId: string;
+  addressId?: string;
+  guest?: { email: string; address: Record<string, string> };
   paymentMethod: string;
   orderNote?: string;
   giftWrap?: boolean;
 }): Promise<ActionResult> {
-  const user = await requireUser();
-
   const parsed = placeSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? 'Check your details.' };
   }
 
+  const session = await getSessionUser();
   const owner = await currentOwner();
-  const result = await placeOrder(owner, user.id, {
+
+  if (session && !parsed.data.addressId) {
+    return { ok: false, error: 'Choose a delivery address to continue.' };
+  }
+  if (!session && !parsed.data.guest) {
+    return { ok: false, error: 'Enter your contact and delivery details to continue.' };
+  }
+
+  const result = await placeOrder(owner, session?.id ?? null, {
     addressId: parsed.data.addressId,
+    guest: parsed.data.guest
+      ? {
+          email: parsed.data.guest.email,
+          phone: parsed.data.guest.address.phone,
+          address: {
+            label: 'HOME' as const,
+            fullName: parsed.data.guest.address.fullName,
+            phone: parsed.data.guest.address.phone,
+            alternatePhone: null,
+            line1: parsed.data.guest.address.line1,
+            line2: parsed.data.guest.address.line2 || null,
+            landmark: parsed.data.guest.address.landmark || null,
+            city: parsed.data.guest.address.city,
+            state: parsed.data.guest.address.state,
+            pincode: parsed.data.guest.address.pincode,
+            country: 'IN',
+          },
+        }
+      : undefined,
     paymentMethod: parsed.data.paymentMethod,
     orderNote: parsed.data.orderNote ?? null,
     giftWrap: parsed.data.giftWrap ?? false,
   });
 
   if (!result.ok) return { ok: false, error: result.error };
+
+  // A guest has no account to look this order up from later, so the browser is
+  // given the only handle to it.
+  if (!session) await rememberGuestOrder(result.orderId);
 
   // Cash on delivery is already confirmed; card and UPI go to the provider step.
   if (parsed.data.paymentMethod === 'COD') {
@@ -72,10 +130,9 @@ export async function submitOrder(input: {
  * customer closes the tab, the webhook still confirms the order.
  */
 export async function confirmPayment(orderId: string): Promise<ActionResult> {
-  const user = await requireUser();
-
-  const orders = await collections.orders();
-  const order = toEntity(await orders.findOne({ _id: orderId, userId: user.id }));
+  // Guests pay too, so this resolves by whoever is entitled to the order
+  // rather than requiring an account.
+  const order = await findOrderForViewer(orderId);
   if (!order?.paymentId) return { ok: false, error: 'Order not found.' };
 
   const payments = await collections.payments();

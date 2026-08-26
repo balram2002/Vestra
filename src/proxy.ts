@@ -68,7 +68,14 @@ export const config = {
     '/admin/:path*',
     '/seller/:path*',
     '/account/:path*',
-    '/orders/:path*',
-    '/checkout/:path*',
+    /*
+     * `/orders` and `/checkout` are deliberately NOT here.
+     *
+     * Guests buy. A blanket redirect to login on either would make guest
+     * checkout impossible, so both enforce access at the page instead: the
+     * order list calls `requireUser`, and an individual order resolves through
+     * `getOrderForViewer`, which scopes a signed-in shopper by their id and a
+     * guest by the cookie their browser was given when they placed it.
+     */
   ],
 };

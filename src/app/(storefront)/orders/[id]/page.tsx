@@ -12,9 +12,9 @@ import { OrderItemActions } from '@/components/orders/order-item-actions';
 import { StatusBadge } from '@/components/ui/badge';
 import { FULFILLMENT_STATUS_META } from '@/domain/enums';
 import { formatDate, formatMoney } from '@/lib/format';
-import { requireUser } from '@/server/auth/session';
+import { getSessionUser } from '@/server/auth/session';
 import { exchangeOptionsFor } from '@/server/services/exchanges';
-import { getOrder } from '@/server/services/orders';
+import { getOrderForViewer } from '@/server/services/orders';
 
 export const metadata: Metadata = {
   title: 'Order',
@@ -52,9 +52,14 @@ async function OrderDetail({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ placed?: string; pending?: string }>;
 }) {
-  const [{ id }, flags, user] = await Promise.all([params, searchParams, requireUser()]);
+  const [{ id }, flags, user] = await Promise.all([params, searchParams, getSessionUser()]);
 
-  const detail = await getOrder(id, user.id);
+  /*
+   * Resolves for a signed-in shopper OR for a guest holding the cookie they
+   * were given at checkout. A 404 for anyone else — an order number should not
+   * confirm that somebody else's order exists.
+   */
+  const detail = await getOrderForViewer(id);
   if (!detail) notFound();
 
   const { order, sellerOrders, items, payment, shipments, returnWindowOpen } = detail;
@@ -71,21 +76,36 @@ async function OrderDetail({
   const exchangeable = items.filter(
     (item) => item.status === 'DELIVERED' && item.exchangeable && (returnWindowOpen[item.id] ?? false),
   );
-  const exchangeOptions = Object.fromEntries(
-    await Promise.all(
-      exchangeable.map(
-        async (item) => [item.id, await exchangeOptionsFor(item.id, user.id)] as const,
-      ),
-    ),
-  );
+  // Exchanges need an account, so a guest is offered none.
+  const exchangeOptions = user
+    ? Object.fromEntries(
+        await Promise.all(
+          exchangeable.map(
+            async (item) => [item.id, await exchangeOptionsFor(item.id, user.id)] as const,
+          ),
+        ),
+      )
+    : {};
 
   return (
     <>
+      {/*
+        A guest has no order history to go back to, so pointing them at
+        /orders would land them on a sign-in wall from a page they are
+        legitimately allowed to read.
+      */}
       <Breadcrumbs
-        items={[
-          { href: '/orders', label: 'Your orders' },
-          { href: `/orders/${order.id}`, label: order.orderNumber },
-        ]}
+        items={
+          user
+            ? [
+                { href: '/orders', label: 'Your orders' },
+                { href: `/orders/${order.id}`, label: order.orderNumber },
+              ]
+            : [
+                { href: '/', label: 'Home' },
+                { href: `/orders/${order.id}`, label: order.orderNumber },
+              ]
+        }
       />
 
       {/* Post-checkout confirmation. Shown once, from the URL, so a refresh
@@ -119,6 +139,32 @@ async function OrderDetail({
               responds — usually within a few minutes.
             </p>
           </div>
+        </div>
+      ) : null}
+
+      {/*
+        A guest has no account, so the only handle on this order is the cookie
+        in this browser. Saying so plainly — and offering the one action that
+        fixes it — is better than letting them discover it when they clear
+        their history.
+      */}
+      {!user ? (
+        <div className="border-accent-border bg-accent-soft mt-4 flex flex-wrap items-start justify-between gap-3 rounded-lg border p-4">
+          <div className="min-w-0">
+            <p className="text-ink text-sm font-semibold">You ordered as a guest</p>
+            <p className="text-muted mt-0.5 text-sm">
+              We emailed the confirmation to{' '}
+              <span className="text-ink">{order.guestEmail ?? 'your email address'}</span>. Create
+              an account with that address to keep this order, track it and return items from
+              your account.
+            </p>
+          </div>
+          <Link
+            href={`/register?next=/orders/${order.id}`}
+            className="bg-ink text-canvas shrink-0 rounded-md px-3.5 py-2 text-xs font-medium"
+          >
+            Create an account
+          </Link>
         </div>
       ) : null}
 

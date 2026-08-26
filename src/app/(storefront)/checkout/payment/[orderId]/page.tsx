@@ -6,8 +6,8 @@ import { Suspense } from 'react';
 import { PaymentPanel } from '@/components/checkout/payment-panel';
 import { CheckoutSteps } from '@/components/checkout/checkout-steps';
 import { formatMoney } from '@/lib/format';
-import { requireUser } from '@/server/auth/session';
 import { collections, toEntity } from '@/server/db/collections';
+import { findOrderForViewer } from '@/server/services/orders';
 
 export const metadata: Metadata = {
   title: 'Payment',
@@ -49,10 +49,10 @@ export default function PaymentPage({
 }
 
 async function PaymentDetail({ params }: { params: Promise<{ orderId: string }> }) {
-  const [{ orderId }, user] = await Promise.all([params, requireUser()]);
+  const { orderId } = await params;
 
-  const orders = await collections.orders();
-  const order = toEntity(await orders.findOne({ _id: orderId, userId: user.id }));
+  // Resolves for a signed-in shopper or a guest holding the checkout cookie.
+  const order = await findOrderForViewer(orderId);
   if (!order) notFound();
 
   const payments = await collections.payments();

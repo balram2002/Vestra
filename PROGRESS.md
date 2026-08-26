@@ -14,12 +14,13 @@ with a server running (`npm run restart && npm run start`):
 | `npm run smoke:exchange` | a size swap end to end, asserted on stock movements |
 | `npm run smoke:listing` | a seller authoring a listing from empty form to sizes |
 | `npm run smoke:offers` | coupons and promotions, asserted on the total not the banner |
+| `npm run smoke:guest` | a purchase with no account, and who can read it afterwards |
 | `npm run audit:a11y` | axe-core, 12 routes × 2 widths |
 | `npm run audit:contrast` | WCAG ratios, parsed from `tokens.css` |
 
 Latest run: **build 272/272 routes · typecheck clean · lint clean · 64 unit tests
 · funnel 11/11 · RBAC 19/19 · admin writes 6/6 · fulfilment 25/25 · exchange 20/20
-· listing 20/20 · offers 17/17 · a11y 0 violations · contrast 3/3**
+· listing 20/20 · offers 17/17 · guest 18/18 · a11y 0 violations · contrast 3/3**
 
 ---
 
@@ -301,6 +302,39 @@ comment says what the field actually holds.
 
 ---
 
+## Phase 14 — Guest checkout · **done**
+
+Checkout required an account, which is the single largest avoidable drop-off
+in a funnel.
+
+- [x] A guest buys with the same stock reservation, the same server-side
+      re-pricing and the same saga. What they lack is an account, so contact
+      details and address travel with the ORDER — everything downstream already
+      treated `order.userId` as nullable
+- [x] `/checkout` and `/orders` came OUT of the proxy matcher and enforce at the
+      page instead; a blanket redirect to login made guest checkout impossible
+- [x] Order access for a guest is granted by an httpOnly cookie holding the ids
+      they placed, never by the order number. Verified: a stranger gets a 404,
+      and so does a signed-in customer who knows the id
+- [x] After buying, the guest is told plainly that the order lives in this
+      browser, and offered the one action that fixes it
+- [x] No dead ends: the saved-address detour and the "Your orders" breadcrumb
+      both bounce a guest into a sign-in wall, so neither is shown to one
+
+**Three defects this surfaced.** The seeder numbered orders with its own
+counter and never advanced the shared `counters` collection, so the first real
+order placed after a seed asked for a number a seeded order already held and
+the unique index rejected it — the saga compensated correctly and the shopper
+saw "we could not place your order", but nobody could buy until the counter
+walked past every seeded number. The seed generators for shipments and returns
+had a private copy of the financial-year helper that produced six digits where
+the canonical one produces four, so seeded and live numbers had different
+shapes. And the guest address fields wrapped their hint text inside the
+`<label>`, which folds it into the accessible NAME — the email field announced
+as "Email Your order confirmation and tracking go here".
+
+---
+
 ## Not yet done
 
 Honest list of what the brief asks for that is not built.
@@ -316,7 +350,6 @@ Honest list of what the brief asks for that is not built.
       approved; there is no application journey.
 - [ ] **Manual refunds from the console.** Approvals, suspensions and toggles
       are done; issuing a refund by hand is not.
-- [ ] **Guest checkout.** Checkout requires an account.
 
 ### Quality gaps
 

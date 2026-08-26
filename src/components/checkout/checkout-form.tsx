@@ -1,7 +1,7 @@
 'use client';
 
 import { AlertTriangle, Banknote, CreditCard, Landmark, Smartphone, Wallet } from 'lucide-react';
-import { useState, useTransition } from 'react';
+import { useId, useState, useTransition } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { SHIPPING } from '@/config/business';
@@ -35,11 +35,25 @@ const METHODS: Array<{
   { value: 'COD', label: 'Cash on delivery', hint: `Adds ${formatMoney(SHIPPING.codFee)}`, icon: Banknote },
 ];
 
+const EMPTY_GUEST = {
+  fullName: '',
+  phone: '',
+  line1: '',
+  line2: '',
+  landmark: '',
+  city: '',
+  state: '',
+  pincode: '',
+};
+
 export function CheckoutForm({
+  isGuest,
   addresses,
   payable,
   codAvailable,
 }: {
+  /** No account. The address is typed here rather than chosen from a list. */
+  isGuest: boolean;
   addresses: Address[];
   payable: number;
   codAvailable: boolean;
@@ -47,22 +61,63 @@ export function CheckoutForm({
   const [addressId, setAddressId] = useState(
     addresses.find((a) => a.isDefault)?.id ?? addresses[0]?.id ?? '',
   );
+  const [email, setEmail] = useState('');
+  const [guest, setGuest] = useState(EMPTY_GUEST);
   const [method, setMethod] = useState<PaymentMethod>('UPI');
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const available = METHODS.filter((m) => m.value !== 'COD' || codAvailable);
+  const setField = (field: keyof typeof EMPTY_GUEST, value: string) =>
+    setGuest((current) => ({ ...current, [field]: value }));
 
   const handleSubmit = () => {
     setError(null);
 
-    if (!addressId) {
+    if (!isGuest && !addressId) {
       setError('Choose a delivery address to continue.');
       return;
     }
 
+    /*
+     * A first pass on the client so the shopper is told immediately; the same
+     * rules run again on the server, which is the actual control. The checks
+     * follow the order of the fields, so the message always points at the
+     * first thing to fix rather than an arbitrary one.
+     */
+    if (isGuest) {
+      if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
+        setError('Enter a valid email address. Your order updates go there.');
+        return;
+      }
+      if (guest.fullName.trim().length < 2) {
+        setError('Enter the full name for the delivery.');
+        return;
+      }
+      if (!/^[6-9]\d{9}$/.test(guest.phone.trim())) {
+        setError('Enter a 10-digit Indian mobile number.');
+        return;
+      }
+      if (guest.line1.trim().length < 4) {
+        setError('Enter the delivery address.');
+        return;
+      }
+      if (guest.city.trim().length < 2 || guest.state.trim().length < 2) {
+        setError('Enter the city and state.');
+        return;
+      }
+      if (!/^\d{6}$/.test(guest.pincode.trim())) {
+        setError('Enter a 6-digit pincode.');
+        return;
+      }
+    }
+
     startTransition(async () => {
-      const result = await submitOrder({ addressId, paymentMethod: method });
+      const result = await submitOrder(
+        isGuest
+          ? { guest: { email: email.trim(), address: guest }, paymentMethod: method }
+          : { addressId, paymentMethod: method },
+      );
       // A success redirects from the server, so reaching here means it failed.
       if (result && !result.ok) setError(result.error ?? 'Could not place your order.');
     });
@@ -87,7 +142,82 @@ export function CheckoutForm({
           Delivery address
         </h2>
 
-        <ul className="mt-3 space-y-2">
+        {isGuest ? (
+          <div className="mt-3 space-y-3">
+            <p className="text-muted text-sm">
+              Buying as a guest.{' '}
+              <a href="/login?next=/checkout" className="text-ink underline underline-offset-2">
+                Sign in
+              </a>{' '}
+              to use a saved address and track this order from your account.
+            </p>
+
+            <GuestField
+              label="Email"
+              hint="Your order confirmation and tracking go here."
+              value={email}
+              onChange={setEmail}
+              type="email"
+              autoComplete="email"
+              placeholder="you@example.com"
+            />
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <GuestField
+                label="Full name"
+                value={guest.fullName}
+                onChange={(value) => setField('fullName', value)}
+                autoComplete="name"
+              />
+              <GuestField
+                label="Mobile number"
+                value={guest.phone}
+                onChange={(value) => setField('phone', value.replace(/\D/g, '').slice(0, 10))}
+                autoComplete="tel"
+                inputMode="numeric"
+                placeholder="98765 43210"
+              />
+            </div>
+
+            <GuestField
+              label="Address"
+              value={guest.line1}
+              onChange={(value) => setField('line1', value)}
+              autoComplete="address-line1"
+              placeholder="Flat, building, street"
+            />
+            <GuestField
+              label="Area (optional)"
+              value={guest.line2}
+              onChange={(value) => setField('line2', value)}
+              autoComplete="address-line2"
+            />
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              <GuestField
+                label="City"
+                value={guest.city}
+                onChange={(value) => setField('city', value)}
+                autoComplete="address-level2"
+              />
+              <GuestField
+                label="State"
+                value={guest.state}
+                onChange={(value) => setField('state', value)}
+                autoComplete="address-level1"
+              />
+              <GuestField
+                label="Pincode"
+                value={guest.pincode}
+                onChange={(value) => setField('pincode', value.replace(/\D/g, '').slice(0, 6))}
+                autoComplete="postal-code"
+                inputMode="numeric"
+              />
+            </div>
+          </div>
+        ) : null}
+
+        <ul className={isGuest ? 'hidden' : 'mt-3 space-y-2'}>
           {addresses.map((address) => (
             <li key={address.id}>
               <label
@@ -181,6 +311,67 @@ export function CheckoutForm({
           order.
         </p>
       </div>
+    </div>
+  );
+}
+
+/**
+ * One guest address field.
+ *
+ * `autoComplete` is set on every one of these deliberately. Typing a full
+ * address by hand is the slowest part of this checkout, and the browser can
+ * fill most of it -- but only if the fields are named the way it expects.
+ */
+function GuestField({
+  label,
+  hint,
+  value,
+  onChange,
+  type = 'text',
+  autoComplete,
+  inputMode,
+  placeholder,
+}: {
+  label: string;
+  hint?: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: string;
+  autoComplete?: string;
+  inputMode?: 'numeric' | 'text';
+  placeholder?: string;
+}) {
+  const id = useId();
+  const hintId = `${id}-hint`;
+
+  return (
+    <div>
+      {/*
+        `htmlFor` rather than a wrapping label, and the hint attached with
+        `aria-describedby` rather than sitting inside it. A wrapping label folds
+        every word it contains into the field's accessible NAME, so this field
+        would announce as "Email Your order confirmation and tracking go here"
+        instead of "Email", with the hint read as part of the label.
+      */}
+      <label htmlFor={id} className="text-ink block text-xs font-medium">
+        {label}
+      </label>
+      {hint ? (
+        <p id={hintId} className="text-faint mt-0.5 text-2xs">
+          {hint}
+        </p>
+      ) : null}
+      <input
+        id={id}
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        autoComplete={autoComplete}
+        inputMode={inputMode}
+        placeholder={placeholder}
+        aria-describedby={hint ? hintId : undefined}
+        className="border-line-strong bg-canvas text-ink placeholder:text-faint mt-1.5 h-10 w-full rounded-sm border px-3 text-sm"
+      />
     </div>
   );
 }

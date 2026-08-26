@@ -1,9 +1,9 @@
 import 'server-only';
 
-import type { OptionalUnlessRequiredId } from 'mongodb';
+import type { Db, OptionalUnlessRequiredId } from 'mongodb';
 
 import { getDb } from '../db/client';
-import { COLLECTIONS, type Doc, toDoc } from '../db/collections';
+import { COLLECTIONS, type CollectionName, type Doc, toDoc } from '../db/collections';
 import { ensureIndexes, type IndexFailure } from '../db/indexes';
 import { hashPassword } from '../auth/password';
 import {
@@ -342,6 +342,36 @@ export async function seedDatabase(
 
   counts.variants = products.reduce((sum, p) => sum + p.variants.length, 0);
 
+  /*
+   * Hand the live sequences over to the seeded data.
+   *
+   * The generators number orders, seller orders, shipments and returns with
+   * their own counters, and the seeded history reaches into the CURRENT
+   * financial year. If the shared `counters` collection is left at zero, the
+   * first real order placed after a seed asks for number 1 -- which a seeded
+   * order already holds -- and the unique index rejects it. The saga
+   * compensates correctly, so the shopper sees "we could not place your
+   * order" and nothing is charged; but nobody can buy anything until the
+   * counter walks past every number the seed used.
+   *
+   * Reading the maximum back out of the data is deliberate: it stays correct
+   * however the generators choose to number things, and it cannot drift from
+   * what was actually written.
+   */
+  log('Syncing number sequences to the seeded data...');
+  await syncCounters(db, [
+    { collection: COLLECTIONS.orders, field: 'orderNumber', prefix: 'VS', key: 'order' },
+    {
+      collection: COLLECTIONS.sellerOrders,
+      field: 'sellerOrderNumber',
+      prefix: 'SO',
+      key: 'sellerOrder',
+    },
+    { collection: COLLECTIONS.shipments, field: 'shipmentNumber', prefix: 'SH', key: 'shipment' },
+    { collection: COLLECTIONS.returns, field: 'returnNumber', prefix: 'RT', key: 'return' },
+    { collection: COLLECTIONS.manifests, field: 'manifestNumber', prefix: 'MF', key: 'manifest' },
+  ]);
+
   log('Building indexes...');
   const indexFailures = await ensureIndexes();
 
@@ -401,4 +431,50 @@ export async function seedDatabase(
       { role: 'Customer', email: 'ananya.iyer@example.com', password: DEMO_PASSWORD },
     ],
   };
+}
+
+/**
+ * Advance each shared counter past the highest number the seed used.
+ *
+ * Numbers are `<prefix><financial year><zero-padded sequence>`, and the
+ * counter is keyed `<name>:<financial year>` -- so the maximum has to be taken
+ * PER YEAR, not across the whole collection. A single global maximum would
+ * push next year's series to start in the thousands.
+ */
+async function syncCounters(
+  db: Db,
+  specs: Array<{ collection: CollectionName; field: string; prefix: string; key: string }>,
+): Promise<void> {
+  const counters = db.collection<{ _id: string; value: number }>(COLLECTIONS.counters);
+
+  for (const spec of specs) {
+    const rows = await db
+      .collection(spec.collection)
+      .find({}, { projection: { [spec.field]: 1 } })
+      .toArray();
+
+    const highest = new Map<string, number>();
+
+    for (const row of rows) {
+      const value = (row as Record<string, unknown>)[spec.field];
+      if (typeof value !== 'string') continue;
+
+      const match = value.match(
+        new RegExp(`^${spec.prefix}(\\d{4})(\\d+)$`),
+      );
+      if (!match) continue;
+
+      const [, financialYear, sequence] = match;
+      const current = highest.get(financialYear) ?? 0;
+      highest.set(financialYear, Math.max(current, Number(sequence)));
+    }
+
+    for (const [financialYear, value] of highest) {
+      await counters.updateOne(
+        { _id: `${spec.key}:${financialYear}` },
+        { $max: { value } },
+        { upsert: true },
+      );
+    }
+  }
 }

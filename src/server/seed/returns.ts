@@ -9,6 +9,8 @@ import {
 } from '@/domain/enums';
 import type { OrderEvent, Order, OrderItem, Refund, ReturnItem, ReturnRequest, SellerOrder } from '@/domain/types';
 import { entityId } from '@/lib/ids';
+
+import { financialYear } from '../db/sequences';
 import { createRng } from '@/lib/random';
 
 /**
@@ -93,8 +95,8 @@ export function generateReturns(args: {
 
     sequence += 1;
     const returnId = entityId('ret');
-    const financialYear = fiscalYearOf(new Date(sellerOrder.placedAt));
-    const returnNumber = `RT${financialYear}${String(sequence).padStart(6, '0')}`;
+    const fy = financialYear(new Date(sellerOrder.placedAt));
+    const returnNumber = `RT${fy}${String(sequence).padStart(6, '0')}`;
 
     const reason = rng.weighted(REASON_WEIGHTS);
     const sellerFault = SELLER_FAULT_REASONS.includes(reason);
@@ -184,7 +186,7 @@ export function generateReturns(args: {
       const refundId = entityId('rfd');
       refunds.push({
         id: refundId,
-        refundNumber: `RF${financialYear}${String(refundSequence).padStart(6, '0')}`,
+        refundNumber: `RF${fy}${String(refundSequence).padStart(6, '0')}`,
         orderId: order.id,
         orderNumber: order.orderNumber,
         sellerOrderId,
@@ -228,10 +230,7 @@ function shift(iso: string, hours: number): string {
   return new Date(Date.parse(iso) + hours * 3_600_000).toISOString();
 }
 
-function fiscalYearOf(date: Date): string {
-  const year = date.getMonth() >= 3 ? date.getFullYear() : date.getFullYear() - 1;
-  return `${year}${String(year + 1).slice(2)}`;
-}
+
 
 function pickNote(reason: ReturnReason, rng: ReturnType<typeof createRng>): string | null {
   const options = NOTES[reason];

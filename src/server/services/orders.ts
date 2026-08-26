@@ -60,8 +60,17 @@ import type { Owner } from '../auth/session';
 
 /* ------------------------------------------------------------------ types */
 
+export interface GuestCheckoutInput {
+  email: string;
+  phone: string;
+  address: Omit<OrderAddress, 'id'>;
+}
+
 export interface PlaceOrderInput {
-  addressId: string;
+  /** Signed-in shoppers pick a saved address. */
+  addressId?: string;
+  /** Guests supply contact details and an address inline. */
+  guest?: GuestCheckoutInput;
   paymentMethod: PaymentMethod;
   useCredit?: boolean;
   orderNote?: string | null;
@@ -88,9 +97,18 @@ interface SagaContext {
 
 /* -------------------------------------------------------------- placement */
 
+/**
+ * Place an order for a signed-in shopper or a guest.
+ *
+ * A guest is not a degraded customer — they get the same stock reservation,
+ * the same price recomputation and the same saga. What they lack is an
+ * account, so their contact details and address travel with the ORDER rather
+ * than being looked up from one. Everything downstream already treats
+ * `order.userId` as nullable.
+ */
 export async function placeOrder(
   owner: Owner,
-  userId: string,
+  userId: string | null,
   input: PlaceOrderInput,
 ): Promise<PlaceOrderResult> {
   const cart = await getCartView(owner);
@@ -110,30 +128,54 @@ export async function placeOrder(
     };
   }
 
-  const addresses = await collections.addresses();
-  const address = toEntity(await addresses.findOne({ _id: input.addressId, userId }));
-  if (!address) {
-    return { ok: false, error: 'Choose a delivery address to continue.', code: 'NO_ADDRESS' };
+  /*
+   * Resolve who is buying and where it goes.
+   *
+   * The two paths differ only in where the address comes from. A signed-in
+   * shopper's is looked up and SCOPED TO THEM, so passing someone else's
+   * address id finds nothing; a guest's arrives with the request and is
+   * snapshotted onto the order, because there is no account to store it on.
+   */
+  let snapshot: OrderAddress;
+  let contact: { name: string; email: string; phone: string | null };
+
+  if (userId) {
+    const addresses = await collections.addresses();
+    const address = toEntity(await addresses.findOne({ _id: input.addressId, userId }));
+    if (!address) {
+      return { ok: false, error: 'Choose a delivery address to continue.', code: 'NO_ADDRESS' };
+    }
+
+    const users = await collections.users();
+    const user = toEntity(await users.findOne({ _id: userId }));
+    if (!user) return { ok: false, error: 'Sign in again to place this order.', code: 'FAILED' };
+
+    snapshot = {
+      id: address.id,
+      label: address.label,
+      fullName: address.fullName,
+      phone: address.phone,
+      alternatePhone: address.alternatePhone,
+      line1: address.line1,
+      line2: address.line2,
+      landmark: address.landmark,
+      city: address.city,
+      state: address.state,
+      pincode: address.pincode,
+      country: address.country,
+    };
+    contact = { name: user.fullName, email: user.email, phone: user.phone };
+  } else {
+    if (!input.guest) {
+      return { ok: false, error: 'Enter a delivery address to continue.', code: 'NO_ADDRESS' };
+    }
+    snapshot = { id: entityId('gad'), ...input.guest.address };
+    contact = {
+      name: input.guest.address.fullName,
+      email: input.guest.email,
+      phone: input.guest.phone,
+    };
   }
-
-  const users = await collections.users();
-  const user = toEntity(await users.findOne({ _id: userId }));
-  if (!user) return { ok: false, error: 'Sign in again to place this order.', code: 'FAILED' };
-
-  const snapshot: OrderAddress = {
-    id: address.id,
-    label: address.label,
-    fullName: address.fullName,
-    phone: address.phone,
-    alternatePhone: address.alternatePhone,
-    line1: address.line1,
-    line2: address.line2,
-    landmark: address.landmark,
-    city: address.city,
-    state: address.state,
-    pincode: address.pincode,
-    country: address.country,
-  };
 
   const movements = cart.groups.flatMap((group) =>
     group.lines.map((line) => ({ variantId: line.variantId, quantity: line.quantity })),
@@ -172,7 +214,8 @@ export async function placeOrder(
           orderId: ctx.orderId,
           orderNumber,
           userId,
-          user: { name: user.fullName, email: user.email, phone: user.phone },
+          user: contact,
+          guest: userId ? null : { email: contact.email, phone: contact.phone ?? '' },
           address: snapshot,
           cart,
           input,
@@ -255,7 +298,7 @@ export async function placeOrder(
           userId,
           amount: cart.pricing.payable,
           method: input.paymentMethod,
-          customer: { name: user.fullName, email: user.email, phone: user.phone },
+          customer: contact,
           now,
         });
 
@@ -307,8 +350,11 @@ export async function placeOrder(
 async function writeOrder(args: {
   orderId: string;
   orderNumber: string;
-  userId: string;
+  /** Null for a guest order. */
+  userId: string | null;
   user: { name: string; email: string; phone: string | null };
+  /** Contact details for a guest, so the order can be reached without an account. */
+  guest: { email: string; phone: string } | null;
   address: OrderAddress;
   cart: Awaited<ReturnType<typeof getCartView>>;
   input: PlaceOrderInput;
@@ -494,8 +540,9 @@ async function writeOrder(args: {
     id: orderId,
     orderNumber,
     userId,
-    guestEmail: null,
-    guestPhone: null,
+    // A guest order has no account to look these up from, so they live here.
+    guestEmail: args.guest?.email ?? null,
+    guestPhone: args.guest?.phone ?? null,
     sellerOrderIds: sellerOrders.map((s) => s.id),
     itemIds: items.map((i) => i.id),
     shippingAddress: address,
@@ -608,7 +655,8 @@ async function clearCart(cartId: string): Promise<void> {
 async function openPayment(args: {
   orderId: string;
   orderNumber: string;
-  userId: string;
+  /** Null for a guest order; the Payment type already allows it. */
+  userId: string | null;
   amount: number;
   method: PaymentMethod;
   customer: { name: string; email: string; phone: string | null };
@@ -836,6 +884,13 @@ export async function getOrder(orderId: string, userId: string): Promise<OrderDe
   const order = toEntity(await orders.findOne({ _id: orderId, userId }));
   if (!order) return null;
 
+  return hydrateOrder(order);
+}
+
+/** Load everything hanging off an order. Callers do the authorisation. */
+async function hydrateOrder(order: Order): Promise<OrderDetail> {
+  const orderId = order.id;
+
   const [sellerOrderCol, itemCol, paymentCol, shipmentCol] = await Promise.all([
     collections.sellerOrders(),
     collections.orderItems(),
@@ -871,6 +926,50 @@ export async function getOrder(orderId: string, userId: string): Promise<OrderDe
     shipments,
     returnWindowOpen,
   };
+}
+
+/**
+ * The order, for whoever is entitled to see it.
+ *
+ * A signed-in shopper is scoped by `userId` in the query. A guest is scoped by
+ * the cookie their browser was given when they placed it — the order number
+ * alone is never enough, or anyone could walk the sequence and read strangers'
+ * addresses and phone numbers.
+ */
+/**
+ * The bare order, for whoever is entitled to it.
+ *
+ * The lighter counterpart to `getOrderForViewer`, for callers that need the
+ * order itself and not the whole graph hanging off it -- the payment step, for
+ * one. Same authorisation rule: signed in scopes by user id, a guest scopes by
+ * the cookie their browser was given at checkout.
+ */
+export async function findOrderForViewer(orderId: string): Promise<Order | null> {
+  const { getSessionUser, ownsGuestOrder } = await import('../auth/session');
+
+  const orders = await collections.orders();
+  const session = await getSessionUser();
+
+  if (session) return toEntity(await orders.findOne({ _id: orderId, userId: session.id }));
+  if (!(await ownsGuestOrder(orderId))) return null;
+
+  return toEntity(await orders.findOne({ _id: orderId, userId: null }));
+}
+
+export async function getOrderForViewer(orderId: string): Promise<OrderDetail | null> {
+  const { getSessionUser, ownsGuestOrder } = await import('../auth/session');
+
+  const session = await getSessionUser();
+  if (session) return getOrder(orderId, session.id);
+
+  if (!(await ownsGuestOrder(orderId))) return null;
+
+  // Guest orders carry no userId, so the ownership check above IS the scope.
+  const orders = await collections.orders();
+  const order = toEntity(await orders.findOne({ _id: orderId, userId: null }));
+  if (!order) return null;
+
+  return hydrateOrder(order);
 }
 
 export async function listOrders(userId: string, limit = 25): Promise<Order[]> {
