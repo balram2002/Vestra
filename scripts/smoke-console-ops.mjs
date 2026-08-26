@@ -132,9 +132,19 @@ if (ticket) {
 
 /* ============================================================== refunds */
 
+/*
+ * An order with nothing already refunded against it.
+ *
+ * The manual refund is capped at what is still owed, so an order that is
+ * already fully refunded would make the action refuse — and the checks below
+ * would then quietly grade a PRE-EXISTING refund instead of the one this test
+ * raised.
+ */
+const refundedOrderIds = await db.collection('refunds').distinct('orderId');
 const order = await db.collection('orders').findOne({
   paymentStatus: 'CAPTURED',
   'pricing.payable': { $gte: 100000 },
+  _id: { $nin: refundedOrderIds },
 });
 check('a paid order exists to refund', Boolean(order), order?.orderNumber ?? '');
 
@@ -202,9 +212,20 @@ if (order) {
         `${manual.items?.length} items`,
       );
 
-      const auditAfter = await db
-        .collection('auditLogs')
-        .countDocuments({ action: 'order.refund' });
+      /*
+       * Poll for the audit entry rather than reading it once.
+       *
+       * The refund ROW is written before the audit entry is, so the moment the
+       * poll above sees the refund the server is still a couple of awaits away
+       * from recording it. Reading the count straight afterwards is a race that
+       * loses often enough to matter.
+       */
+      let auditAfter = auditBefore;
+      for (let attempt = 0; attempt < 40; attempt++) {
+        auditAfter = await db.collection('auditLogs').countDocuments({ action: 'order.refund' });
+        if (auditAfter > auditBefore) break;
+        await finance.page.waitForTimeout(250);
+      }
       check('the refund was audited', auditAfter > auditBefore, `${auditBefore} → ${auditAfter}`);
 
       const entry = await db
@@ -212,9 +233,12 @@ if (order) {
         .findOne({ action: 'order.refund' }, { sort: { occurredAt: -1 } });
       check('the audit entry is marked critical', entry?.severity === 'CRITICAL', entry?.severity);
 
-      // Clean up the refund this test raised.
+      /*
+       * Clean up only what this test created. `manual` is guaranteed to be the
+       * test's own refund because the order was chosen with none against it.
+       */
       await db.collection('refunds').deleteOne({ _id: manual._id });
-      await db.collection('auditLogs').deleteOne({ _id: entry._id });
+      if (entry) await db.collection('auditLogs').deleteOne({ _id: entry._id });
     }
   }
 

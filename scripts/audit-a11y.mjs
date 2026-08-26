@@ -24,6 +24,9 @@ const ROUTES = [
   { path: '/category/womens-ethnic-wear', as: null },
   { path: '/search?q=kurta', as: null },
   { path: '/login', as: null },
+  { path: '/sell-with-us', as: null },
+  // The longest form on the site, and the one a new seller meets first.
+  { path: '/sell-with-us/apply', as: 'ananya.iyer@example.com' },
   { path: '/bag', as: 'ananya.iyer@example.com' },
   { path: '/account', as: 'ananya.iyer@example.com' },
   { path: '/orders', as: 'ananya.iyer@example.com' },

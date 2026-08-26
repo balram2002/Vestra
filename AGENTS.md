@@ -163,6 +163,14 @@ the customer's original price, coupon share and tax snapshot intact.
   `proxy.ts` is a redirect layer, not a security boundary.
 - **Seller queries are scoped from the session**, never from a request
   parameter. Use `requireSeller()` and take `sellerId` from its return value.
+  `requireSeller()` also asserts the store was APPROVED — an applicant holds the
+  SELLER role from the moment they apply, so the role alone does not mean they
+  may trade. Only the onboarding screen itself may drop to the weaker
+  `requireSellerAccount()`.
+- **Granting a role means reissuing the session.** `proxy.ts` routes on the
+  roles baked into the cookie and cannot reach the database, so any action that
+  changes a user's own roles must call `refreshSession()` before redirecting, or
+  the user keeps being routed as who they were.
 - **Order items freeze their own price snapshot.** Later catalogue edits must
   never alter historical orders.
 - **No business logic in JSX.** Services in `src/server/`, presentation in

@@ -16,13 +16,14 @@ with a server running (`npm run restart && npm run start`):
 | `npm run smoke:offers` | coupons and promotions, asserted on the total not the banner |
 | `npm run smoke:guest` | a purchase with no account, and who can read it afterwards |
 | `npm run smoke:ops` | answering a ticket and refunding an order, incl. permissions |
-| `npm run audit:a11y` | axe-core, 12 routes × 2 widths |
+| `npm run smoke:onboarding` | applying to sell, KYC upload, and the gate on an unverified store |
+| `npm run audit:a11y` | axe-core, 14 routes × 2 widths |
 | `npm run audit:contrast` | WCAG ratios, parsed from `tokens.css` |
 
-Latest run: **build 272/272 routes · typecheck clean · lint clean · 64 unit tests
+Latest run: **build 276/276 routes · typecheck clean · lint clean · 64 unit tests
 · funnel 11/11 · RBAC 19/19 · admin writes 6/6 · fulfilment 25/25 · exchange 20/20
-· listing 20/20 · offers 17/17 · guest 18/18 · console ops 23/23 · a11y 0 violations
-· contrast 3/3**
+· listing 20/20 · offers 17/17 · guest 18/18 · console ops 23/23 · onboarding 23/23
+· a11y 0 violations · contrast 3/3**
 
 ---
 
@@ -364,6 +365,37 @@ The last two console gaps, plus the screen both of them needed.
 
 ---
 
+## Phase 16 — Seller onboarding and KYC · **done**
+
+The last functional gap in the brief. Until now sellers arrived pre-approved
+from the seeder; there was no way to become one.
+
+- [x] `/sell-with-us/apply` — one page, not a wizard. The applicant needs to see
+      what is being asked of them before they start, and a four-step wizard
+      hides exactly that
+- [x] The GSTIN is checked against the pickup state, not merely against the
+      format. A GSTIN starting `29` on a Rajasthan address is a transcription
+      error, and catching it here is cheaper than catching it on the face of an
+      invoice three weeks later
+- [x] Only the last four digits of the bank account are stored. The full number
+      is never needed again after the payout instruction is set up
+- [x] The applicant gets the SELLER role the moment they apply — otherwise they
+      could not reach the screen that asks for their documents — so the console
+      gates on the store's STATUS, not on the role. `requireSeller()` sends an
+      unapproved store to its onboarding screen; `requireSellerAccount()` is the
+      weaker assertion that onboarding screen itself uses
+- [x] Applying reissues the session token. `proxy.ts` routes on the roles baked
+      into the cookie and deliberately cannot reach the database, so without
+      this a fresh applicant is bounced off their own onboarding screen with no
+      way out but signing out and back in
+- [x] Documents are validated by their BYTES, not by the name or the MIME type
+      the browser claimed, and lock once the application is in review — a set a
+      reviewer can no longer see being swapped underneath them is not a review
+- [x] Submission is refused until all four are present, and the screen names
+      which are missing rather than only disabling the button
+
+---
+
 ## Not yet done
 
 Honest list of what the brief asks for that is not built.
@@ -373,8 +405,6 @@ Honest list of what the brief asks for that is not built.
 - [ ] **Real notification delivery.** The in-app centre works and preferences
       are honoured, but the email, SMS and push adapters log rather than send —
       deliberately visible as stubs.
-- [ ] **Seller onboarding and KYC submission flow.** Sellers are seeded as
-      approved; there is no application journey.
 
 ### Quality gaps
 

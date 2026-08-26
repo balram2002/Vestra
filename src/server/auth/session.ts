@@ -2,7 +2,7 @@ import 'server-only';
 
 import { randomUUID } from 'node:crypto';
 import { cookies } from 'next/headers';
-import { forbidden, unauthorized } from 'next/navigation';
+import { forbidden, redirect, unauthorized } from 'next/navigation';
 
 import type { Permission, PublicUser, SessionUser, UserRole } from '@/domain/types';
 
@@ -99,10 +99,51 @@ export async function requireAnyRole(roles: UserRole[]): Promise<SessionUser> {
  * to. Centralising this is what stops one seller reading another's orders:
  * console queries take `sellerId` from here, never from a request parameter.
  */
-export async function requireSeller(): Promise<SessionUser & { sellerId: string }> {
+/**
+ * A seller account, whatever state its application is in.
+ *
+ * Used by the onboarding screen itself, which somebody halfway through
+ * applying has to be able to reach.
+ */
+export async function requireSellerAccount(): Promise<SessionUser & { sellerId: string }> {
   const user = await requireAnyRole(['SELLER', 'SELLER_STAFF']);
   if (!user.sellerId) forbidden();
   return user as SessionUser & { sellerId: string };
+}
+
+/**
+ * A seller who may actually trade.
+ *
+ * The role says they own a store; it does not say the store was approved. An
+ * applicant gets the SELLER role the moment they apply — otherwise they could
+ * not reach the screen that asks for their documents — so the console has to
+ * check the STATUS as well, or an unverified store would be able to list
+ * products and take orders.
+ *
+ * A pending applicant is redirected rather than forbidden: they have somewhere
+ * useful to be, and it is one click of work away.
+ */
+export async function requireSeller(): Promise<SessionUser & { sellerId: string }> {
+  const user = await requireSellerAccount();
+
+  const { collections } = await import('../db/collections');
+  const sellers = await collections.sellers();
+  const store = await sellers.findOne(
+    { _id: user.sellerId },
+    { projection: { status: 1 } },
+  );
+
+  // Staff opening a seller console for support work are not the seller, and
+  // are not blocked by the seller's own onboarding state.
+  const isStaff = user.roles.some((role) =>
+    ['ADMIN', 'SUPER_ADMIN', 'OPERATIONS', 'SUPPORT'].includes(role),
+  );
+
+  if (!isStaff && store && store.status !== 'ACTIVE' && store.status !== 'APPROVED') {
+    redirect('/seller/onboarding');
+  }
+
+  return user;
 }
 
 /* ---------------------------------------------------------------- cookies */
@@ -121,6 +162,25 @@ export async function startSession(user: PublicUser, role?: UserRole): Promise<v
 
   const store = await cookies();
   store.set(SESSION_COOKIE, token, cookieOptions(sessionTtlSeconds(activeRole)));
+}
+
+/**
+ * Re-sign the session token from the database.
+ *
+ * The token carries a SNAPSHOT of the user's roles, and `proxy.ts` routes on
+ * that snapshot because it deliberately cannot reach the database. So anything
+ * that grants a role has to reissue the token, or the holder keeps being routed
+ * as who they were when they signed in: a fresh applicant would be bounced off
+ * their own onboarding screen until they signed out and back in.
+ *
+ * Silently does nothing when there is no session to refresh — the caller has
+ * already established who is acting, and a missing cookie here is a signed-out
+ * user, not an error worth raising.
+ */
+export async function refreshSession(role?: UserRole): Promise<void> {
+  const user = await getSessionUser();
+  if (!user) return;
+  await startSession(user, role ?? user.activeRole);
 }
 
 export async function endSession(): Promise<void> {

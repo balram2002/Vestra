@@ -208,8 +208,16 @@ if (parcel) {
 
   await context.close();
 
-  // Ownership: a different seller must not be able to open this parcel.
-  const other = await db.collection('sellers').findOne({ _id: { $ne: parcel.sellerId } });
+  /*
+   * Ownership: a different seller must not be able to open this parcel.
+   *
+   * The intruder has to be an ACTIVE store. An unverified one is redirected to
+   * its own onboarding screen before scoping is ever reached, which would prove
+   * nothing about isolation while still looking like a pass.
+   */
+  const other = await db
+    .collection('sellers')
+    .findOne({ _id: { $ne: parcel.sellerId }, status: 'ACTIVE' });
   const otherUser = await db.collection('users').findOne({ _id: other.ownerUserId });
   const intruder = await sessionFor(otherUser.email);
   const response = await intruder.page.goto(`${BASE}/seller/shipments/${parcel._id}`, {
@@ -217,10 +225,18 @@ if (parcel) {
   });
   await intruder.page.waitForTimeout(600);
   const intruderText = await intruder.page.locator('body').innerText();
+  /*
+   * Assert on what actually matters — that none of the parcel's details reached
+   * the intruder's browser. A status code alone would accept any redirect,
+   * including one that happened to land somewhere harmless for another reason.
+   */
+  const leaked = [parcel.awb, parcel.shipmentNumber, parcel.deliveryAddress.pincode].filter(
+    (value) => value && intruderText.includes(value),
+  );
   check(
     'another seller cannot open the parcel',
-    response?.status() === 404 || /not found|404/i.test(intruderText),
-    `status ${response?.status()}`,
+    leaked.length === 0 && (response?.status() === 404 || /not found|404/i.test(intruderText)),
+    leaked.length ? `leaked ${leaked.join(', ')}` : `status ${response?.status()}`,
   );
   await intruder.context.close();
 }

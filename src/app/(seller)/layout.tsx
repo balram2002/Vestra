@@ -4,7 +4,7 @@ import { Suspense } from 'react';
 import { QueueBadge } from '@/components/console/queue-badge';
 import { ConsoleShell } from '@/components/layout/console-shell';
 import { SELLER_ACTIONABLE } from '@/domain/enums';
-import { requireSeller } from '@/server/auth/session';
+import { requireSellerAccount } from '@/server/auth/session';
 import { collections } from '@/server/db/collections';
 
 export const metadata: Metadata = {
@@ -98,14 +98,14 @@ export default function SellerLayout({ children }: { children: React.ReactNode }
 }
 
 async function StoreName() {
-  const user = await requireSeller();
+  const user = await requireSellerAccount();
   const sellers = await collections.sellers();
   const seller = await sellers.findOne({ _id: user.sellerId }, { projection: { displayName: 1 } });
   return <>{seller?.displayName ?? 'Your store'}</>;
 }
 
 async function OrderQueueBadge() {
-  const user = await requireSeller();
+  const user = await requireSellerAccount();
   const sellerOrders = await collections.sellerOrders();
   const count = await sellerOrders.countDocuments({
     sellerId: user.sellerId,
@@ -120,7 +120,7 @@ async function OrderQueueBadge() {
  * problem and would only inflate the number.
  */
 async function ShipmentQueueBadge() {
-  const user = await requireSeller();
+  const user = await requireSellerAccount();
   const shipments = await collections.shipments();
   const count = await shipments.countDocuments({
     sellerId: user.sellerId,
@@ -135,7 +135,7 @@ async function ShipmentQueueBadge() {
  * urgent as a return.
  */
 async function ReturnQueueBadge() {
-  const user = await requireSeller();
+  const user = await requireSellerAccount();
   const [returns, exchanges] = await Promise.all([
     collections.returns(),
     collections.exchanges(),
@@ -153,7 +153,7 @@ async function ReturnQueueBadge() {
 }
 
 async function WhoAmI() {
-  const user = await requireSeller();
+  const user = await requireSellerAccount();
   return (
     <span className="text-muted text-xs">
       {user.fullName}{' '}

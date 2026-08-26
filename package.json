@@ -28,6 +28,7 @@
     "smoke:listing": "node scripts/smoke-listing.mjs",
     "smoke:offers": "node scripts/smoke-offers.mjs",
     "smoke:guest": "node scripts/smoke-guest.mjs",
+    "smoke:onboarding": "node scripts/smoke-onboarding.mjs",
     "smoke:ops": "node scripts/smoke-console-ops.mjs"
   },
   "dependencies": {

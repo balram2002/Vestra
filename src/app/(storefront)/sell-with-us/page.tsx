@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { CmsPageView } from '@/components/cms/cms-page-view';
@@ -20,12 +21,36 @@ export default async function SellWithUsPage() {
   if (!page) notFound();
 
   return (
-    <CmsPageView
-      page={page}
-      breadcrumbs={[
-        { href: '/', label: 'Home' },
-        { href: '/sell-with-us', label: page.title },
-      ]}
-    />
+    <>
+      <CmsPageView
+        page={page}
+        breadcrumbs={[
+          { href: '/', label: 'Home' },
+          { href: '/sell-with-us', label: page.title },
+        ]}
+      />
+
+      {/*
+        The call to action lives in the page rather than in the CMS body,
+        because a marketing page whose only route forward is a link somebody
+        remembered to type into markdown is one edit away from a dead end.
+      */}
+      <div className="gutter shell-max pb-16">
+        <div className="border-accent-border bg-accent-soft flex flex-wrap items-center justify-between gap-4 rounded-lg border p-6">
+          <div>
+            <h2 className="font-display text-ink text-lg">Ready to open your store?</h2>
+            <p className="text-muted mt-1 text-sm">
+              About fifteen minutes, if you have your GSTIN and bank details to hand.
+            </p>
+          </div>
+          <Link
+            href="/sell-with-us/apply"
+            className="bg-ink text-canvas shrink-0 rounded-md px-5 py-2.5 text-sm font-medium"
+          >
+            Start your application
+          </Link>
+        </div>
+      </div>
+    </>
   );
 }
