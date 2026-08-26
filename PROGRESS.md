@@ -20,7 +20,7 @@ with a server running (`npm run restart && npm run start`):
 | `npm run audit:a11y` | axe-core, 14 routes × 2 widths |
 | `npm run audit:contrast` | WCAG ratios, parsed from `tokens.css` |
 
-Latest run: **build 276/276 routes · typecheck clean · lint clean · 155 tests
+Latest run: **build 276/276 routes · typecheck clean · lint clean · 165 tests
 · funnel 11/11 · RBAC 19/19 · admin writes 6/6 · fulfilment 25/25 · exchange 20/20
 · listing 20/20 · offers 17/17 · guest 18/18 · console ops 23/23 · onboarding 23/23
 · a11y 0 violations · contrast 3/3**
@@ -423,6 +423,31 @@ last two phases are the argument for pushing that logic down.
       produce exactly ten winners
 - [x] The suite skips itself when no server is reachable, and refuses to drop
       any database but the scratch one
+
+---
+
+## Phase 18 — Dynamic OG images · **done**
+
+- [x] `next/og` cards for the site default, categories and stores, from ONE
+      renderer in `src/lib/og/card.tsx`. A card per route is how five slightly
+      different brands end up in one social feed
+- [x] The site-wide default matters most: without it every share of the home
+      page, search, or any CMS page rendered as a bare link, because
+      `summary_large_image` was declared with no image to show
+- [x] Products keep their own photography — a real garment beats a generated
+      card. The category banner does NOT: it is a wide crop that loses its
+      subject at 1200×630, is often shared across a whole department, and
+      carries no text, so a shared link never said which category it was
+- [x] Satori supports a deliberate subset of CSS and cannot read custom
+      properties, so the tokens are mirrored as literals in exactly one file
+      rather than once per card
+- [x] **Bug found by looking at the output:** `absoluteUrl()` prefixed the site
+      origin onto already-absolute media URLs, so every product's `og:image`
+      AND the `image` array in its Product JSON-LD read
+      `https://vestra.example/https://images.example/photo.jpg`. Every social
+      share and every rich-result crawl of a product page fetched a 404. Fixed
+      in the shared helper, which repaired 46 call sites at once, and pinned
+      with tests
 
 ---
 

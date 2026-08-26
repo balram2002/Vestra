@@ -75,7 +75,15 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
       title,
       description: category.description,
       url: absoluteUrl(`/category/${category.slug}`),
-      images: category.bannerUrl ? [{ url: category.bannerUrl }] : undefined,
+      /*
+       * No `images` here on purpose.
+       *
+       * Setting it would override the generated card in `opengraph-image.tsx`,
+       * and the banner is the weaker choice: it is a wide lifestyle crop that
+       * loses its subject at 1200×630, it is often shared across a whole
+       * department, and it carries no text — so a shared link would not say
+       * which category it was.
+       */
     },
   };
 }

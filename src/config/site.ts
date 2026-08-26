@@ -50,6 +50,24 @@ export function siteUrl(): string {
 
 /** Build an absolute URL for canonicals, Open Graph and structured data. */
 export function absoluteUrl(path = '/'): string {
+  /*
+   * Already absolute: hand it back untouched.
+   *
+   * Media lives on a remote host, so `absoluteUrl(media.url)` is a natural
+   * thing to write — and without this it produced
+   * `https://vestra.example/https://images.example/photo.jpg`, which every
+   * social crawler fetched as a 404. Making the function idempotent fixes it
+   * for every caller rather than at the one call site where it was noticed.
+   */
+  if (/^[a-z][a-z0-9+.-]*:/i.test(path)) return path;
+
+  /*
+   * Protocol-relative. `//cdn.example/a.png` is rooted at ANOTHER HOST, not at
+   * this one, so treating it as a path would silently point the URL at our own
+   * origin with a doubled slash.
+   */
+  if (path.startsWith('//')) return path;
+
   const base = siteUrl();
   if (!path.startsWith('/')) return `${base}/${path}`;
   return `${base}${path}`;
