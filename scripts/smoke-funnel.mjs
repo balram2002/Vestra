@@ -111,7 +111,16 @@ try {
    * `main` is what excludes the footer. The empty-bag copy is checked as well,
    * so the two ways this can be wrong are both covered.
    */
-  const bagLines = await page.locator('main li').filter({ hasText: /Size/ }).count();
+  const bagLine = page.locator('main li').filter({ hasText: /Size/ });
+  /*
+   * Wait for the LINE, not for a fixed number of milliseconds.
+   *
+   * `/bag` streams its contents, so counting immediately after navigation
+   * raced the render and reported an empty bag perhaps one run in three.
+   */
+  await bagLine.first().waitFor({ state: 'visible', timeout: 20000 }).catch(() => {});
+
+  const bagLines = await bagLine.count();
   const bagText = await page.locator('main').innerText();
   record(
     'item reached the bag',

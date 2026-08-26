@@ -36,9 +36,21 @@ console.log('\nSeller onboarding\n');
 
 /* ------------------------------------------------- a customer with no store */
 
+/*
+ * Accounts other suites depend on, which this one must not touch.
+ *
+ * This test GRANTS its applicant the seller role and a store. Picking whoever
+ * happens to be first meant picking ananya.iyer, whom eleven assertions across
+ * the funnel, guest and accessibility suites shop as — so a crash here left her
+ * owning an unverified store, and the next suite to run failed somewhere
+ * unrelated and inexplicable.
+ */
+const RESERVED = ['ananya.iyer@example.com'];
+
 const applicant = await db.collection('users').findOne({
   roles: { $eq: ['CUSTOMER'] },
   sellerId: null,
+  email: { $nin: RESERVED },
 });
 check('found a customer without a store', Boolean(applicant), applicant?.email ?? '');
 
