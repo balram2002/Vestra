@@ -2,13 +2,19 @@ import { defineConfig } from 'vitest/config';
 import path from 'node:path';
 
 /**
- * Unit tests only.
+ * Unit tests, and one deliberate integration suite.
  *
- * The domain engines — pricing, tax, coupons, the shipment state machine, the
- * barcode table — are pure functions with a lot of branches and no I/O, which
- * is exactly what unit tests are good at. Anything that needs Mongo, a session
- * or a browser is covered by the smoke suites instead, because a mocked
- * database mostly tests the mock.
+ * The domain engines — pricing, tax, coupons, promotions, the shipment state
+ * machine, the barcode table — are pure functions with a lot of branches and no
+ * I/O, which is exactly what unit tests are good at. Anything that needs a
+ * session or a browser is covered by the smoke suites instead.
+ *
+ * The exception is `repositories/inventory.test.ts`, which talks to a real
+ * MongoDB on a throwaway database. Every movement in that repository IS a Mongo
+ * query, so a mock would only re-state the source; and the guarantee that
+ * matters — that a conditional update cannot oversell under concurrency — is a
+ * claim about MongoDB that only MongoDB can settle. It skips itself when no
+ * server is reachable.
  */
 export default defineConfig({
   resolve: {

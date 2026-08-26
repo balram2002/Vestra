@@ -20,7 +20,7 @@ with a server running (`npm run restart && npm run start`):
 | `npm run audit:a11y` | axe-core, 14 routes × 2 widths |
 | `npm run audit:contrast` | WCAG ratios, parsed from `tokens.css` |
 
-Latest run: **build 276/276 routes · typecheck clean · lint clean · 64 unit tests
+Latest run: **build 276/276 routes · typecheck clean · lint clean · 155 tests
 · funnel 11/11 · RBAC 19/19 · admin writes 6/6 · fulfilment 25/25 · exchange 20/20
 · listing 20/20 · offers 17/17 · guest 18/18 · console ops 23/23 · onboarding 23/23
 · a11y 0 violations · contrast 3/3**
@@ -396,6 +396,36 @@ from the seeder; there was no way to become one.
 
 ---
 
+## Phase 17 — The untested money paths · **done**
+
+Coupon evaluation, inventory movements and the saga runner were the three
+places where real money and real stock are decided, and all three were covered
+only by end-to-end smoke tests. Six flaky smoke assertions fixed across the
+last two phases are the argument for pushing that logic down.
+
+- [x] 40 tests on coupon evaluation. Asserted on the NUMBERS and the WORDS, not
+      on `applicable` — a coupon that applies for the wrong reason, or refuses
+      with a message that sends a shopper to add the wrong thing, is a bug that
+      a boolean assertion sails past
+- [x] The load-bearing rule pinned down: the minimum spend is measured against
+      QUALIFYING items, so a pair of shoes cannot unlock a coupon written for
+      ethnic wear. So is the clamp that stops a ₹500 coupon taking ₹500 off
+      ₹300 of goods
+- [x] 19 tests on the saga runner — reverse-order compensation, a compensation
+      that throws not abandoning the rest, and the original failure never being
+      masked by the cleanup's failure. The journal is asserted on too: it is the
+      only durable trace of a half-finished unit of work
+- [x] 32 tests on inventory movements, against a REAL MongoDB on a throwaway
+      database. Every movement there is a Mongo query, so a mock would only
+      re-state the source — and the guarantee that matters, that a conditional
+      update cannot oversell under concurrency, is a claim about MongoDB that
+      only MongoDB can settle. Twenty concurrent attempts at the last ten units
+      produce exactly ten winners
+- [x] The suite skips itself when no server is reachable, and refuses to drop
+      any database but the scratch one
+
+---
+
 ## Not yet done
 
 Honest list of what the brief asks for that is not built.
@@ -408,13 +438,14 @@ Honest list of what the brief asks for that is not built.
 
 ### Quality gaps
 
-- [ ] **Automated tests — partly done.** 64 unit tests now cover the pricing
-      engine's allocation and GST-slab rules, the shipment state machine, and
-      the Code 128 table (checked against the specification, because a
-      transposed digit produces a barcode that looks right and fails at the
-      scanner), the promotions engine and the invoice amount-in-words
-      conversion. Coupon evaluation, inventory movements and the saga runner
-      are still only covered by the smoke suites.
+- [x] **Automated tests.** 155 tests cover the pricing engine's allocation and
+      GST-slab rules, the shipment state machine, the Code 128 table (checked
+      against the specification, because a transposed digit produces a barcode
+      that looks right and fails at the scanner), the promotions and coupon
+      engines, the invoice amount-in-words conversion, the saga runner's
+      compensation contract, and inventory movements against a real MongoDB.
+      What is still smoke-only is the parts that need a browser: rendering,
+      navigation and the console screens.
 - [ ] **Core Web Vitals.** Not measured. LCP, CLS and INP targets are designed
       for (priority hero image, skeletons that reserve exact space, Server
       Components by default) but no number has been taken.
