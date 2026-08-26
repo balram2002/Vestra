@@ -171,6 +171,14 @@ the customer's original price, coupon share and tax snapshot intact.
   roles baked into the cookie and cannot reach the database, so any action that
   changes a user's own roles must call `refreshSession()` before redirecting, or
   the user keeps being routed as who they were.
+- **A mutation that changes what a shopper sees must invalidate.** Every
+  `"use cache"` scope has a `cacheLife` measured in hours, so without a call to
+  `invalidate()` from `services/cache-invalidation.ts` the change is invisible
+  until it expires on its own clock. Spend the tags from `cache-tags.ts`; do not
+  invent strings. Stock is the exception that proves it: movements invalidate
+  only when the change is VISIBLE (crossing zero, or inside the urgency band),
+  because expiring every listing on every add-to-bag is not worth a number
+  nobody renders.
 - **Order items freeze their own price snapshot.** Later catalogue edits must
   never alter historical orders.
 - **No business logic in JSX.** Services in `src/server/`, presentation in

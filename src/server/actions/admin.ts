@@ -17,6 +17,8 @@ import {
 } from '../services/settlements';
 import { collections, toEntity } from '../db/collections';
 import * as audit from '../services/audit';
+import { invalidate } from '../services/cache-invalidation';
+import { productTags, tags } from '../services/cache-tags';
 import { notifyQuietly } from '../services/notifications';
 
 /**
@@ -94,6 +96,13 @@ export async function reviewProduct(input: {
       };
 
   await products.updateOne({ _id: product.id }, { $set: patch });
+
+  /*
+   * Approval is what puts a listing in front of shoppers. Leaving it to a
+   * cache to expire on its own clock means a seller is told they are live and
+   * then cannot find themselves in the shop.
+   */
+  invalidate(productTags(product.id, 'status'));
 
   await audit.record({
     actor,
@@ -175,6 +184,12 @@ export async function setSellerStatus(input: {
   };
 
   await sellers.updateOne({ _id: seller.id }, { $set: patch });
+
+  /*
+   * A suspended store's products stop being sellable, so the listings that
+   * carry them have to be rebuilt, not just the store's own page.
+   */
+  invalidate([tags.seller(seller.slug), tags.sellerList, tags.productList]);
 
   await audit.record({
     actor,
@@ -260,6 +275,7 @@ export async function setCouponActive(input: {
 
   const patch = { isActive: input.isActive, updatedAt: new Date().toISOString() };
   await coupons.updateOne({ _id: coupon.id }, { $set: patch });
+  invalidate([tags.coupons]);
 
   await audit.record({
     actor,
@@ -293,6 +309,7 @@ export async function setSectionActive(input: {
     updatedByUserId: actor.id,
   };
   await sections.updateOne({ _id: section.id }, { $set: patch });
+  invalidate([tags.content]);
 
   await audit.record({
     actor,
@@ -431,6 +448,8 @@ export async function setPromotionActive(input: {
 
   const patch = { isActive: input.isActive, updatedAt: new Date().toISOString() };
   await promotions.updateOne({ _id: promotion.id }, { $set: patch });
+  // Promotions change displayed prices, so grids and their sorting move too.
+  invalidate([tags.promotions, tags.productList]);
 
   await audit.record({
     actor,

@@ -14,6 +14,8 @@ import {
 } from '@/lib/validation/product';
 
 import { collections, toEntities, toEntity } from '../db/collections';
+import { invalidate } from './cache-invalidation';
+import { productTags } from './cache-tags';
 import { notifyQuietly } from './notifications';
 
 /**
@@ -214,6 +216,13 @@ export async function updateDraft(
 
   await products.updateOne({ _id: productId }, { $set: patch });
 
+  /*
+   * A material edit sends a live listing back to review, which changes whether
+   * it is buyable at all — so the blast radius depends on what happened, not on
+   * the fact that something did.
+   */
+  invalidate(productTags(productId, requiresReview ? 'status' : 'content'));
+
   return { ok: true, requiresReview };
 }
 
@@ -321,6 +330,12 @@ export async function setVariants(
     },
   );
 
+  /*
+   * The matrix carries prices, sizes and opening stock, so this moves grid
+   * ordering and price facets as well as the product's own page.
+   */
+  invalidate(productTags(productId, 'price'));
+
   return { ok: true };
 }
 
@@ -365,6 +380,8 @@ export async function attachMedia(
     { $push: { media: { $each: added } }, $set: { updatedAt: new Date().toISOString() } },
   );
 
+  invalidate(productTags(productId, 'content'));
+
   return { ok: true };
 }
 
@@ -393,6 +410,8 @@ export async function removeMedia(
     await mediaStore().remove(removed.url.split('/').pop() ?? '');
   }
 
+  invalidate(productTags(productId, 'content'));
+
   return { ok: true };
 }
 
@@ -417,6 +436,8 @@ export async function setPrimaryMedia(
     { _id: productId },
     { $set: { media: reordered, updatedAt: new Date().toISOString() } },
   );
+
+  invalidate(productTags(productId, 'content'));
 
   return { ok: true };
 }
@@ -481,6 +502,9 @@ export async function submitForReview(
     },
   );
 
+  // Leaving the draft state changes whether the listing is buyable.
+  invalidate(productTags(productId, 'status'));
+
   return { ok: true };
 }
 
@@ -522,6 +546,13 @@ export async function setPublished(
     },
   );
 
+  /*
+   * Going live is the whole reason a seller pressed the button, and taking a
+   * listing down is usually urgent. Neither can wait for a cache to expire on
+   * its own clock.
+   */
+  invalidate(productTags(productId, 'status'));
+
   return { ok: true };
 }
 
@@ -537,6 +568,8 @@ export async function archiveProduct(
     { _id: productId },
     { $set: { status: 'ARCHIVED', updatedAt: new Date().toISOString() } },
   );
+
+  invalidate(productTags(productId, 'status'));
 
   return { ok: true };
 }

@@ -5,6 +5,8 @@ import type { StockLevel } from '@/domain/enums';
 import type { Inventory } from '@/domain/types';
 
 import { collections } from '../db/collections';
+import { invalidate, stockChangeIsVisible } from '../services/cache-invalidation';
+import { productTags } from '../services/cache-tags';
 
 /**
  * Inventory movements.
@@ -31,6 +33,56 @@ import { collections } from '../db/collections';
  *   damaged    written off, never sellable again
  */
 
+/**
+ * Apply one conditional movement, and expire caches if what changed is visible.
+ *
+ * Every movement below is the same shape — a filter that doubles as the
+ * precondition, and an update that only lands if the filter matched — so the
+ * round trip is written once. `findOneAndUpdate` is used rather than
+ * `updateOne` because the resulting stock level decides whether any cache has
+ * to be expired, and reading it back separately would be both a second round
+ * trip and a race.
+ *
+ * `availableDelta` is how much this movement added to `available` (negative to
+ * take stock off sale), which is what lets the level BEFORE the write be
+ * recovered from the level after it without a second read.
+ */
+async function applyMovement(
+  filter: Record<string, unknown>,
+  update: Record<string, unknown>,
+  availableDelta: number,
+): Promise<boolean> {
+  const products = await collections.products();
+
+  /*
+   * The document as it was BEFORE the write.
+   *
+   * MongoDB refuses a positional projection together with `returnDocument:
+   * 'after'`, and the positional `$` is what returns the element the filter
+   * matched rather than the first one. Taking the before-state and adding the
+   * delta gets the same answer without asking for the combination it rejects.
+   *
+   * A null result means the filter did not match — the precondition failed, or
+   * the variant does not exist — which is exactly the caller's `false`.
+   */
+  const before = await products.findOneAndUpdate(filter, update, {
+    returnDocument: 'before',
+    projection: { 'variants.$': 1 },
+  });
+
+  if (!before) return false;
+
+  const variant = before.variants?.[0];
+  if (variant) {
+    const availableBefore = variant.inventory.available;
+    if (stockChangeIsVisible(availableBefore, availableBefore + availableDelta)) {
+      invalidate(productTags(before.id, 'stock'));
+    }
+  }
+
+  return true;
+}
+
 export interface StockMovement {
   variantId: string;
   quantity: number;
@@ -54,8 +106,7 @@ export interface MovementResult {
 export async function reserve(variantId: string, quantity: number): Promise<boolean> {
   if (quantity <= 0) return true;
 
-  const products = await collections.products();
-  const result = await products.updateOne(
+  return applyMovement(
     {
       variants: {
         $elemMatch: { id: variantId, 'inventory.available': { $gte: quantity } },
@@ -68,9 +119,8 @@ export async function reserve(variantId: string, quantity: number): Promise<bool
       },
       $set: { 'variants.$.inventory.updatedAt': new Date().toISOString() },
     },
+    -quantity,
   );
-
-  return result.modifiedCount === 1;
 }
 
 /**
@@ -123,8 +173,7 @@ export async function reserveMany(movements: StockMovement[]): Promise<MovementR
 export async function release(variantId: string, quantity: number): Promise<boolean> {
   if (quantity <= 0) return true;
 
-  const products = await collections.products();
-  const result = await products.updateOne(
+  return applyMovement(
     {
       variants: {
         $elemMatch: { id: variantId, 'inventory.reserved': { $gte: quantity } },
@@ -137,9 +186,8 @@ export async function release(variantId: string, quantity: number): Promise<bool
       },
       $set: { 'variants.$.inventory.updatedAt': new Date().toISOString() },
     },
+    quantity,
   );
-
-  return result.modifiedCount === 1;
 }
 
 export async function releaseMany(movements: StockMovement[]): Promise<void> {
@@ -157,8 +205,8 @@ export async function releaseMany(movements: StockMovement[]): Promise<void> {
 export async function commitSale(variantId: string, quantity: number): Promise<boolean> {
   if (quantity <= 0) return true;
 
-  const products = await collections.products();
-  const result = await products.updateOne(
+  // `available` does not move: the unit left the reserved bucket, not the shelf.
+  return applyMovement(
     {
       variants: {
         $elemMatch: { id: variantId, 'inventory.reserved': { $gte: quantity } },
@@ -171,9 +219,8 @@ export async function commitSale(variantId: string, quantity: number): Promise<b
       },
       $set: { 'variants.$.inventory.updatedAt': new Date().toISOString() },
     },
+    0,
   );
-
-  return result.modifiedCount === 1;
 }
 
 /* --------------------------------------------------------------- returns */
@@ -185,8 +232,7 @@ export async function commitSale(variantId: string, quantity: number): Promise<b
 export async function restock(variantId: string, quantity: number): Promise<boolean> {
   if (quantity <= 0) return true;
 
-  const products = await collections.products();
-  const result = await products.updateOne(
+  return applyMovement(
     { 'variants.id': variantId },
     {
       $inc: {
@@ -195,25 +241,23 @@ export async function restock(variantId: string, quantity: number): Promise<bool
       },
       $set: { 'variants.$.inventory.updatedAt': new Date().toISOString() },
     },
+    quantity,
   );
-
-  return result.modifiedCount === 1;
 }
 
 /** A returned unit that failed quality check. Written off, never resold. */
 export async function writeOff(variantId: string, quantity: number): Promise<boolean> {
   if (quantity <= 0) return true;
 
-  const products = await collections.products();
-  const result = await products.updateOne(
+  // Written off out of the returned pile, so nothing sellable moves.
+  return applyMovement(
     { 'variants.id': variantId },
     {
       $inc: { 'variants.$.inventory.damaged': quantity },
       $set: { 'variants.$.inventory.updatedAt': new Date().toISOString() },
     },
+    0,
   );
-
-  return result.modifiedCount === 1;
 }
 
 /* ------------------------------------------------------------ adjustment */
@@ -228,7 +272,14 @@ export async function setAvailable(variantId: string, available: number): Promis
   const next = Math.max(0, Math.floor(available));
 
   const products = await collections.products();
-  const result = await products.updateOne(
+
+  /*
+   * A stock take SETS rather than increments, so there is no delta to recover
+   * the previous level from. Ask for the document as it was instead — a seller
+   * correcting their counts is exactly the case where a stale size chip is
+   * least forgivable, so this one must not be allowed to miss.
+   */
+  const before = await products.findOneAndUpdate(
     { 'variants.id': variantId },
     {
       $set: {
@@ -236,9 +287,17 @@ export async function setAvailable(variantId: string, available: number): Promis
         'variants.$.inventory.updatedAt': new Date().toISOString(),
       },
     },
+    { returnDocument: 'before', projection: { 'variants.$': 1 } },
   );
 
-  return result.modifiedCount === 1;
+  if (!before) return false;
+
+  const previous = before.variants?.[0]?.inventory.available ?? 0;
+  if (stockChangeIsVisible(previous, next)) {
+    invalidate(productTags(before.id, 'stock'));
+  }
+
+  return true;
 }
 
 export async function setLowStockThreshold(

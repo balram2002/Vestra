@@ -99,8 +99,25 @@ try {
   await page.waitForTimeout(2500);
 
   await go('/bag');
-  const bagLines = await page.locator('li').filter({ hasText: /Size/ }).count();
-  record('item reached the bag', bagLines > 0, `${bagLines} line(s)`);
+  /*
+   * Scope this to the bag itself.
+   *
+   * `page.locator('li').filter({ hasText: /Size/ })` matched the FOOTER's
+   * "Size guide" link, so this check passed on a completely empty bag — and
+   * then the run failed further down at checkout, where the real problem
+   * surfaced with no hint of where it started. An assertion that cannot fail
+   * for the reason it names is worse than no assertion.
+   *
+   * `main` is what excludes the footer. The empty-bag copy is checked as well,
+   * so the two ways this can be wrong are both covered.
+   */
+  const bagLines = await page.locator('main li').filter({ hasText: /Size/ }).count();
+  const bagText = await page.locator('main').innerText();
+  record(
+    'item reached the bag',
+    bagLines > 0 && !/your bag is empty/i.test(bagText),
+    `${bagLines} line(s)`,
+  );
 
   /* -------------------------------------------------------------- checkout */
 

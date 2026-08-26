@@ -20,7 +20,7 @@ with a server running (`npm run restart && npm run start`):
 | `npm run audit:a11y` | axe-core, 14 routes × 2 widths |
 | `npm run audit:contrast` | WCAG ratios, parsed from `tokens.css` |
 
-Latest run: **build 276/276 routes · typecheck clean · lint clean · 165 tests
+Latest run: **build 276/276 routes · typecheck clean · lint clean · 173 tests
 · funnel 11/11 · RBAC 19/19 · admin writes 6/6 · fulfilment 25/25 · exchange 20/20
 · listing 20/20 · offers 17/17 · guest 18/18 · console ops 23/23 · onboarding 23/23
 · a11y 0 violations · contrast 3/3**
@@ -448,6 +448,42 @@ last two phases are the argument for pushing that logic down.
       share and every rich-result crawl of a product page fetched a 404. Fixed
       in the shared helper, which repaired 46 call sites at once, and pinned
       with tests
+
+---
+
+## Phase 19 — Wiring up cache invalidation · **done**
+
+`cache-tags.ts` defined a careful tag vocabulary, documented how far each
+mutation should reach, and exported `productTags(id, scope)`. Nothing ever
+called it. `revalidateTag` appeared nowhere in the codebase outside a comment.
+
+Every `"use cache"` scope in the storefront therefore refreshed ONLY on expiry,
+which is hours. Found by chasing a funnel failure to its root: a size chip
+rendered as selectable for a variant that had been sold out for the best part
+of an hour, and the shopper who picked it was refused at the bag with "this
+size just sold out".
+
+- [x] `invalidate()` in a new `cache-invalidation.ts`, kept apart from the
+      vocabulary because the vocabulary is dependency-free and importable
+      anywhere, while `revalidateTag` drags in the request scope
+- [x] Safe outside a request. The seeder, scripts and tests call the same
+      repositories a request does, and `revalidateTag` throws there — but only
+      that throw is swallowed, and only because there is genuinely no cache
+- [x] Inventory movements invalidate on a POLICY, not on every write. Expiring
+      every listing page on every add-to-bag is a heavy price for a number
+      nobody renders; what is rendered is a size chip's enabled state and the
+      "Only N left" count. So a crossing of zero fires, a movement inside the
+      urgency band fires, and 77 → 76 deliberately does not
+- [x] `findOneAndUpdate` returning the BEFORE document — MongoDB refuses a
+      positional projection together with `returnDocument: 'after'`, and the
+      positional `$` is what returns the matched variant rather than the first
+- [x] Catalogue mutations wired: approve/reject, publish/unpublish, archive,
+      submit-for-review, draft edits, the variant matrix, media, seller
+      suspension, coupons, promotions and CMS sections
+- [x] **A second false-passing test found.** The funnel's "item reached the
+      bag" check matched the FOOTER's "Size guide" link, so it passed on a
+      completely empty bag and the run then failed further down at checkout
+      with no hint of where it started
 
 ---
 
