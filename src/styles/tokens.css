@@ -311,6 +311,46 @@
 
     --focus-ring: var(--color-mulberry-400);
 
+    /*
+     * Status tints, re-tuned for a dark canvas.
+     *
+     * `-50` and `-100` are pale washes designed to sit on near-white. On a dark
+     * page they became bright panels — an alert banner lit up like a lightbox,
+     * which is the opposite of the calm a warning should carry. Here they are a
+     * low-alpha wash of the same hue instead, so the SHAPE of every alert is
+     * unchanged and only its ground moves.
+     *
+     * The `-700` text steps flip too: they are dark inks meant for a pale
+     * tint, and unreadable on one of these washes. The `-300` steps are the
+     * same hues at a light enough value to read on them.
+     *
+     * Doing it here rather than in components is the point of the token layer:
+     * forty-eight call sites adapt without being touched.
+     */
+    --color-success-50: rgb(21 127 90 / 0.16);
+    --color-success-100: rgb(21 127 90 / 0.28);
+    --color-success-600: var(--color-success-300);
+    --color-success-700: var(--color-success-300);
+
+    --color-warning-50: rgb(180 105 14 / 0.18);
+    --color-warning-100: rgb(180 105 14 / 0.30);
+    --color-warning-600: var(--color-warning-300);
+    --color-warning-700: var(--color-warning-300);
+
+    --color-danger-50: rgb(192 54 44 / 0.18);
+    --color-danger-100: rgb(192 54 44 / 0.30);
+    --color-danger-600: var(--color-danger-300);
+    --color-danger-700: var(--color-danger-300);
+
+    --color-info-50: rgb(37 99 168 / 0.18);
+    --color-info-100: rgb(37 99 168 / 0.30);
+    --color-info-600: var(--color-info-300);
+    --color-info-700: var(--color-info-300);
+
+    --color-ember-50: rgb(194 65 12 / 0.18);
+    --color-ember-100: rgb(194 65 12 / 0.30);
+    --color-ember-600: var(--color-ember-300);
+
     --chart-grid: #2e2a26;
     --chart-axis: #857f73;
   }

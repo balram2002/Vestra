@@ -563,6 +563,29 @@ weight on phones.
 
 ---
 
+## Phase 23 — Dark mode across the consoles · **done**
+
+Dark mode was unreachable until Phase 22, which means nothing outside the
+storefront had ever been SEEN in it.
+
+- [x] Looked at the bag, the account, the seller console and the admin console
+      on a dark canvas for the first time. The layouts, the sidebar, the cards
+      and the revenue chart all adapt — the token layer did its job
+- [x] **What did not adapt: every status tint.** `danger-50`, `warning-50`,
+      `success-50` and `info-50` are pale washes designed to sit on near-white,
+      so on a dark page each alert banner lit up like a lightbox — the opposite
+      of the calm a warning should carry. They are a low-alpha wash of their own
+      hue in dark now, with the `-700` inks flipping to the `-300` steps so the
+      text on them stays readable
+- [x] Fixed in `tokens.css` rather than in components, so all 48 call sites
+      adapted without being touched. That is what the token layer is for
+- [x] The three-way `ThemeToggle` was built in Phase 22 and never mounted —
+      the header only carried the compact cycling one. Cycling is right for a
+      toolbar and wrong as the only control, because it never shows what the
+      options are. Appearance now has an explicit setting on the account page
+
+---
+
 ## Not yet done
 
 Honest list of what the brief asks for that is not built.

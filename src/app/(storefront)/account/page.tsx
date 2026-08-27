@@ -6,6 +6,7 @@ import { Suspense } from 'react';
 
 import { AccountNav } from '@/components/account/account-nav';
 import { VerifyEmailNotice } from '@/components/account/verify-email-notice';
+import { ThemeToggle } from '@/components/theme/theme-toggle';
 import { SignOutButton } from '@/components/account/sign-out-button';
 import { StatusBadge } from '@/components/ui/badge';
 import { FULFILLMENT_STATUS_META } from '@/domain/enums';
@@ -80,6 +81,24 @@ async function Overview() {
       </header>
 
       {!user.emailVerified ? <VerifyEmailNotice email={user.email} /> : null}
+
+      {/*
+        Appearance.
+        
+        The header carries a compact control that cycles through the three
+        modes, which is right for a toolbar and wrong as the only way to set it:
+        cycling gives no way to see what the options ARE. This is the explicit
+        one, where someone looking for a setting would look for it.
+      */}
+      <section className="border-line bg-raised mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4">
+        <div>
+          <h2 className="text-ink text-sm font-semibold">Appearance</h2>
+          <p className="text-muted mt-0.5 text-sm">
+            System follows your device, and changes with it.
+          </p>
+        </div>
+        <ThemeToggle />
+      </section>
 
       <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,1fr)_18rem] lg:gap-14">
         <section>
