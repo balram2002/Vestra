@@ -149,6 +149,48 @@ export async function uploadListingMedia(formData: FormData): Promise<AuthoringR
   return { ok: true, productId };
 }
 
+/**
+ * Attach a photo the BROWSER already uploaded.
+ *
+ * The direct-upload path never passed through this process, so nothing here
+ * has seen the bytes. `verifyUploadedFile` reads the first two kilobytes back
+ * off the CDN and applies the same magic-number test the server-side path
+ * applies — before the URL is written against a product. Skipping that would
+ * let a signed permit be used to hang arbitrary content off a listing.
+ *
+ * The URL is also checked to be one of ours: an attacker who could pass any
+ * URL here would have a stored-content vector through the product page.
+ */
+export async function attachUploadedMedia(input: {
+  productId: string;
+  url: string;
+}): Promise<AuthoringResult> {
+  const user = await requireSeller();
+
+  if (!input.productId) return { ok: false, error: 'Save the listing before adding photos.' };
+
+  const products = await collections.products();
+  const owns = await products.countDocuments({ _id: input.productId, sellerId: user.sellerId });
+  if (owns === 0) return { ok: false, error: 'Product not found.' };
+
+  const { verifyUploaded } = await import('../media/verify');
+  const verified = await verifyUploaded(input.url);
+  if (!verified.ok) return { ok: false, error: verified.error };
+
+  const attached = await attachMedia(user.sellerId, input.productId, [
+    {
+      url: input.url,
+      contentType: verified.contentType,
+      width: verified.width,
+      height: verified.height,
+    },
+  ]);
+  if (!attached.ok) return { ok: false, error: attached.error };
+
+  refresh(input.productId);
+  return { ok: true, productId: input.productId };
+}
+
 export async function deleteListingMedia(input: {
   productId: string;
   mediaId: string;

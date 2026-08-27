@@ -1,12 +1,15 @@
 'use client';
 
-import { Check, FileUp, Send } from 'lucide-react';
-import { useRef, useState, useTransition } from 'react';
+import { Check, FileUp, Send, X } from 'lucide-react';
+import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 
+import { FileUpload } from '@/components/ui/file-upload';
+import { CATALOG } from '@/config/business';
 import type { KycDocument, SellerStatus } from '@/domain/types';
+import { formatFileSize } from '@/lib/format';
 import { REQUIRED_DOCUMENTS } from '@/lib/validation/seller';
-import { submitKyc, uploadKycDocument } from '@/server/actions/onboarding';
+import { attachUploadedKycDocument, submitKyc } from '@/server/actions/onboarding';
 
 /**
  * The document step of onboarding.
@@ -18,6 +21,11 @@ import { submitKyc, uploadKycDocument } from '@/server/actions/onboarding';
  * Uploads are locked once the application is in review. An applicant who could
  * still swap documents afterwards would mean the reviewer approves a set that
  * is not the one they read.
+ *
+ * The uploader is the same `<FileUpload>` the product form uses. A phone-camera
+ * scan of a GST certificate is often larger than a product photo, so the
+ * progress and time-remaining figures earn their place here too — and an
+ * applicant who has already uploaded product shots meets a control they know.
  */
 export function KycDocuments({
   status,
@@ -29,7 +37,14 @@ export function KycDocuments({
   rejectionReason: string | null;
 }) {
   const [pending, startTransition] = useTransition();
-  const [uploading, setUploading] = useState<string | null>(null);
+
+  /*
+   * Which row has its uploader open.
+   *
+   * One row at a time: four drop zones stacked on one screen is four things
+   * competing for the same gesture, and only one document is ever being chosen.
+   */
+  const [openRow, setOpenRow] = useState<string | null>(null);
 
   const editable = status === 'ONBOARDING' || status === 'REJECTED';
   const uploaded = new Set(documents.map((document) => document.type));
@@ -76,18 +91,23 @@ export function KycDocuments({
               label={required.label}
               document={existing}
               editable={editable}
-              busy={uploading === required.type}
-              onUpload={(file) => {
-                setUploading(required.type);
-                const formData = new FormData();
-                formData.set('type', required.type);
-                formData.set('file', file);
-
+              open={openRow === required.type}
+              onToggle={() =>
+                setOpenRow((current) => (current === required.type ? null : required.type))
+              }
+              onUploaded={(url, fileName) => {
                 startTransition(async () => {
-                  const result = await uploadKycDocument(formData);
-                  setUploading(null);
-                  if (result.ok) toast.success(`${required.label} uploaded`);
-                  else toast.error(result.error ?? 'That upload did not work.');
+                  const result = await attachUploadedKycDocument({
+                    type: required.type,
+                    url,
+                    fileName,
+                  });
+                  if (result.ok) {
+                    toast.success(`${required.label} uploaded`);
+                    setOpenRow(null);
+                  } else {
+                    toast.error(result.error ?? 'That upload did not work.');
+                  }
                 });
               }}
             />
@@ -122,75 +142,87 @@ function DocumentRow({
   label,
   document,
   editable,
-  busy,
-  onUpload,
+  open,
+  onToggle,
+  onUploaded,
 }: {
   type: string;
   label: string;
   document: KycDocument | undefined;
   editable: boolean;
-  busy: boolean;
-  onUpload: (file: File) => void;
+  open: boolean;
+  onToggle: () => void;
+  onUploaded: (url: string, fileName: string) => void;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const inputId = `kyc-${type}`;
-
   return (
-    <li className="border-line flex flex-wrap items-center justify-between gap-3 rounded-md border p-3">
-      <div className="flex min-w-0 items-center gap-2.5">
-        <span
-          aria-hidden
-          className={
-            document
-              ? 'bg-success-500 grid size-5 shrink-0 place-items-center rounded-full text-white'
-              : 'border-line-strong grid size-5 shrink-0 place-items-center rounded-full border'
-          }
-        >
-          {document ? <Check className="size-3" strokeWidth={3} /> : null}
-        </span>
+    <li className="border-line rounded-md border p-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span
+            aria-hidden
+            className={
+              document
+                ? 'bg-success-500 grid size-5 shrink-0 place-items-center rounded-full text-white'
+                : 'border-line-strong grid size-5 shrink-0 place-items-center rounded-full border'
+            }
+          >
+            {document ? <Check className="size-3" strokeWidth={3} /> : null}
+          </span>
 
-        <div className="min-w-0">
-          <p className="text-ink text-xs font-medium">{label}</p>
-          {document ? (
-            <p className="text-faint truncate text-2xs">{document.fileName}</p>
-          ) : (
-            <p className="text-faint text-2xs">JPEG, PNG or PDF-quality scan</p>
-          )}
+          <div className="min-w-0">
+            <p className="text-ink text-xs font-medium">{label}</p>
+            {document ? (
+              <p className="text-faint truncate text-2xs">{document.fileName}</p>
+            ) : (
+              <p className="text-faint text-2xs">JPEG, PNG or a PDF-quality scan</p>
+            )}
+          </div>
         </div>
-      </div>
 
-      {editable ? (
-        <>
+        {editable ? (
           <button
             type="button"
-            onClick={() => inputRef.current?.click()}
-            disabled={busy}
-            className="border-line-strong text-ink hover:border-ink inline-flex shrink-0 items-center gap-1.5 rounded-sm border px-2.5 py-1.5 text-xs transition-colors disabled:cursor-wait"
+            onClick={onToggle}
+            aria-expanded={open}
+            className="border-line-strong text-ink hover:border-ink inline-flex shrink-0 items-center gap-1.5 rounded-sm border px-2.5 py-1.5 text-xs transition-colors"
           >
-            <FileUp className="size-3.5" aria-hidden />
-            {busy ? 'Uploading…' : document ? 'Replace' : 'Upload'}
+            {open ? (
+              <>
+                <X className="size-3.5" aria-hidden />
+                Cancel
+              </>
+            ) : (
+              <>
+                <FileUp className="size-3.5" aria-hidden />
+                {document ? 'Replace' : 'Upload'}
+              </>
+            )}
           </button>
+        ) : (
+          <span className="text-faint text-2xs">{document ? 'Received' : 'Not provided'}</span>
+        )}
+      </div>
 
-          {/* Labelled for screen readers; the visible control is the button. */}
-          <label htmlFor={inputId} className="sr-only">
-            Upload {label}
-          </label>
-          <input
-            id={inputId}
-            ref={inputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) onUpload(file);
-              event.target.value = '';
-            }}
-            className="sr-only"
-          />
-        </>
-      ) : (
-        <span className="text-faint text-2xs">{document ? 'Received' : 'Not provided'}</span>
-      )}
+      {editable && open ? (
+        <FileUpload
+          className="mt-3"
+          purpose="kyc"
+          multiple={false}
+          /*
+           * The input keeps a predictable id per document type. It is visually
+           * hidden — the drop zone is the control — but the smoke suite drives
+           * it directly, and a generated id would make that untestable.
+           */
+          inputId={`kyc-${type}`}
+          accept="image/jpeg,image/png,image/webp"
+          maxBytes={CATALOG.maxImageBytes}
+          label={`Drop your ${label.toLowerCase()} here, or browse`}
+          hint={`A clear, readable scan · up to ${formatFileSize(CATALOG.maxImageBytes)}`}
+          onUploaded={(file) => {
+            onUploaded(file.url, file.name);
+          }}
+        />
+      ) : null}
     </li>
   );
 }

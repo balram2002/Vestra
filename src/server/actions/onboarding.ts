@@ -101,6 +101,41 @@ export async function uploadKycDocument(formData: FormData): Promise<OnboardingR
   return { ok: true };
 }
 
+/**
+ * Attach a KYC document the BROWSER already uploaded.
+ *
+ * Same rule as the listing path: the bytes never passed through this process,
+ * so they are read back and checked before the URL is recorded against an
+ * application. A reviewer has to be looking at a real document.
+ */
+export async function attachUploadedKycDocument(input: {
+  type: string;
+  url: string;
+  fileName: string;
+}): Promise<OnboardingResult> {
+  const user = await requireUser();
+
+  const store = await ownStore(user.id);
+  if (!store) return { ok: false, error: 'Start your application before uploading documents.' };
+
+  const type = z.enum(DOCUMENT_TYPES).safeParse(input.type);
+  if (!type.success) return { ok: false, error: 'That is not a document we ask for.' };
+
+  const { verifyUploaded } = await import('../media/verify');
+  const verified = await verifyUploaded(input.url);
+  if (!verified.ok) return { ok: false, error: verified.error };
+
+  const attached = await attachKycDocument(store.id, {
+    type: type.data,
+    fileName: input.fileName.slice(0, 120),
+    fileUrl: input.url,
+  });
+  if (!attached.ok) return { ok: false, error: attached.error };
+
+  revalidatePath('/seller/onboarding');
+  return { ok: true };
+}
+
 /* ------------------------------------------------------------- submission */
 
 export async function submitKyc(): Promise<OnboardingResult> {

@@ -50,6 +50,13 @@ const nextConfig: NextConfig = {
     imageSizes: [32, 48, 64, 96, 128, 160, 200, 256, 384],
     qualities: [60, 75, 90],
     minimumCacheTTL: 14400,
+    /*
+     * Every <Image> resolves through this loader, which is what makes "images
+     * are served by ImageKit" true of the whole app rather than of the handful
+     * of components someone remembered to change. With no ImageKit credentials
+     * it hands the request back to `/_next/image`, so a clone still runs.
+     */
+    loaderFile: './src/lib/image-loader.ts',
     remotePatterns: [
       // Seller-uploaded media would land on the asset CDN in production.
       { protocol: 'https', hostname: 'cdn.vestra.example' },
@@ -60,6 +67,8 @@ const nextConfig: NextConfig = {
        * dependency entirely and falls back to the first-party SVG renderer.
        */
       { protocol: 'https', hostname: 'images.unsplash.com' },
+      // ImageKit's delivery host, when configured.
+      { protocol: 'https', hostname: 'ik.imagekit.io' },
     ],
   },
 

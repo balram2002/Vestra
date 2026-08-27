@@ -29,6 +29,15 @@ const check = (name, ok, detail = '') => {
   }
 };
 
+/** The words the applicant actually reads, from REQUIRED_DOCUMENTS. */
+const labelFor = (type) =>
+  ({
+    GST_CERTIFICATE: 'GST certificate',
+    PAN_CARD: 'PAN card',
+    CANCELLED_CHEQUE: 'Cancelled cheque',
+    ADDRESS_PROOF: 'Proof of the pickup address',
+  })[type] ?? type;
+
 const client = await MongoClient.connect(process.env.MONGODB_URI ?? 'mongodb://127.0.0.1:27017');
 const db = client.db(process.env.MONGODB_DB ?? 'vestra');
 
@@ -222,10 +231,17 @@ try {
     );
 
     for (const type of ['GST_CERTIFICATE', 'PAN_CARD', 'CANCELLED_CHEQUE', 'ADDRESS_PROOF']) {
+      /*
+       * The uploader is revealed per row rather than four drop zones stacked on
+       * one screen, so the row has to be opened before its input exists.
+       */
+      const row = page.locator('li').filter({ hasText: labelFor(type) }).first();
+      await row.getByRole('button', { name: /Upload|Replace/ }).click();
+      await page.locator(`#kyc-${type}`).waitFor({ state: 'attached', timeout: 10000 });
       await page
         .locator(`#kyc-${type}`)
         .setInputFiles({ name: `${type.toLowerCase()}.png`, mimeType: 'image/png', buffer: png });
-      await page.waitForTimeout(1500);
+      await page.waitForTimeout(2500);
     }
 
     const withDocuments = await db.collection('sellers').findOne({ _id: store._id });

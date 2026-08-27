@@ -176,6 +176,37 @@ export function formatFileSize(bytes: number): string {
 }
 
 /** "S, M, L +2" -- for product cards where space is tight. */
+/**
+ * A transfer rate, for an upload in flight.
+ *
+ * Always one decimal below 10 units and none above, so the number stops
+ * jittering at exactly the point where the extra digit adds nothing.
+ */
+export function formatTransferRate(bytesPerSecond: number): string {
+  if (!Number.isFinite(bytesPerSecond) || bytesPerSecond <= 0) return '—';
+  return `${formatFileSize(bytesPerSecond)}/s`;
+}
+
+/**
+ * A countdown, phrased the way a person would say it.
+ *
+ * Deliberately coarse above a minute: an upload that reports "1 min 47 sec"
+ * and then "1 min 46 sec" invites the user to watch it rather than to look
+ * away, and the precision is fictional anyway.
+ */
+export function formatDuration(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) return '—';
+  if (seconds < 1) return 'less than a second';
+  if (seconds < 60) return `${Math.ceil(seconds)} sec`;
+
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} min`;
+
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest ? `${hours} hr ${rest} min` : `${hours} hr`;
+}
+
 export function formatList(items: readonly string[], max = 3): string {
   if (items.length === 0) return '';
   if (items.length <= max) return items.join(', ');
