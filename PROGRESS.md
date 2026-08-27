@@ -19,7 +19,7 @@ with a server running (`npm run restart && npm run start`):
 | `npm run smoke:onboarding` | applying to sell, KYC upload, and the gate on an unverified store |
 | `npm run smoke:email` | verification, password reset, and what actually reaches an inbox |
 | `npm run audit:a11y` | axe-core, 14 routes × 2 widths |
-| `npm run audit:contrast` | WCAG ratios, parsed from `tokens.css` |
+| `npm run audit:contrast` | WCAG ratios in BOTH themes, parsed from `tokens.css` |
 
 Latest run: **build 276/276 routes · typecheck clean · lint clean · 173 tests
 · funnel 11/11 · RBAC 19/19 · admin writes 6/6 · fulfilment 25/25 · exchange 20/20
@@ -517,6 +517,49 @@ size just sold out".
       seeded as a flat ₹300 in paise, so the engine computed a 30,000% discount
       and the clamp downstream quietly reduced it to the whole line. Orders were
       going out free and nothing failed
+
+---
+
+## Phase 22 — Theme, carousels and a mobile shell · **done**
+
+The first milestone aimed squarely at how the thing looks and feels, with the
+weight on phones.
+
+- [x] **Dark mode, finally reachable.** The dark palette had been sitting in
+      `tokens.css` under a `.dark` class that nothing ever applied — written,
+      complete, and dead. Now an inline script in `<head>` resolves the choice
+      before the first paint, so there is no flash of the wrong theme, and
+      `light / dark / system` is a three-way control because `system` is the
+      commonest real answer, not a fallback
+- [x] The theme lives outside React, in a store read through
+      `useSyncExternalStore` — it is a DOM attribute, `localStorage` and a media
+      query, which is exactly that hook's shape. It follows the device while set
+      to `system`, and follows other tabs
+- [x] **The contrast checker only ever measured the light palette**, so the dark
+      tokens shipped with ratios nobody had calculated. It now checks both, and
+      immediately found `text-tertiary` at 4.45:1 — a WCAG AA failure by a hair
+- [x] **A carousel primitive**, built on native scroll-snap rather than a
+      transform track: momentum, rubber-banding and trackpad gestures are the
+      platform's rather than reimplemented, it works before hydration, and it
+      costs no dependency. Labelled region, per-slide position, arrows that
+      disable at the ends, and nothing that auto-advances
+- [x] The home hero was a mosaic that stacked into three full-height cards on a
+      phone — roughly two and a half screens before the first product. It is one
+      swipeable row at every width now. Product rails use the same primitive
+- [x] **The PDP gallery was a tablist**: a big image changed by clicking a
+      thumbnail, which meant swiping the photo — the one thing everybody tries —
+      did nothing. The photos are the carousel now and the thumbnails drive it
+- [x] **A sticky buy bar on mobile**, carrying price, size and the action, so
+      the primary control on the page is never a scroll away
+- [x] **A bottom navigation bar**, because the five things people move between
+      were behind a hamburger at the least reachable corner of the phone
+- [x] `/categories` — the taxonomy was reachable only through the desktop mega
+      menu, so browsing did not exist on a phone
+- [x] **The header bag and wishlist badges were hardcoded to `0`.**
+      `getBagCount` and `getWishlistCount` both existed and neither had ever
+      been called, so the badge had never once appeared
+- [x] The PLP header cost about two thirds of a phone screen before the first
+      product. Filter, sort and count are one sticky row now
 
 ---
 

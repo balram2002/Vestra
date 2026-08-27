@@ -4,6 +4,7 @@ import { Toaster } from 'sonner';
 
 import { siteConfig, siteUrl } from '@/config/site';
 import { cn } from '@/lib/cn';
+import { themeInitScript } from '@/lib/theme';
 
 import '@/styles/global.css';
 
@@ -77,6 +78,14 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang={siteConfig.language} suppressHydrationWarning>
+      <head>
+        {/*
+          Runs before the first paint and stamps `data-theme` on <html>.
+          Anything deferred to hydration paints the wrong theme first, and that
+          white flash is what makes a dark mode feel broken on every load.
+        */}
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       <body className={cn(sans.variable, display.variable, 'min-h-dvh antialiased')}>
         {children}
 

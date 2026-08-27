@@ -1,4 +1,9 @@
 import { Heart, Search, ShoppingBag, User } from 'lucide-react';
+
+import { ThemeToggleCompact } from '@/components/theme/theme-toggle';
+import { currentOwner } from '@/server/auth/session';
+import { getBagCount } from '@/server/services/cart';
+import { getWishlistCount } from '@/server/services/wishlist';
 import Link from 'next/link';
 import { Suspense } from 'react';
 
@@ -26,8 +31,16 @@ export async function SiteHeader() {
 
   return (
     <header className="bg-raised border-line sticky top-0 z-50 border-b">
-      {/* Announcement strip: the one place site-wide promises are stated. */}
-      <p className="bg-inverse text-on-inverse py-1.5 text-center text-2xs tracking-wide">
+      {/*
+        Announcement strip: the one place site-wide promises are stated.
+
+        Accent rather than `bg-inverse`. Inverse flips with the theme, which is
+        correct semantically and wrong to look at: on a dark page it became a
+        full-width strip of near-white at the very top of the screen, which is
+        glare rather than emphasis. The accent reads as a highlight in both
+        themes because it is the same colour in both.
+      */}
+      <p className="bg-accent text-on-accent py-1.5 text-center text-2xs tracking-wide">
         Free delivery above ₹1,199 · 14-day returns · Verified sellers only
       </p>
 
@@ -64,6 +77,8 @@ export async function SiteHeader() {
               />
             </div>
           </form>
+
+          <ThemeToggleCompact />
 
           <Link
             href="/account"
@@ -113,7 +128,9 @@ function CountIconFallback({ label, icon }: { label: string; icon: 'heart' | 'ba
  * complete and nothing is a dead control.
  */
 async function WishlistIcon() {
-  const count = 0;
+  // Real, not a placeholder. `getWishlistCount` existed from the start and was
+  // never called, so this badge had never once appeared.
+  const count = await getWishlistCount(await currentOwner());
   return (
     <Link
       href="/wishlist"
@@ -127,7 +144,7 @@ async function WishlistIcon() {
 }
 
 async function BagIcon() {
-  const count = 0;
+  const count = await getBagCount(await currentOwner());
   return (
     <Link
       href="/bag"

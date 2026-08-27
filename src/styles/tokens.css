@@ -119,6 +119,19 @@
   --color-muted: var(--text-secondary);
   --color-faint: var(--text-tertiary);
   --color-on-inverse: var(--text-inverse);
+  /*
+   * Text that sits ON the accent. Deliberately NOT theme-flipped: the accent is
+   * a mid-to-dark mulberry in both themes, so light text is correct in both,
+   * and `--text-inverse` would put near-black on it in dark mode.
+   */
+  --color-on-accent: var(--color-bone-50);
+
+  /*
+   * The sticky site header's height. Anything else that sticks has to sit
+   * below it, and a hard-coded offset in three files is three chances to be
+   * wrong by four pixels.
+   */
+  --header-height: 6.25rem;
 
   --color-line: var(--border-subtle);
   --color-line-strong: var(--border-default);
@@ -225,6 +238,9 @@
  */
 @layer theme {
   :root {
+    /* Scrollbars, form controls and overscroll follow this. */
+    color-scheme: light;
+
     --surface-canvas: var(--color-bone-50);
     --surface-raised: var(--color-bone-0);
     --surface-sunken: var(--color-bone-100);
@@ -252,7 +268,21 @@
     --chart-axis: var(--color-bone-500);
   }
 
+  /*
+   * The dark palette, declared once.
+   *
+   * `[data-theme='dark']` is stamped on <html> by the inline script in
+   * `<head>`, which resolves `system` against `prefers-color-scheme` BEFORE the
+   * first paint. Doing that in script rather than in a `@media` block is what
+   * lets this list exist in one place instead of twice — see `lib/theme.ts` for
+   * the trade it makes.
+   *
+   * `.dark` is kept alongside it so anything that sets a class still works.
+   */
+  :root[data-theme='dark'],
   .dark {
+    color-scheme: dark;
+
     --surface-canvas: var(--color-bone-950);
     --surface-raised: #1a1815;
     --surface-sunken: #0b0a0c;
@@ -265,7 +295,12 @@
 
     --text-primary: var(--color-bone-50);
     --text-secondary: #a9a294;
-    --text-tertiary: #857f73;
+    /*
+     * Lightened from #857f73, which measured 4.45:1 on `surface-raised` and
+     * failed WCAG AA by a hair. It shipped unmeasured because the contrast
+     * checker only ever looked at the light palette; it now checks both.
+     */
+    --text-tertiary: #888275;
     --text-inverse: var(--color-bone-950);
 
     --accent-solid: var(--color-mulberry-500);

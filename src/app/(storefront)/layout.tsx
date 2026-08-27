@@ -3,6 +3,10 @@ import { Suspense } from 'react';
 import { SiteFooter } from '@/components/layout/site-footer';
 import { SiteHeader } from '@/components/layout/site-header';
 import { RouteProgress } from '@/components/layout/route-progress';
+import { BottomNav, BottomNavBar } from '@/components/layout/bottom-nav';
+import { currentOwner } from '@/server/auth/session';
+import { getBagCount } from '@/server/services/cart';
+import { getWishlistCount } from '@/server/services/wishlist';
 
 /**
  * Storefront shell.
@@ -32,13 +36,42 @@ export default function StorefrontLayout({ children }: { children: React.ReactNo
         <SiteHeader />
       </Suspense>
 
-      <main id="main" className="flex-1">
+      {/*
+        The bottom bar is fixed, so the page needs room underneath it or it
+        covers the last element of every screen. Paying for that here — once,
+        next to where the bar is mounted — keeps it from becoming something
+        every page has to remember.
+      */}
+      <main id="main" className="flex-1 pb-14 lg:pb-0">
         {children}
       </main>
 
       <Suspense fallback={null}>
         <SiteFooter />
       </Suspense>
+
+      {/* The fallback is the same bar with nothing highlighted, so it is
+          usable from the first paint and never shifts when the counts land. */}
+      <Suspense fallback={<BottomNavBar pathname={null} />}>
+        <BottomNavWithCounts />
+      </Suspense>
     </div>
   );
+}
+
+/**
+ * The bar with live counts.
+ *
+ * Its own boundary so reading the session never delays the page. The fallback
+ * is the same bar without numbers, so navigation is usable from the first paint
+ * and the badges simply appear — the bar itself never moves.
+ */
+async function BottomNavWithCounts() {
+  const owner = await currentOwner();
+  const [bagCount, wishlistCount] = await Promise.all([
+    getBagCount(owner),
+    getWishlistCount(owner),
+  ]);
+
+  return <BottomNav bagCount={bagCount} wishlistCount={wishlistCount} />;
 }

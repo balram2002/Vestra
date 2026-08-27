@@ -5,7 +5,7 @@ import { Suspense } from 'react';
 import { Breadcrumbs } from '@/components/commerce/breadcrumbs';
 import { FilterDrawer } from '@/components/commerce/filter-drawer';
 import { FilterRail } from '@/components/commerce/filter-rail';
-import { ListingToolbar } from '@/components/commerce/listing-toolbar';
+import { ListingToolbar, SortChips } from '@/components/commerce/listing-toolbar';
 import { Pagination } from '@/components/commerce/pagination';
 import { ProductGrid } from '@/components/commerce/product-grid';
 import { ProductGridSkeleton } from '@/components/skeletons/product-card-skeleton';
@@ -121,10 +121,21 @@ export default async function CategoryPage({ params, searchParams }: PageProps) 
         ])}
       />
 
-      <header className="mt-3">
-        <h1 className="font-display text-ink text-2xl sm:text-3xl">{category.name}</h1>
+      {/*
+        Tight on a phone.
+        
+        Breadcrumb, heading, description, a filter button, a count and a sort
+        row used to fill roughly two thirds of a 844px screen before the first
+        product. The description is clamped to two lines and the rest is folded
+        into the sticky bar below, so the grid starts near the top where someone
+        who came to shop is already looking.
+      */}
+      <header className="mt-2 sm:mt-3">
+        <h1 className="font-display text-ink text-xl sm:text-3xl">{category.name}</h1>
         {category.description ? (
-          <p className="text-muted mt-1.5 max-w-2xl text-sm">{category.description}</p>
+          <p className="text-muted mt-1 line-clamp-2 max-w-2xl text-sm sm:mt-1.5 sm:line-clamp-none">
+            {category.description}
+          </p>
         ) : null}
       </header>
 
@@ -176,7 +187,7 @@ async function CategoryListing({
         the drawer on mobile. Re-implementing it for small screens would
         guarantee the two sets of filters drift apart.
       */}
-      <div className="mt-5 lg:hidden">
+      <div className="bg-canvas/95 gutter sticky top-[var(--header-height)] z-30 -mx-4 mt-3 flex items-center gap-2 border-b border-line py-2 backdrop-blur-md sm:-mx-6 lg:hidden">
         <FilterDrawer appliedCount={result.appliedFilterCount}>
           <FilterRail
             facets={result.facets}
@@ -186,6 +197,25 @@ async function CategoryListing({
             appliedCount={result.appliedFilterCount}
           />
         </FilterDrawer>
+
+        {/*
+          The chips scroll and the count does not.
+          
+          A fade on the trailing edge is what says "there is more sort to the
+          right"; without it the last chip is simply sliced in half against the
+          count and reads as a rendering fault.
+        */}
+        <div className="relative min-w-0 flex-1">
+          <SortChips activeSort={query.sort ?? 'popularity'} params={raw} basePath={basePath} />
+          <div
+            aria-hidden
+            className="from-canvas pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l to-transparent"
+          />
+        </div>
+
+        <p className="text-faint tabular border-line shrink-0 border-l pl-2.5 text-2xs" role="status">
+          {result.total} items
+        </p>
       </div>
 
       <div className="mt-4 flex gap-8 lg:mt-5">
@@ -201,6 +231,7 @@ async function CategoryListing({
 
         <div className="min-w-0 flex-1">
           <ListingToolbar
+            className="hidden lg:flex"
             total={result.total}
             activeSort={query.sort ?? 'popularity'}
             params={raw}

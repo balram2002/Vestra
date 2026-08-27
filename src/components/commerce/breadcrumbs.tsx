@@ -18,13 +18,21 @@ export function Breadcrumbs({
 
   return (
     <nav aria-label="Breadcrumb">
-      <ol className="text-faint flex flex-wrap items-center gap-1 text-xs">
+      {/*
+        One line that scrolls, rather than wrapping.
+        
+        A product title inside a breadcrumb wraps to two or three lines on a
+        phone, and those lines sit directly above the photograph — the most
+        valuable space on the page spent restating the title that appears again
+        forty pixels below. Scrolling keeps the trail complete and costs one row.
+      */}
+      <ol className="text-faint scrollbar-none flex items-center gap-1 overflow-x-auto whitespace-nowrap text-xs sm:flex-wrap sm:whitespace-normal">
         {items.map((item, index) => {
           const last = index === items.length - 1;
           return (
             <li key={item.href} className="flex items-center gap-1">
               {last ? (
-                <span aria-current="page" className="text-muted">
+                <span aria-current="page" className="text-muted max-w-[14rem] truncate sm:max-w-none">
                   {item.label}
                 </span>
               ) : (

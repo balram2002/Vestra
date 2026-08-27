@@ -29,14 +29,51 @@ const PALETTE = Object.fromEntries(
   [...css.matchAll(/--color-(bone-[\w]+):\s*(#[0-9a-fA-F]{6})/g)].map((m) => [m[1], m[2]]),
 );
 
-/** Which palette step each semantic text token resolves to. */
-function resolve(name) {
-  const match = css.match(new RegExp(`--${name}:\\s*var\\(--color-(bone-[\\w]+)\\)`));
-  return match ? match[1] : null;
+/** Surfaces light-mode text actually sits on — the hardest case wins. */
+const SURFACES = ['bone-0', 'bone-25', 'bone-50', 'bone-100'];
+
+/**
+ * The slice of the stylesheet that defines one theme.
+ *
+ * Until dark mode was actually reachable, this checker only ever measured the
+ * light palette — so the dark tokens had shipped with contrast nobody had
+ * calculated. Splitting on the dark selector is enough because the file
+ * declares light first and dark once.
+ */
+function themeBlock(theme) {
+  const start = css.indexOf("[data-theme='dark']");
+  if (start === -1) return theme === 'light' ? css : '';
+  return theme === 'light' ? css.slice(0, start) : css.slice(start);
 }
 
-/** Surfaces text actually sits on, lightest first — the hardest case wins. */
-const SURFACES = ['bone-0', 'bone-25', 'bone-50', 'bone-100'];
+/**
+ * What a semantic token resolves to in a theme.
+ *
+ * Handles both forms the tokens use: a reference to a palette step, and a
+ * literal hex — the dark block uses literals for the surfaces it tunes by hand.
+ */
+function resolve(name, theme = 'light') {
+  const block = themeBlock(theme);
+
+  const viaPalette = block.match(new RegExp(`--${name}:\\s*var\\(--color-(bone-[\\w]+)\\)`));
+  if (viaPalette) return { token: viaPalette[1], hex: PALETTE[viaPalette[1]] };
+
+  const literal = block.match(new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{6})`));
+  if (literal) return { token: 'literal', hex: literal[1] };
+
+  return null;
+}
+
+/** The surfaces text sits on in a theme, as name/hex pairs. */
+function surfacesFor(theme) {
+  if (theme === 'light') {
+    return SURFACES.map((name) => ({ name, hex: PALETTE[name] }));
+  }
+
+  return ['surface-canvas', 'surface-raised', 'surface-sunken']
+    .map((name) => ({ name, hex: resolve(name, 'dark')?.hex ?? null }))
+    .filter((surface) => Boolean(surface.hex));
+}
 
 function channel(value) {
   const c = value / 255;
@@ -58,51 +95,39 @@ export function contrast(foreground, background) {
   return (light + 0.05) / (dark + 0.05);
 }
 
-/** Darkest hex on the bone hue that clears `target` on the lightest surface. */
-function solveFor(target, surface, hue = [128, 122, 110]) {
-  // Walk the hue towards black in 1% steps and take the first passing step, so
-  // the result stays on-brand rather than defaulting to grey.
-  for (let step = 0; step <= 100; step++) {
-    const factor = 1 - step / 100;
-    const rgb = hue.map((component) => Math.round(component * factor));
-    const hex = `#${rgb.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
-    if (contrast(hex, PALETTE[surface]) >= target) return { hex, ratio: contrast(hex, PALETTE[surface]) };
-  }
-  return { hex: '#000000', ratio: 21 };
-}
-
 const CHECKS = ['text-primary', 'text-secondary', 'text-tertiary'];
-
-console.log('\n  Token contrast against light surfaces (need 4.5:1)\n');
 
 let failed = 0;
 
-for (const name of CHECKS) {
-  const token = resolve(name);
-  if (!token || !PALETTE[token]) {
-    console.log(`  SKIP  ${name} — could not resolve from tokens.css`);
-    continue;
-  }
-  const hex = PALETTE[token];
-  const worst = SURFACES.reduce(
-    (acc, surface) => {
-      const ratio = contrast(hex, PALETTE[surface]);
-      return ratio < acc.ratio ? { surface, ratio } : acc;
-    },
-    { surface: '', ratio: Infinity },
-  );
+for (const theme of ['light', 'dark']) {
+  console.log(`
+  Token contrast in ${theme} (need 4.5:1)
+`);
 
-  const ok = worst.ratio >= 4.5;
-  if (!ok) failed += 1;
+  const surfaces = surfacesFor(theme);
 
-  console.log(
-    `  ${ok ? 'PASS' : 'FAIL'}  ${name.padEnd(16)} ${token.padEnd(9)} ${hex}  ` +
-      `${worst.ratio.toFixed(2)}:1 on ${worst.surface}`,
-  );
+  for (const name of CHECKS) {
+    const resolved = resolve(name, theme);
+    if (!resolved?.hex) {
+      console.log(`  SKIP  ${name} — could not resolve from tokens.css`);
+      continue;
+    }
 
-  if (!ok) {
-    const fix = solveFor(4.5, 'bone-100');
-    console.log(`        -> ${fix.hex} would give ${fix.ratio.toFixed(2)}:1`);
+    const worst = surfaces.reduce(
+      (acc, surface) => {
+        const ratio = contrast(resolved.hex, surface.hex);
+        return ratio < acc.ratio ? { surface: surface.name, ratio } : acc;
+      },
+      { surface: '', ratio: Infinity },
+    );
+
+    const ok = worst.ratio >= 4.5;
+    if (!ok) failed += 1;
+
+    console.log(
+      `  ${ok ? 'PASS' : 'FAIL'}  ${name.padEnd(16)} ${resolved.hex}  ` +
+        `${worst.ratio.toFixed(2)}:1 on ${worst.surface}`,
+    );
   }
 }
 

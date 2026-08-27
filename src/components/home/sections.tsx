@@ -2,6 +2,8 @@ import { ArrowRight, RotateCcw, ShieldCheck, Truck } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 
+import { Carousel, CarouselItem } from '@/components/ui/carousel';
+
 import { ProductCard } from '@/components/commerce/product-card';
 import { Badge } from '@/components/ui/badge';
 import type { Banner, Category, HomeSection, ProductSummary, Seller } from '@/domain/types';
@@ -26,20 +28,47 @@ import { formatCompactNumber } from '@/lib/format';
  * given the weight.
  */
 export function HeroCarousel({ banners }: { banners: Banner[] }) {
-  const [lead, ...rest] = banners;
-  if (!lead) return null;
+  const shown = banners.slice(0, 4);
+  if (shown.length === 0) return null;
 
+  /*
+   * One carousel at every width rather than a mosaic that stacks.
+   *
+   * The mosaic read well on a desktop and turned into three full-height cards
+   * on a phone — roughly two and a half screens of scrolling before the first
+   * product. Swiping is the gesture people already use for a hero, and because
+   * this is a scroll container the slides simply sit side by side once there is
+   * room, so a wide screen shows the set without any second layout.
+   *
+   * Slide widths are set here rather than inside the panel: the carousel owns
+   * how much is visible, the panel owns what a panel looks like.
+   */
   return (
-    <section className="gutter shell-max pt-3 sm:pt-5" aria-label="Featured">
-      <div className="grid gap-2.5 lg:grid-cols-12 lg:gap-3">
-        <HeroPanel banner={lead} priority size="lg" className="lg:col-span-7 xl:col-span-8" />
-
-        <div className="grid gap-2.5 sm:grid-cols-2 lg:col-span-5 lg:grid-cols-1 lg:gap-3 xl:col-span-4">
-          {rest.slice(0, 2).map((banner) => (
-            <HeroPanel key={banner.id} banner={banner} size="sm" />
-          ))}
-        </div>
-      </div>
+    <section className="pt-3 sm:pt-5" aria-label="Featured">
+      <Carousel
+        label="Featured collections"
+        dots
+        className="shell-max"
+        // The gutter lives on the scroller so the first slide lines up with the
+        // page and the last can still scroll clear of the edge.
+        contentClassName="gutter gap-3 pb-1"
+      >
+        {shown.map((banner, index) => (
+          <CarouselItem
+            key={banner.id}
+            index={index + 1}
+            total={shown.length}
+            className="w-[86%] sm:w-[62%] lg:w-[44%] xl:w-[38%]"
+          >
+            <HeroPanel
+              banner={banner}
+              // Only the first is the LCP candidate; the rest are a swipe away.
+              priority={index === 0}
+              size={index === 0 ? 'lg' : 'sm'}
+            />
+          </CarouselItem>
+        ))}
+      </Carousel>
     </section>
   );
 }
@@ -61,7 +90,7 @@ function HeroPanel({
     <Link
       href={banner.href}
       className={`group relative isolate flex overflow-hidden rounded-xl ${
-        large ? 'aspect-[4/5] sm:aspect-[16/10] lg:aspect-[4/3] xl:aspect-[16/11]' : 'aspect-[16/9] lg:aspect-[16/8]'
+        large ? 'aspect-[4/5] sm:aspect-[3/4] lg:aspect-[4/5]' : 'aspect-[4/5] sm:aspect-[3/4] lg:aspect-[4/5]'
       } ${className ?? ''}`}
     >
       <Image
@@ -69,7 +98,7 @@ function HeroPanel({
         alt={banner.alt}
         fill
         priority={priority}
-        sizes={large ? '(max-width: 64rem) 100vw, 62vw' : '(max-width: 40rem) 100vw, (max-width: 64rem) 50vw, 31vw'}
+        sizes="(max-width: 40rem) 86vw, (max-width: 64rem) 62vw, 44vw"
         className="object-cover transition-transform duration-700 ease-out-quint motion-safe:group-hover:scale-[1.04]"
       />
 
@@ -189,16 +218,23 @@ export function ProductRail({
 
   return (
     <Section title={section.title} subtitle={section.subtitle} href={section.href}>
-      <ul className="scrollbar-none -mx-1 flex snap-x gap-3 overflow-x-auto px-1 pb-1">
-        {products.map((product) => (
-          <li
+      {/*
+        Slightly less than half the width on a phone, so the cut edge of the
+        third card is visible. That sliver is what tells someone the row scrolls
+        — a row that ends flush at the viewport looks like the whole set.
+      */}
+      <Carousel label={section.title ?? 'Products'} contentClassName="-mx-1 px-1 pb-1">
+        {products.map((product, index) => (
+          <CarouselItem
             key={product.id}
-            className="w-[52%] shrink-0 snap-start sm:w-[31%] lg:w-[23%] xl:w-[17.5%]"
+            index={index + 1}
+            total={products.length}
+            className="w-[46%] sm:w-[31%] lg:w-[23%] xl:w-[17.5%]"
           >
             <ProductCard product={product} />
-          </li>
+          </CarouselItem>
         ))}
-      </ul>
+      </Carousel>
     </Section>
   );
 }
