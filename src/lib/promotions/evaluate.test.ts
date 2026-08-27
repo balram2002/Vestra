@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { promotionValueKind } from '@/domain/enums';
 import type { Promotion } from '@/domain/types';
 import { toPaise } from '../money';
 import { evaluatePromotions, type PromotionContextLine } from './evaluate';
@@ -22,6 +23,7 @@ function promotion(overrides: Partial<Promotion> = {}): Promotion {
     subtitle: null,
     description: 'A test offer',
     type: 'PERCENT_DISCOUNT',
+    valueKind: 'PERCENT',
     value: 10,
     maxDiscount: null,
     minOrderValue: 0,
@@ -197,7 +199,7 @@ describe('flash sales', () => {
 
 describe('flat discounts', () => {
   it('spreads across lines by value and never exceeds the total', () => {
-    const flat = promotion({ type: 'FLAT_DISCOUNT', value: toPaise(300) });
+    const flat = promotion({ type: 'FLAT_DISCOUNT', valueKind: 'AMOUNT', value: toPaise(300) });
     const result = evaluatePromotions(
       [flat],
       context([line(), line({ refId: 'line-2', lineSubtotal: toPaise(3000) })]),
@@ -206,7 +208,7 @@ describe('flat discounts', () => {
   });
 
   it('caps at the bag value when the flat amount exceeds it', () => {
-    const flat = promotion({ type: 'FLAT_DISCOUNT', value: toPaise(9000) });
+    const flat = promotion({ type: 'FLAT_DISCOUNT', valueKind: 'AMOUNT', value: toPaise(9000) });
     const result = evaluatePromotions([flat], context([line()]));
     expect(result.offers[0].discount).toBeLessThanOrEqual(toPaise(1000));
   });
@@ -243,5 +245,84 @@ describe('buy X get Y', () => {
     );
     // Six units, two complete groups of three, two free units at 500.
     expect(result.offers[0].discount).toBe(toPaise(1000));
+  });
+});
+
+/* ------------------------------------------------ what a value MEANS */
+
+describe('percent versus amount', () => {
+  /*
+   * The regression.
+   *
+   * A seeded "flat ₹300 off" was typed SELLER_OFFER, and the engine read
+   * SELLER_OFFER as a percentage — so 30000 paise became 30,000%, the discount
+   * exceeded the line, and `clampDiscount` downstream quietly reduced it to the
+   * whole line. Orders went out for ₹0 and nothing failed.
+   */
+  it('reads an amount-based offer as paise, not as a percentage', () => {
+    const result = evaluatePromotions(
+      [promotion({ type: 'SELLER_OFFER', valueKind: 'AMOUNT', value: 30000 })],
+      context([line({ lineSubtotal: 249900 })]),
+    );
+
+    expect(result.applied[0]?.discountByRefId['line-1']).toBe(30000);
+  });
+
+  it('still reads a percent-based offer as a percentage', () => {
+    const result = evaluatePromotions(
+      [promotion({ type: 'SELLER_OFFER', valueKind: 'PERCENT', value: 30 })],
+      context([line({ lineSubtotal: 249900 })]),
+    );
+
+    expect(result.applied[0]?.discountByRefId['line-1']).toBe(74970);
+  });
+
+  /*
+   * Corrupt data must not be able to give an order away. A percentage above
+   * 100 is impossible, so it is clamped rather than trusted — the failure it
+   * guards against is silent and total.
+   */
+  it('clamps a nonsensical percentage instead of zeroing the order', () => {
+    const result = evaluatePromotions(
+      [promotion({ valueKind: 'PERCENT', value: 30000 })],
+      context([line({ lineSubtotal: 249900 })]),
+    );
+
+    const discount = result.applied[0]?.discountByRefId['line-1'] ?? 0;
+    expect(discount).toBeLessThanOrEqual(249900);
+  });
+
+  it('never lets a negative percentage add money back', () => {
+    const result = evaluatePromotions(
+      [promotion({ valueKind: 'PERCENT', value: -50 })],
+      context([line({ lineSubtotal: 249900 })]),
+    );
+
+    expect(result.applied.length).toBe(0);
+  });
+});
+
+describe('promotionValueKind', () => {
+  /*
+   * Rows written before `valueKind` existed have to be read somehow. A
+   * percentage can never exceed 100, so anything larger is unambiguously an
+   * amount — a fact about percentages, not a guess about intent.
+   */
+  it('trusts an explicit kind above any inference', () => {
+    expect(promotionValueKind({ type: 'FLAT_DISCOUNT', valueKind: 'PERCENT', value: 20 })).toBe(
+      'PERCENT',
+    );
+  });
+
+  it('reads a legacy flat discount as an amount', () => {
+    expect(promotionValueKind({ type: 'FLAT_DISCOUNT', value: 30000 })).toBe('AMOUNT');
+  });
+
+  it('reads a legacy value above 100 as an amount', () => {
+    expect(promotionValueKind({ type: 'SELLER_OFFER', value: 30000 })).toBe('AMOUNT');
+  });
+
+  it('reads a plausible legacy percentage as a percentage', () => {
+    expect(promotionValueKind({ type: 'SELLER_OFFER', value: 30 })).toBe('PERCENT');
   });
 });

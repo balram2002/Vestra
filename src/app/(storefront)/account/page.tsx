@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 
 import { AccountNav } from '@/components/account/account-nav';
+import { VerifyEmailNotice } from '@/components/account/verify-email-notice';
 import { SignOutButton } from '@/components/account/sign-out-button';
 import { StatusBadge } from '@/components/ui/badge';
 import { FULFILLMENT_STATUS_META } from '@/domain/enums';
@@ -72,13 +73,13 @@ async function Overview() {
         <div>
           <h1 className="font-display text-ink text-2xl">{user.fullName}</h1>
           <p className="text-muted mt-1 text-sm">{user.email}</p>
-          {!user.emailVerified ? (
-            <p className="text-warning-700 mt-1 text-xs">Email not verified yet</p>
-          ) : null}
+
         </div>
 
         <SignOutButton />
       </header>
+
+      {!user.emailVerified ? <VerifyEmailNotice email={user.email} /> : null}
 
       <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,1fr)_18rem] lg:gap-14">
         <section>

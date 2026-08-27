@@ -179,6 +179,10 @@ the customer's original price, coupon share and tax snapshot intact.
   only when the change is VISIBLE (crossing zero, or inside the urgency band),
   because expiring every listing on every add-to-bag is not worth a number
   nobody renders.
+- **A promotion's `value` means what `valueKind` says**, never what its `type`
+  implies. Most promotion types name a scope or a campaign — SELLER_OFFER,
+  FLASH_SALE, BANK_OFFER — and say nothing about whether the number is a
+  percentage or paise. Guessing gave whole orders away for free.
 - **Order items freeze their own price snapshot.** Later catalogue edits must
   never alter historical orders.
 - **No business logic in JSX.** Services in `src/server/`, presentation in

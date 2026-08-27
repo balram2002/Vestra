@@ -37,6 +37,8 @@ export function generatePromotions(
   const second = sellers[1] ?? sellers[0];
 
   const base = {
+    // Percentages are the common case; the two amount-based offers say so.
+    valueKind: 'PERCENT' as const,
     categoryIds: [] as string[],
     brandIds: [] as string[],
     sellerIds: [] as string[],
@@ -122,6 +124,7 @@ export function generatePromotions(
       subtitle: 'On everyday basics',
       description: 'Add three basics and the cheapest is free.',
       type: 'BUY_X_GET_Y',
+      // The percentage lives in `buyXGetY.discountPercent`; `value` is unused.
       value: 0,
       startsAt: at(-8),
       endsAt: at(22),
@@ -139,6 +142,7 @@ export function generatePromotions(
       subtitle: 'New store on Vestra',
       description: `Flat ₹300 off everything from ${second.displayName}.`,
       type: 'SELLER_OFFER',
+      valueKind: 'AMOUNT' as const,
       value: toPaise(300),
       minOrderValue: toPaise(1299),
       sellerIds: [second.id],

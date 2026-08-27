@@ -272,3 +272,19 @@ export interface Role {
   system: boolean;
   userCount: number;
 }
+
+/**
+ * A single-use, expiring token behind an email link.
+ *
+ * Only the SHA-256 of the token is ever stored — the raw value exists once, in
+ * the email that carries it. See `server/auth/tokens.ts`.
+ */
+export interface AuthToken {
+  id: string;
+  userId: string;
+  purpose: 'EMAIL_VERIFICATION' | 'PASSWORD_RESET';
+  hash: string;
+  expiresAt: string;
+  consumedAt: string | null;
+  createdAt: string;
+}

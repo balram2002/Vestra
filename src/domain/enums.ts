@@ -511,6 +511,33 @@ export const PROMOTION_TYPES = [
 ] as const;
 export type PromotionType = (typeof PROMOTION_TYPES)[number];
 
+/**
+ * Whether a promotion's `value` is a percentage or an amount in paise.
+ *
+ * Carried separately from `PromotionType` because most of those types name a
+ * scope or a campaign, not a way of calculating.
+ */
+export const PROMOTION_VALUE_KINDS = ['PERCENT', 'AMOUNT'] as const;
+export type PromotionValueKind = (typeof PROMOTION_VALUE_KINDS)[number];
+
+/**
+ * What a promotion's value means, for rows written before `valueKind` existed.
+ *
+ * A percentage can never exceed 100, so a larger number is unambiguously an
+ * amount. That is a fact about percentages rather than a guess about intent,
+ * which is what makes it safe to apply to data nobody can go back and ask
+ * about.
+ */
+export function promotionValueKind(promotion: {
+  type: PromotionType;
+  valueKind?: PromotionValueKind;
+  value: number;
+}): PromotionValueKind {
+  if (promotion.valueKind) return promotion.valueKind;
+  if (promotion.type === 'FLAT_DISCOUNT') return 'AMOUNT';
+  return promotion.value > 100 ? 'AMOUNT' : 'PERCENT';
+}
+
 /* --------------------------------------------------------- notifications */
 
 export const NOTIFICATION_CHANNELS = ['IN_APP', 'EMAIL', 'SMS', 'PUSH', 'WHATSAPP'] as const;

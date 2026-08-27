@@ -17,6 +17,7 @@ with a server running (`npm run restart && npm run start`):
 | `npm run smoke:guest` | a purchase with no account, and who can read it afterwards |
 | `npm run smoke:ops` | answering a ticket and refunding an order, incl. permissions |
 | `npm run smoke:onboarding` | applying to sell, KYC upload, and the gate on an unverified store |
+| `npm run smoke:email` | verification, password reset, and what actually reaches an inbox |
 | `npm run audit:a11y` | axe-core, 14 routes × 2 widths |
 | `npm run audit:contrast` | WCAG ratios, parsed from `tokens.css` |
 
@@ -487,15 +488,46 @@ size just sold out".
 
 ---
 
+## Phase 21 — Email that actually sends · **done**
+
+- [x] SMTP through one `EmailTransport` seam, because every provider speaks it
+      — SES, Mailgun, Postmark, Resend — so choosing one is a change to `.env`
+      rather than to any code. With no SMTP host, mail is written to
+      `.data/outbox` as rendered HTML and says on every message that it was not
+      delivered
+- [x] `email/catalogue.ts` drives out WHICH actions mail, against three tests:
+      it is a record, it needs an action while the person is away, or it is
+      time-critical. Catalogue events fail all three and stay in-app — mailing a
+      seller forty times a week is how the messages that matter stop being read
+- [x] One table-based shell with a plain-text alternative rendered from the
+      same content, so the two cannot drift. Email is not the web: Outlook
+      renders through Word and flexbox is unavailable in enough clients that
+      using it means designing for a subset
+- [x] Verification and password reset, on single-use hashed tokens. Only the
+      SHA-256 is stored, verification and consumption are one operation, and the
+      comparison is constant-time
+- [x] The reset form answers identically for a known and an unknown address —
+      anything else is an account-enumeration oracle
+- [x] **Bug found on the way:** newly registered customers were created with an
+      empty preference map, an absent preference read as "off", and so they
+      never received their own order confirmation. The default now lives in one
+      place and `notify()` falls back to it, which fixes existing accounts too
+- [x] **Bug found by reading a rendered email:** the order total printed ₹0. It
+      was not the email. `SELLER_OFFER` was priced as a percentage while being
+      seeded as a flat ₹300 in paise, so the engine computed a 30,000% discount
+      and the clamp downstream quietly reduced it to the whole line. Orders were
+      going out free and nothing failed
+
+---
+
 ## Not yet done
 
 Honest list of what the brief asks for that is not built.
 
 ### Functional gaps
 
-- [ ] **Real notification delivery.** The in-app centre works and preferences
-      are honoured, but the email, SMS and push adapters log rather than send —
-      deliberately visible as stubs.
+- [ ] **SMS and push delivery.** Email now sends for real; the SMS and push
+      adapters still log, deliberately visible as stubs.
 
 ### Quality gaps
 

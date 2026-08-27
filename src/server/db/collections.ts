@@ -20,6 +20,7 @@ import type {
   Invoice,
   Manifest,
   NavigationNode,
+  AuthToken,
   Notification,
   Order,
   OrderItem,
@@ -89,6 +90,8 @@ export const COLLECTIONS = {
   addresses: 'addresses',
   roles: 'roles',
   sessions: 'sessions',
+  /** Single-use, expiring tokens behind email verification and password reset. */
+  authTokens: 'authTokens',
 
   /* sellers */
   sellers: 'sellers',
@@ -167,6 +170,7 @@ async function typed<T extends Document>(name: CollectionName): Promise<Collecti
 
 export const collections = {
   users: () => typed<User>(COLLECTIONS.users),
+  authTokens: () => typed<AuthToken>(COLLECTIONS.authTokens),
   addresses: () => typed<Address>(COLLECTIONS.addresses),
   roles: () => typed<Role>(COLLECTIONS.roles),
 

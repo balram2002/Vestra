@@ -1,5 +1,7 @@
 import type { ProductSummary } from './catalog';
-import type { AudienceType, CouponScope, CouponType, PaymentMethod, PromotionType, StockLevel } from '../enums';
+import type { AudienceType, CouponScope, CouponType, PaymentMethod, PromotionType, StockLevel,
+  PromotionValueKind,
+} from '../enums';
 
 /* -------------------------------------------------------------- price math */
 
@@ -333,7 +335,19 @@ export interface Promotion {
   subtitle: string | null;
   description: string;
   type: PromotionType;
-  /** Percentage for PERCENT_DISCOUNT, paise for FLAT_DISCOUNT. */
+  /**
+   * What `value` MEANS.
+   *
+   * Explicit rather than inferred from `type`, because `type` conflates two
+   * unrelated things: FLAT_DISCOUNT and PERCENT_DISCOUNT describe the value,
+   * while FLASH_SALE, BANK_OFFER, SELLER_OFFER, CATEGORY_OFFER and
+   * FESTIVAL_CAMPAIGN describe the scope or the branding and say nothing about
+   * it. A seeded "flat ₹300 off" SELLER_OFFER was read as 30,000% and
+   * discounted whole orders to zero, which is what this field exists to make
+   * impossible.
+   */
+  valueKind: PromotionValueKind;
+  /** A percentage (0–100) when `valueKind` is PERCENT, otherwise paise. */
   value: number;
   maxDiscount: number | null;
   minOrderValue: number;

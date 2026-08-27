@@ -28,6 +28,7 @@
     "smoke:listing": "node scripts/smoke-listing.mjs",
     "smoke:offers": "node scripts/smoke-offers.mjs",
     "smoke:guest": "node scripts/smoke-guest.mjs",
+    "smoke:email": "node scripts/smoke-email.mjs",
     "smoke:onboarding": "node scripts/smoke-onboarding.mjs",
     "smoke:ops": "node scripts/smoke-console-ops.mjs"
   },
@@ -57,6 +58,7 @@
     "lucide-react": "^0.545.0",
     "mongodb": "^6.21.0",
     "next": "16.3.2",
+    "nodemailer": "^9.0.5",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-hook-form": "^7.86.0",
@@ -77,6 +79,7 @@
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
     "@types/node": "^22.18.8",
+    "@types/nodemailer": "^8.0.1",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.1",
     "@vitejs/plugin-react": "^5.0.4",

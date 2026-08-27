@@ -1,4 +1,5 @@
 import { COLOR_BY_VALUE, SIZE_SCALES, sortSizes } from '@/domain/attributes';
+import { defaultNotificationPreferences } from '@/domain/notifications';
 import type {
   Address,
   Banner,
@@ -384,23 +385,12 @@ export function generateSellers(
 }
 
 function defaultPreferences() {
-  const categories = ['ORDER', 'SHIPPING', 'PAYMENT', 'RETURN', 'PROMOTION', 'ACCOUNT'];
-  const notifications: Record<
-    string,
-    { inApp: boolean; email: boolean; sms: boolean; push: boolean }
-  > = {};
-
-  for (const category of categories) {
-    // Transactional channels default on; marketing defaults off, which is both
-    // the lawful default and the one users expect.
-    const transactional = category !== 'PROMOTION';
-    notifications[category] = {
-      inApp: true,
-      email: transactional,
-      sms: transactional && category !== 'ACCOUNT',
-      push: transactional,
-    };
-  }
+  /*
+   * Every category, from the one shared definition. The list used to be
+   * written out here and was missing FINANCE, SYSTEM and CATALOG, so seeded
+   * sellers had no recorded preference for their own payouts.
+   */
+  const notifications = defaultNotificationPreferences();
 
   return {
     notifications,

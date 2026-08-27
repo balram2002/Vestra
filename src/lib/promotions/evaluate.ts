@@ -1,3 +1,4 @@
+import { promotionValueKind } from '@/domain/enums';
 import type { AppliedOffer, Promotion } from '@/domain/types';
 import type { PaymentMethod } from '@/domain/enums';
 import type { PricingPromotionInput } from '@/lib/pricing/calculate';
@@ -188,18 +189,31 @@ function discountFor(
 ): Map<string, number> {
   const result = new Map<string, number>();
 
-  switch (promotion.type) {
-    case 'PERCENT_DISCOUNT':
-    case 'FLASH_SALE':
-    case 'CATEGORY_OFFER':
-    case 'SELLER_OFFER':
-    case 'FESTIVAL_CAMPAIGN':
-    case 'BANK_OFFER': {
+  /*
+   * BUY_X_GET_Y prices from its own rule; everything else is either a
+   * percentage or an amount, and WHICH is read from `valueKind` rather than
+   * inferred from `type`. Most of the type names describe a scope or a
+   * campaign — SELLER_OFFER, FLASH_SALE, BANK_OFFER — and say nothing about
+   * how the number should be read. Guessing from them is what turned a flat
+   * ₹300 seller offer into a 30,000% discount and gave whole orders away.
+   */
+  if (promotion.type !== 'BUY_X_GET_Y') {
+    const kind = promotionValueKind(promotion);
+
+    if (kind === 'PERCENT') {
+      /*
+       * Clamped to 0–100. A percentage outside that range is corrupt data, and
+       * the failure mode without this is silent and total: the discount
+       * exceeds the line, gets clamped to it downstream, and the order is
+       * free.
+       */
+      const percent = Math.min(100, Math.max(0, promotion.value));
+
       // A cap applies to the whole promotion, not to each line, so it is
       // apportioned by value once the raw discounts are known.
       const raw = lines.map((line) => ({
         refId: line.refId,
-        amount: percentOf(line.lineSubtotal, promotion.value),
+        amount: percentOf(line.lineSubtotal, percent),
       }));
       const total = sumPaise(raw.map((entry) => entry.amount));
       const capped =
@@ -209,19 +223,20 @@ function discountFor(
       for (const entry of raw) {
         result.set(entry.refId, Math.round(entry.amount * ratio));
       }
-      break;
+      return result;
     }
 
-    case 'FLAT_DISCOUNT': {
-      // Spread by value so a flat 500 off never exceeds any one line.
-      const total = sumPaise(lines.map((line) => line.lineSubtotal));
-      if (total <= 0) break;
-      const amount = clampDiscount(promotion.value, total);
-      for (const line of lines) {
-        result.set(line.refId, Math.round((amount * line.lineSubtotal) / total));
-      }
-      break;
+    // Spread by value so a flat 500 off never exceeds any one line.
+    const total = sumPaise(lines.map((line) => line.lineSubtotal));
+    if (total <= 0) return result;
+    const amount = clampDiscount(promotion.value, total);
+    for (const line of lines) {
+      result.set(line.refId, Math.round((amount * line.lineSubtotal) / total));
     }
+    return result;
+  }
+
+  switch (promotion.type) {
 
     case 'BUY_X_GET_Y': {
       const rule = promotion.buyXGetY;

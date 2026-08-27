@@ -51,3 +51,29 @@ export const registerSchema = z.object({
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;
+
+/**
+ * Asking for a reset link.
+ *
+ * Only the address is validated, and only for shape. Whether an account exists
+ * is deliberately never revealed — see `requestPasswordReset`.
+ */
+export const passwordResetRequestSchema = z.object({
+  email: emailSchema,
+});
+
+export type PasswordResetRequestInput = z.infer<typeof passwordResetRequestSchema>;
+
+/**
+ * Choosing a new password.
+ *
+ * Reuses `passwordSchema`, so the rule a new password must satisfy is the same
+ * one registration applies — two different minimum lengths in one product is
+ * how the weaker of them becomes the real one.
+ */
+export const passwordResetSchema = z.object({
+  token: z.string().min(1, 'That link is incomplete.'),
+  password: passwordSchema,
+});
+
+export type PasswordResetInput = z.infer<typeof passwordResetSchema>;

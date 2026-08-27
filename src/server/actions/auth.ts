@@ -2,9 +2,15 @@
 
 import { redirect } from 'next/navigation';
 
+import { defaultNotificationPreferences } from '@/domain/notifications';
 import type { PublicUser, User } from '@/domain/types';
 import { entityId } from '@/lib/ids';
-import { loginSchema, registerSchema } from '@/lib/validation/auth';
+import {
+  loginSchema,
+  passwordResetRequestSchema,
+  passwordResetSchema,
+  registerSchema,
+} from '@/lib/validation/auth';
 
 import { hashPassword, needsRehash, verifyPassword } from '../auth/password';
 import { landingPathFor } from '../auth/rbac';
@@ -170,7 +176,7 @@ export async function register(input: {
     lastLoginAt: now,
     creditBalance: 0,
     preferences: {
-      notifications: {},
+      notifications: defaultNotificationPreferences(),
       marketingOptIn: parsed.data.marketingOptIn,
       theme: 'system',
       preferredSizes: {},
@@ -199,7 +205,153 @@ export async function register(input: {
   }
 
   await startSession(toPublicUser(user));
+
+  /*
+   * Send the confirmation, but do not make signup wait on it. A mail server
+   * having a slow minute must not turn a successful registration into an error
+   * the person cannot act on — they are signed in either way, and the account
+   * page carries a prompt to resend.
+   */
+  void issueAndSendVerification(user.id, user.email, user.fullName);
+
   redirect('/');
+}
+
+
+/* ------------------------------------------------------- email verification */
+
+/**
+ * Mint a verification token and mail it.
+ *
+ * Shared by signup and by the resend button so the two cannot drift — issuing
+ * a token consumes any earlier one, which is what stops an older link in an
+ * inbox staying live after a resend.
+ */
+async function issueAndSendVerification(
+  userId: string,
+  email: string,
+  fullName: string,
+): Promise<void> {
+  try {
+    const { issueToken } = await import('../auth/tokens');
+    const { sendVerificationEmail } = await import('../email/account');
+    const token = await issueToken(userId, 'EMAIL_VERIFICATION');
+    await sendVerificationEmail({ to: email, name: fullName, token });
+  } catch (error) {
+    console.error('[vestra:auth] could not send a verification email', error);
+  }
+}
+
+export async function resendVerificationEmail(): Promise<AuthResult> {
+  const { getSessionUser } = await import('../auth/session');
+  const user = await getSessionUser();
+  if (!user) return { ok: false, error: 'Sign in first.' };
+  if (user.emailVerified) return { ok: true };
+
+  await issueAndSendVerification(user.id, user.email, user.fullName);
+  return { ok: true };
+}
+
+/**
+ * Confirm an address from the link in the email.
+ *
+ * Idempotent from the reader's point of view: a link clicked twice reports
+ * success the second time if the address is already confirmed, because telling
+ * someone their working email "is not valid" is worse than useless.
+ */
+export async function verifyEmail(token: string): Promise<AuthResult> {
+  const { consumeToken, tokenFailureMessage } = await import('../auth/tokens');
+
+  const result = await consumeToken(token, 'EMAIL_VERIFICATION');
+  if (!result.ok) return { ok: false, error: tokenFailureMessage(result.reason) };
+
+  const users = await collections.users();
+  await users.updateOne(
+    { _id: result.userId },
+    { $set: { emailVerified: true, updatedAt: new Date().toISOString() } },
+  );
+
+  return { ok: true };
+}
+
+/* ----------------------------------------------------------- password reset */
+
+/**
+ * Start a reset.
+ *
+ * Always reports success, whether or not the address exists. Saying "no account
+ * with that email" turns this form into an account-enumeration oracle — the
+ * same reason the sign-in form never says which half was wrong.
+ */
+export async function requestPasswordReset(input: { email: string }): Promise<AuthResult> {
+  const parsed = passwordResetRequestSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, fieldErrors: { email: 'Enter a valid email address.' } };
+  }
+
+  const users = await collections.users();
+  const user = toEntity(await users.findOne({ email: parsed.data.email }));
+
+  if (user && user.status === 'ACTIVE') {
+    try {
+      const { issueToken } = await import('../auth/tokens');
+      const { sendPasswordResetEmail } = await import('../email/account');
+      const token = await issueToken(user.id, 'PASSWORD_RESET');
+      await sendPasswordResetEmail({ to: user.email, name: user.fullName, token });
+    } catch (error) {
+      console.error('[vestra:auth] could not send a reset email', error);
+    }
+  }
+
+  return { ok: true };
+}
+
+export async function resetPassword(input: {
+  token: string;
+  password: string;
+}): Promise<AuthResult> {
+  const parsed = passwordResetSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return { ok: false, fieldErrors: { password: parsed.error.issues[0]?.message ?? 'Check the password.' } };
+  }
+
+  const { consumeToken, tokenFailureMessage } = await import('../auth/tokens');
+  const result = await consumeToken(parsed.data.token, 'PASSWORD_RESET');
+  if (!result.ok) return { ok: false, error: tokenFailureMessage(result.reason) };
+
+  const users = await collections.users();
+  const user = toEntity(await users.findOne({ _id: result.userId }));
+  if (!user) return { ok: false, error: 'That account no longer exists.' };
+
+  await users.updateOne(
+    { _id: user.id },
+    {
+      $set: {
+        passwordHash: await hashPassword(parsed.data.password),
+        /*
+         * Reaching the reset link proves the address works, so confirming it
+         * here saves the person a second round trip for the same proof.
+         */
+        emailVerified: true,
+        updatedAt: new Date().toISOString(),
+      },
+    },
+  );
+
+  /*
+   * Tell them it changed. If the reset was not theirs, this mail is the only
+   * signal they will get, so it goes to the address on the account regardless
+   * of who just used the link.
+   */
+  try {
+    const { sendPasswordChangedEmail } = await import('../email/account');
+    await sendPasswordChangedEmail({ to: user.email, name: user.fullName });
+  } catch (error) {
+    console.error('[vestra:auth] could not send a password-changed email', error);
+  }
+
+  return { ok: true };
 }
 
 export async function signOut(): Promise<void> {

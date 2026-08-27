@@ -6,6 +6,7 @@ import {
   FORWARD_FLOW,
   FULFILLMENT_STATUS_META,
   isCustomerCancellable,
+  PAYMENT_METHOD_LABEL,
   type CancellationReason,
   type FulfillmentStatus,
 } from '@/domain/enums';
@@ -851,7 +852,14 @@ async function confirmOrder(orderId: string, note: string): Promise<void> {
   // confirmed order.
   const order = toEntity(await orders.findOne({ _id: orderId }));
   if (order?.userId) {
-    void NOTIFY.orderPlaced(order.userId, order.orderNumber, order.id);
+    const orderItemsCol = await collections.orderItems();
+    const items = await orderItemsCol.countDocuments({ orderId: order.id });
+
+    void NOTIFY.orderPlaced(order.userId, order.orderNumber, order.id, {
+      items,
+      total: order.pricing.payable,
+      payment: PAYMENT_METHOD_LABEL[order.paymentMethod] ?? order.paymentMethod,
+    });
   }
 }
 
