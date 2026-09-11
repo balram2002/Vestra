@@ -1,6 +1,6 @@
 'use client';
 
-import { Check, FileUp, Send, X } from 'lucide-react';
+import { Check, FileUp, X } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
@@ -9,24 +9,16 @@ import { FileUpload } from '@/components/ui/file-upload';
 import { CATALOG } from '@/config/business';
 import type { KycDocument, SellerStatus } from '@/domain/types';
 import { formatFileSize } from '@/lib/format';
-import { REQUIRED_DOCUMENTS } from '@/lib/validation/seller';
-import { attachUploadedKycDocument, submitKyc } from '@/server/actions/onboarding';
+import { VERIFICATION_DOCUMENTS } from '@/lib/validation/seller';
+import { attachUploadedKycDocument } from '@/server/actions/onboarding';
 
 /**
- * The document step of onboarding.
+ * Verification documents.
  *
- * Four rows, each either empty or ticked. A progress bar would be decoration;
- * what an applicant needs is to see at a glance which of the four is still
- * missing, and to be unable to submit until none are.
- *
- * Uploads are locked once the application is in review. An applicant who could
- * still swap documents afterwards would mean the reviewer approves a set that
- * is not the one they read.
- *
- * The uploader is the same `<FileUpload>` the product form uses. A phone-camera
- * scan of a GST certificate is often larger than a product photo, so the
- * progress and time-remaining figures earn their place here too — and an
- * applicant who has already uploaded product shots meets a control they know.
+ * Optional at every stage: none is needed to apply or to start selling. They
+ * are what a reviewer checks the GSTIN, bank account and pickup address against
+ * when verification is due. One row per document, each empty or ticked, with
+ * the same uploader the product form uses.
  */
 export function KycDocuments({
   status,
@@ -37,7 +29,7 @@ export function KycDocuments({
   documents: KycDocument[];
   rejectionReason: string | null;
 }) {
-  const [pending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
 
   /*
    * Which row has its uploader open.
@@ -47,22 +39,7 @@ export function KycDocuments({
    */
   const [openRow, setOpenRow] = useState<string | null>(null);
 
-  const editable = status === 'ONBOARDING' || status === 'REJECTED';
-  const uploaded = new Set(documents.map((document) => document.type));
-  const missing = REQUIRED_DOCUMENTS.filter((document) => !uploaded.has(document.type));
-
-  const submit = () => {
-    startTransition(async () => {
-      const result = await submitKyc();
-      if (result.ok) {
-        toast.success('Sent for review. We usually come back within two working days.');
-      } else if (result.missing?.length) {
-        toast.error(`Still needed: ${result.missing.join(', ')}`);
-      } else {
-        toast.error(result.error ?? 'That did not work.');
-      }
-    });
-  };
+  const editable = status !== 'SUSPENDED';
 
   return (
     <Card as="section">
@@ -70,8 +47,8 @@ export function KycDocuments({
         <h2 className="text-ink text-md font-semibold">Verification documents</h2>
         <p className="text-muted mt-0.5 text-sm">
           {editable
-            ? 'All four are needed before we can review your application.'
-            : 'Locked while your application is in review.'}
+            ? 'Keep these on file so we can verify your business when it is due. Uploading one again replaces it.'
+            : 'Locked while your store is suspended.'}
         </p>
       </header>
 
@@ -83,7 +60,7 @@ export function KycDocuments({
       ) : null}
 
       <ul className="space-y-2">
-        {REQUIRED_DOCUMENTS.map((required) => {
+        {VERIFICATION_DOCUMENTS.map((required) => {
           const existing = documents.find((document) => document.type === required.type);
           return (
             <DocumentRow
@@ -116,24 +93,6 @@ export function KycDocuments({
         })}
       </ul>
 
-      {editable ? (
-        <div className="border-line mt-5 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
-          <p className="text-faint text-2xs">
-            {missing.length === 0
-              ? 'Everything we need is here.'
-              : `Still needed: ${missing.map((document) => document.label).join(', ')}.`}
-          </p>
-          <button
-            type="button"
-            onClick={submit}
-            disabled={pending || missing.length > 0}
-            className="bg-ink text-canvas disabled:bg-line-strong inline-flex shrink-0 items-center gap-1.5 rounded-md px-3.5 py-2 text-xs font-medium disabled:cursor-not-allowed"
-          >
-            <Send className="size-3.5" aria-hidden />
-            {pending ? 'Sending…' : 'Send for review'}
-          </button>
-        </div>
-      ) : null}
     </Card>
   );
 }

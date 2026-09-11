@@ -9,9 +9,7 @@ import { toast } from 'sonner';
 
 import { cn } from '@/lib/cn';
 import {
-  deleteBanner,
   reviewProduct,
-  setBannerActive,
   setBrandActive,
   setCategoryActive,
   setCouponActive,
@@ -149,48 +147,52 @@ export function SellerStatusActions({
   name: string;
   status: string;
 }) {
-  const [suspending, setSuspending] = useState(false);
+  // Which decision is collecting its reason, if any.
+  const [asking, setAsking] = useState<null | 'REJECTED' | 'SUSPENDED'>(null);
   const [reason, setReason] = useState('');
   const { pending, run } = useAction();
 
-  const suspended = status === 'SUSPENDED' || status === 'ON_HOLD';
+  const awaitingReview = status === 'ONBOARDING' || status === 'KYC_SUBMITTED' || status === 'KYC_PENDING';
+  const paused = status === 'SUSPENDED' || status === 'ON_HOLD';
 
-  if (suspending) {
+  if (asking) {
+    const rejecting = asking === 'REJECTED';
     return (
-      <div className="w-56">
+      <div className="w-64">
         <Textarea
           label="Reason"
           hideLabel
           value={reason}
           onChange={(event) => setReason(event.target.value)}
-          rows={2}
+          rows={3}
           maxLength={400}
-          placeholder="Reason. This takes a business offline."
+          placeholder={
+            rejecting
+              ? 'What should they change? The applicant reads this.'
+              : 'Reason. This takes a business offline.'
+          }
           className="text-xs"
         />
         <div className="mt-1.5 flex gap-1.5">
           <Button
             type="button"
+            variant="danger"
+            size="xs"
             disabled={pending || reason.trim().length < 8}
             onClick={() =>
               run(
-                () => setSellerStatus({ sellerId, status: 'SUSPENDED', reason: reason.trim() }),
-                `${name} suspended`,
-                () => setSuspending(false),
+                () => setSellerStatus({ sellerId, status: asking, reason: reason.trim() }),
+                rejecting ? `${name} sent back to the applicant` : `${name} suspended`,
+                () => {
+                  setAsking(null);
+                  setReason('');
+                },
               )
             }
-            variant="danger"
-          size="xs"
           >
-            Suspend
+            {rejecting ? 'Reject' : 'Suspend'}
           </Button>
-          <Button
-            type="button"
-            onClick={() => setSuspending(false)}
-            disabled={pending}
-            variant="ghost"
-          size="xs"
-          >
+          <Button type="button" variant="ghost" size="xs" disabled={pending} onClick={() => setAsking(null)}>
             Cancel
           </Button>
         </div>
@@ -198,26 +200,50 @@ export function SellerStatusActions({
     );
   }
 
-  return (
-    <div className="flex shrink-0 gap-1.5">
-      {suspended ? (
+  if (awaitingReview || status === 'REJECTED') {
+    return (
+      <div className="flex shrink-0 gap-1.5">
         <Button
           type="button"
-          disabled={pending}
-          onClick={() =>
-            run(() => setSellerStatus({ sellerId, status: 'ACTIVE' }), `${name} reinstated`)
-          }
           size="xs"
+          disabled={pending}
+          onClick={() => run(() => setSellerStatus({ sellerId, status: 'ACTIVE' }), `${name} approved`)}
+        >
+          Approve
+        </Button>
+        {awaitingReview ? (
+          <Button
+            type="button"
+            variant="secondary"
+            size="xs"
+            disabled={pending}
+            onClick={() => setAsking('REJECTED')}
+          >
+            Reject
+          </Button>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex shrink-0 gap-1.5">
+      {paused ? (
+        <Button
+          type="button"
+          size="xs"
+          disabled={pending}
+          onClick={() => run(() => setSellerStatus({ sellerId, status: 'ACTIVE' }), `${name} reinstated`)}
         >
           Reinstate
         </Button>
       ) : (
         <Button
           type="button"
-          disabled={pending}
-          onClick={() => setSuspending(true)}
           variant="secondary"
           size="xs"
+          disabled={pending}
+          onClick={() => setAsking('SUSPENDED')}
         >
           Suspend
         </Button>
@@ -593,76 +619,5 @@ export function BrandToggle({
         )
       }
     />
-  );
-}
-
-/* ------------------------------------------------------------------ banner */
-
-export function BannerToggle({
-  bannerId,
-  name,
-  isActive,
-}: {
-  bannerId: string;
-  name: string;
-  isActive: boolean;
-}) {
-  const { pending, run } = useAction();
-
-  return (
-    <Toggle
-      pending={pending}
-      on={isActive}
-      onLabel="Live"
-      offLabel="Hidden"
-      onClick={() =>
-        run(
-          () => setBannerActive({ bannerId, isActive: !isActive }),
-          isActive ? `${name} hidden from the homepage` : `${name} is live`,
-        )
-      }
-    />
-  );
-}
-
-export function DeleteBannerButton({ bannerId, name }: { bannerId: string; name: string }) {
-  const [open, setOpen] = useState(false);
-  const { pending, run } = useAction();
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button type="button" size="xs" variant="ghost" className="text-danger-600 hover:text-danger-700">
-          Delete
-        </Button>
-      </DialogTrigger>
-      <DialogContent
-        title={`Delete ${name}?`}
-        size="sm"
-        footer={
-          <>
-            <DialogClose asChild>
-              <Button type="button" variant="ghost" size="sm" disabled={pending}>
-                Keep it
-              </Button>
-            </DialogClose>
-            <Button
-              type="button"
-              variant="danger"
-              size="sm"
-              loading={pending}
-              onClick={() => run(() => deleteBanner({ bannerId }), `${name} deleted`, () => setOpen(false))}
-            >
-              Delete banner
-            </Button>
-          </>
-        }
-      >
-        <p className="text-muted text-sm">
-          It comes off the homepage and out of this list for good. To take it down for a while
-          instead, set it to Hidden.
-        </p>
-      </DialogContent>
-    </Dialog>
   );
 }

@@ -285,7 +285,7 @@ function HeroPanel({
               show: { scaleX: 1, transition: spring.glide },
             }}
           />
-          {banner.name.toLowerCase().includes('hero') ? 'Featured' : 'The edit'}
+          {banner.eyebrow || 'Featured'}
         </motion.p>
 
         <motion.h2

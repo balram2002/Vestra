@@ -2,6 +2,7 @@ import 'server-only';
 
 import { cacheLife, cacheTag } from 'next/cache';
 
+import { DEFAULT_HERO_SLIDES } from '@/config/home';
 import type { Banner, CmsPage, HomeSection } from '@/domain/types';
 
 import { collections, toEntities, toEntity } from '../db/collections';
@@ -54,6 +55,16 @@ export async function getBanners(placement: Banner['placement']): Promise<Banner
     if (banner.endsAt && Date.parse(banner.endsAt) < now) return false;
     return true;
   });
+}
+
+/**
+ * The hero's slides: the shop's own live HOME_HERO banners, or the built-in
+ * default set when there are none, so a new shop never opens on an empty
+ * first screen. Hiding the hero section itself is how to have no hero at all.
+ */
+export async function getHeroSlides(): Promise<Banner[]> {
+  const banners = await getBanners('HOME_HERO');
+  return banners.length > 0 ? banners : DEFAULT_HERO_SLIDES;
 }
 
 /* ------------------------------------------------------------- cms pages */

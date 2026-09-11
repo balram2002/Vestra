@@ -7,9 +7,11 @@ import { Suspense } from 'react';
 
 import { RevenueChart } from '@/components/console/revenue-chart';
 import { StatCard } from '@/components/console/stat-card';
+import { SetupChecklist } from '@/components/seller/setup-checklist';
 import { requireSeller } from '@/server/auth/session';
 import { formatMoneyCompact, formatMoney, formatCompactNumber } from '@/lib/format';
 import { getLiveStats } from '@/server/services/live';
+import { getSetupChecklist } from '@/server/services/onboarding';
 import { getSellerDashboard } from '@/server/services/seller';
 
 export const metadata: Metadata = { title: 'Dashboard' };
@@ -39,15 +41,18 @@ async function Dashboard() {
    * order dashboard, so awaiting them in sequence would add a round trip to the
    * slowest screen in the console for no reason.
    */
-  const [data, live] = await Promise.all([
+  const [data, live, setup] = await Promise.all([
     getSellerDashboard(user.sellerId),
     getLiveStats(user.sellerId),
+    getSetupChecklist(user.sellerId),
   ]);
 
   if (!data) return null;
 
   return (
     <div className="mt-6 space-y-6">
+      <SetupChecklist items={setup} />
+
       {/*
         Work that needs doing comes FIRST, above the revenue figures. A seller
         opening this screen needs to know what is late before they know what

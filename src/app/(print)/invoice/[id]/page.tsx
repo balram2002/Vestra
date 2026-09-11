@@ -47,7 +47,7 @@ async function InvoiceDocument({ params }: { params: Promise<{ id: string }> }) 
     <>
       <PrintTrigger label="Print invoice" />
 
-      <div className="mx-auto my-6 w-[8.27in] max-w-full bg-white p-8 text-black shadow-sm print:my-0 print:w-full print:p-0 print:shadow-none">
+      <div className="mx-auto my-6 w-[8.27in] max-w-full bg-white p-4 text-black sm:p-8 shadow-sm print:my-0 print:w-full print:p-0 print:shadow-none">
         {/* ------------------------------------------------------ header */}
         <header className="flex items-start justify-between gap-6 border-b-2 border-black pb-4">
           <div>
@@ -79,7 +79,9 @@ async function InvoiceDocument({ params }: { params: Promise<{ id: string }> }) 
             </p>
             <p className="mt-1 text-sm font-semibold">{invoice.sellerName}</p>
             <p className="text-[11px] leading-snug text-neutral-700">{invoice.sellerAddress}</p>
-            <p className="mt-1 font-mono text-[11px]">GSTIN {invoice.sellerGstin}</p>
+            <p className="mt-1 font-mono text-[11px]">
+              {invoice.sellerGstin ? `GSTIN ${invoice.sellerGstin}` : 'Unregistered supplier (no GSTIN)'}
+            </p>
           </div>
 
           <div>
@@ -105,7 +107,7 @@ async function InvoiceDocument({ params }: { params: Promise<{ id: string }> }) 
         </p>
 
         {/* ------------------------------------------------------- lines */}
-        <table className="w-full border-collapse text-[11px]">
+        <div className="overflow-x-auto print:overflow-visible"><table className="w-full min-w-[34rem] border-collapse text-[11px]">
           <thead>
             <tr className="border-y border-black text-left">
               <th className="py-1.5 pr-2 font-semibold">Description</th>
@@ -152,7 +154,7 @@ async function InvoiceDocument({ params }: { params: Promise<{ id: string }> }) 
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
 
         {/* ------------------------------------------------------ totals */}
         <section className="mt-4 flex justify-between gap-8">
@@ -160,7 +162,7 @@ async function InvoiceDocument({ params }: { params: Promise<{ id: string }> }) 
             <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">
               Tax summary
             </p>
-            <table className="mt-1 w-full border-collapse text-[10px]">
+            <div className="overflow-x-auto print:overflow-visible"><table className="mt-1 w-full min-w-[24rem] border-collapse text-[10px]">
               <thead>
                 <tr className="border-b border-neutral-300 text-left">
                   <th className="py-1 pr-2">Rate</th>
@@ -179,7 +181,7 @@ async function InvoiceDocument({ params }: { params: Promise<{ id: string }> }) 
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           </div>
 
           <dl className="w-[2.8in] shrink-0 text-[11px]">

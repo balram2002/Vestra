@@ -230,7 +230,7 @@ export function sellerJsonLd(seller: Seller, url: string): JsonLdNode {
       '@type': 'PostalAddress',
       addressLocality: seller.kyc.registeredAddress.city,
       addressRegion: seller.kyc.registeredAddress.state,
-      postalCode: seller.kyc.registeredAddress.pincode,
+      ...(seller.kyc.registeredAddress.pincode ? { postalCode: seller.kyc.registeredAddress.pincode } : {}),
       addressCountry: 'IN',
     },
   };

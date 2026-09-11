@@ -63,7 +63,7 @@ async function step(name, fn) {
  */
 async function homepageLinksToBanner() {
   for (let attempt = 0; attempt < 4; attempt += 1) {
-    await page.goto(`${BASE}/`);
+    await page.goto(`${BASE}/`, { waitUntil: 'domcontentloaded' });
     if ((await page.locator(`a[href="${HREF}"]`).count()) > 0) return true;
     await page.waitForTimeout(1500);
   }
@@ -72,7 +72,7 @@ async function homepageLinksToBanner() {
 
 async function homepageDropsBanner() {
   for (let attempt = 0; attempt < 4; attempt += 1) {
-    await page.goto(`${BASE}/`);
+    await page.goto(`${BASE}/`, { waitUntil: 'domcontentloaded' });
     if ((await page.locator(`a[href="${HREF}"]`).count()) === 0) return true;
     await page.waitForTimeout(1500);
   }
@@ -92,7 +92,7 @@ try {
 
   await step('banner: a javascript: link is refused under the field', async () => {
     await page.goto(`${BASE}/admin/cms`);
-    await page.getByRole('button', { name: 'New banner' }).click();
+    await page.getByRole('button', { name: 'Add tile' }).click();
     const dialog = page.getByRole('dialog');
     await dialog.locator('input[name="name"]').fill(NAME);
     // The tile grid shows every banner it has; the hero shows one at a time.

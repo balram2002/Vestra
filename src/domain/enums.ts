@@ -433,11 +433,11 @@ export const SELLER_STATUSES = [
 export type SellerStatus = (typeof SELLER_STATUSES)[number];
 
 export const SELLER_STATUS_META: Record<SellerStatus, StatusMeta> = {
-  ONBOARDING: { label: 'Onboarding', tone: 'neutral', description: 'Seller is completing their profile.' },
-  KYC_SUBMITTED: { label: 'KYC submitted', tone: 'info', description: 'Documents submitted for review.' },
-  KYC_PENDING: { label: 'KYC pending', tone: 'warning', description: 'Documents are being verified.' },
+  ONBOARDING: { label: 'Applying', tone: 'neutral', description: 'Still filling in the application.' },
+  KYC_SUBMITTED: { label: 'Awaiting review', tone: 'info', description: 'Application sent, waiting for a decision.' },
+  KYC_PENDING: { label: 'In review', tone: 'warning', description: 'Being checked by the team.' },
   APPROVED: { label: 'Approved', tone: 'success', description: 'Approved, awaiting first listing.' },
-  REJECTED: { label: 'Rejected', tone: 'danger', description: 'Application was rejected.' },
+  REJECTED: { label: 'Sent back', tone: 'danger', description: 'Returned to the applicant with a reason.' },
   ACTIVE: { label: 'Active', tone: 'success', description: 'Selling on VestraWAB.' },
   ON_HOLD: { label: 'On hold', tone: 'warning', description: 'Temporarily paused by operations.' },
   SUSPENDED: { label: 'Suspended', tone: 'danger', description: 'Suspended for policy violation.' },

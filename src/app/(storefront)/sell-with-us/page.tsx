@@ -41,7 +41,7 @@ export default async function SellWithUsPage() {
           <div>
             <h2 className="font-display text-ink text-lg">Ready to open your store?</h2>
             <p className="text-muted mt-1 text-sm">
-              About fifteen minutes, if you have your GSTIN and bank details to hand.
+              Two minutes: just your business details. Tax, bank and pickup details come later.
             </p>
           </div>
           <Button asChild size="lg" className="shrink-0">

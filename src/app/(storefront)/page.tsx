@@ -14,7 +14,7 @@ import { ProductRailSkeleton } from '@/components/skeletons/product-card-skeleto
 import { CATALOG } from '@/config/business';
 import type { HomeSection } from '@/domain/types';
 import { getCategoryTree, listBrands, listSellers } from '@/server/services/catalog';
-import { getBanners, getHomeSections } from '@/server/services/content';
+import { getBanners, getHeroSlides, getHomeSections } from '@/server/services/content';
 import { getProductRail } from '@/server/services/listing';
 
 /**
@@ -119,8 +119,7 @@ function SectionRenderer({
 /* ----------------------------------------------------------- data wrappers */
 
 async function HeroSection() {
-  const banners = await getBanners('HOME_HERO');
-  return <HeroCarousel banners={banners} />;
+  return <HeroCarousel banners={await getHeroSlides()} />;
 }
 
 async function CategorySection({ section }: { section: HomeSection }) {
@@ -162,7 +161,9 @@ async function BrandSection({ section }: { section: HomeSection }) {
 
 async function SellerSection({ section }: { section: HomeSection }) {
   const limit = section.config.limit ?? 4;
-  const sellers = await listSellers(limit);
+  // Only stores with something to buy: a spotlight on an empty shelf sends a
+  // shopper nowhere. A new store joins as soon as its first listing is live.
+  const sellers = (await listSellers(limit * 4)).filter((seller) => seller.metrics.liveProductCount > 0);
   return <SellerSpotlight section={section} sellers={sellers.slice(0, limit)} />;
 }
 

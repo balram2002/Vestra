@@ -18,7 +18,7 @@ import {
   markSettlementPaid,
   runSettlement,
 } from '../services/settlements';
-import { collections, toDoc, toEntity } from '../db/collections';
+import { collections, toDoc, toEntities, toEntity } from '../db/collections';
 import * as audit from '../services/audit';
 import { invalidate } from '../services/cache-invalidation';
 import { productTags, tags } from '../services/cache-tags';
@@ -167,10 +167,16 @@ export async function setSellerStatus(input: {
   if (!parsed.success) return { ok: false, error: 'That is not a valid status.' };
 
   const restricting = parsed.data.status === 'SUSPENDED' || parsed.data.status === 'ON_HOLD';
+  const rejecting = parsed.data.status === 'REJECTED';
   const actor = await requirePermission(restricting ? 'seller:suspend' : 'seller:approve');
+  const reason = (parsed.data.reason ?? '').trim();
 
-  if (restricting && (parsed.data.reason ?? '').trim().length < 8) {
+  if (restricting && reason.length < 8) {
     return { ok: false, error: 'Suspending a store requires a reason.' };
+  }
+  // The applicant reads this, and it is what tells them what to correct.
+  if (rejecting && reason.length < 8) {
+    return { ok: false, error: 'Say what the applicant needs to change. They will read it.' };
   }
 
   const sellers = await collections.sellers();
@@ -189,7 +195,18 @@ export async function setSellerStatus(input: {
       : {}),
   };
 
-  await sellers.updateOne({ _id: seller.id }, { $set: patch });
+  const approving = parsed.data.status === 'ACTIVE' || parsed.data.status === 'APPROVED';
+  await sellers.updateOne(
+    { _id: seller.id },
+    {
+      $set: {
+        ...patch,
+        // The reason a rejected applicant sees on their status screen.
+        ...(rejecting ? { 'kyc.rejectionReason': reason } : {}),
+        ...(approving ? { 'kyc.rejectionReason': null } : {}),
+      },
+    },
+  );
 
   /*
    * A suspended store's products stop being sellable, so the listings that
@@ -208,18 +225,49 @@ export async function setSellerStatus(input: {
     severity: restricting ? 'CRITICAL' : 'NOTICE',
   });
 
+  const message = sellerStatusMessage(parsed.data.status, reason, seller);
   notifyQuietly({
     userId: seller.ownerUserId,
     category: 'ACCOUNT',
-    title: `Your store is now ${SELLER_STATUS_META[parsed.data.status].label.toLowerCase()}`,
-    body: parsed.data.reason?.trim() || SELLER_STATUS_META[parsed.data.status].description,
-    href: '/seller/settings',
+    title: message.title,
+    body: message.body,
+    href: message.href,
     entityType: 'seller',
     entityId: seller.id,
   });
 
   revalidatePath('/admin/sellers');
+  revalidatePath(`/admin/sellers/${seller.id}`);
   return { ok: true };
+}
+
+/** What the store owner is told, in words that say what to do next. */
+function sellerStatusMessage(
+  status: 'ACTIVE' | 'ON_HOLD' | 'SUSPENDED' | 'APPROVED' | 'REJECTED',
+  reason: string,
+  seller: { displayName: string; approvedAt: string | null },
+): { title: string; body: string; href: string } {
+  if (status === 'ACTIVE' || status === 'APPROVED') {
+    return seller.approvedAt
+      ? {
+          title: `${seller.displayName} is back on VestraWAB`,
+          body: 'Your store is live again and your listings are back on sale.',
+          href: '/seller',
+        }
+      : {
+          title: `${seller.displayName} is approved`,
+          body: 'Your seller console is open. Add your first products, and a pickup address before your first order ships.',
+          href: '/seller',
+        };
+  }
+  if (status === 'REJECTED') {
+    return { title: 'Your seller application needs a change', body: reason, href: '/seller/onboarding' };
+  }
+  return {
+    title: `Your store is now ${SELLER_STATUS_META[status].label.toLowerCase()}`,
+    body: reason || SELLER_STATUS_META[status].description,
+    href: '/seller/onboarding',
+  };
 }
 
 /* ------------------------------------------------------------------- users */
@@ -1100,40 +1148,52 @@ export async function setBrandActive(input: {
 
 /* ----------------------------------------------------------------- banners */
 
-const createBannerSchema = z.object({
+const bannerSchema = z.object({
   name: z.string().trim().min(2, 'Name the banner, for this list.').max(60),
   placement: z.enum(['HOME_HERO', 'HOME_GRID']),
   imageUrl: z.string().trim().min(1, 'Upload an image, or paste a link to one.').max(1000),
   alt: z.string().trim().min(3, 'Describe the image for people who cannot see it.').max(160),
+  eyebrow: z.string().trim().max(40, 'Keep the label short.'),
   headline: z.string().trim().max(80),
   subheadline: z.string().trim().max(160),
   ctaLabel: z.string().trim().max(24),
   href: z.string().trim().min(1, 'Say where the banner links to.').max(300),
 });
 
-export type CreateBannerInput = z.infer<typeof createBannerSchema>;
+export type BannerInput = z.infer<typeof bannerSchema>;
 
-/**
- * Add a homepage banner.
- *
- * The hero and the tile grid render nothing until one exists, so a new shop
- * opens on its categories instead of on stock photography. The image is one
- * uploaded here or served over https; the link stays on this site or is https.
- * A new banner goes live at the end of its row.
- */
-export async function createBanner(input: CreateBannerInput): Promise<ActionResult> {
-  const actor = await requirePermission('cms:write');
-
-  const parsed = createBannerSchema.safeParse(input);
-  if (!parsed.success) return firstIssue(parsed.error);
-  const data = parsed.data;
-
-  if (!/^https:\/\/\S+$/.test(data.imageUrl) && !/^\/api\/media\/\S+$/.test(data.imageUrl)) {
+/** The image must be an upload or https; the link must stay on this site or be https. */
+function bannerLinkProblem(data: Pick<BannerInput, 'imageUrl' | 'href'>): ActionResult | null {
+  // An upload, an https link, or one of the default slides' own pictures,
+  // which a customised default slide keeps until someone replaces it.
+  if (
+    !/^https:\/\/\S+$/.test(data.imageUrl) &&
+    !/^\/api\/media\/\S+$/.test(data.imageUrl) &&
+    !/^\/hero\/[\w.-]+\.(?:jpe?g|png|webp)$/.test(data.imageUrl)
+  ) {
     return fail('imageUrl', 'Upload the image, or use an https:// link.');
   }
   if (!/^\/(?!\/)\S*$/.test(data.href) && !/^https:\/\/\S+$/.test(data.href)) {
     return fail('href', 'Use a path on this site, like /category/kurtas, or an https:// link.');
   }
+  return null;
+}
+
+/**
+ * Add a homepage banner.
+ *
+ * Until a hero banner exists the homepage shows the built-in default slides,
+ * and the tile grid stays hidden. A new banner goes live at the end of its row.
+ */
+export async function createBanner(input: BannerInput): Promise<ActionResult> {
+  const actor = await requirePermission('cms:write');
+
+  const parsed = bannerSchema.safeParse(input);
+  if (!parsed.success) return firstIssue(parsed.error);
+  const data = parsed.data;
+
+  const problem = bannerLinkProblem(data);
+  if (problem) return problem;
 
   const banners = await collections.banners();
   const [last] = await banners.find({ placement: data.placement }).sort({ position: -1 }).limit(1).toArray();
@@ -1143,6 +1203,7 @@ export async function createBanner(input: CreateBannerInput): Promise<ActionResu
     id: entityId('bnr'),
     name: data.name,
     placement: data.placement,
+    eyebrow: data.eyebrow || null,
     headline: data.headline || null,
     subheadline: data.subheadline || null,
     ctaLabel: data.ctaLabel || null,
@@ -1171,6 +1232,151 @@ export async function createBanner(input: CreateBannerInput): Promise<ActionResu
     entityType: 'banner',
     entityId: banner.id,
     entityLabel: banner.name,
+  });
+
+  revalidatePath('/admin/cms');
+  revalidatePath('/');
+  return { ok: true };
+}
+
+const updateBannerSchema = bannerSchema.extend({ bannerId: z.string().min(1) });
+
+/**
+ * Edit a banner: its picture, words, link or row.
+ *
+ * A new picture drops the separate phone crop, which belonged to the old one.
+ * Moving to the other row puts it at the end of that row.
+ */
+export async function updateBanner(input: BannerInput & { bannerId: string }): Promise<ActionResult> {
+  const actor = await requirePermission('cms:write');
+
+  const parsed = updateBannerSchema.safeParse(input);
+  if (!parsed.success) return firstIssue(parsed.error);
+  const { bannerId, ...data } = parsed.data;
+
+  const problem = bannerLinkProblem(data);
+  if (problem) return problem;
+
+  const banners = await collections.banners();
+  const banner = toEntity(await banners.findOne({ _id: bannerId }));
+  if (!banner) return { ok: false, error: 'Banner not found.' };
+
+  const moved = data.placement !== banner.placement;
+  const [last] = moved
+    ? await banners.find({ placement: data.placement }).sort({ position: -1 }).limit(1).toArray()
+    : [];
+
+  const patch = {
+    name: data.name,
+    placement: data.placement,
+    eyebrow: data.eyebrow || null,
+    headline: data.headline || null,
+    subheadline: data.subheadline || null,
+    ctaLabel: data.ctaLabel || null,
+    href: data.href,
+    imageUrl: data.imageUrl,
+    mobileImageUrl: data.imageUrl === banner.imageUrl ? banner.mobileImageUrl : null,
+    alt: data.alt,
+    ...(moved ? { position: last ? last.position + 1 : 0 } : {}),
+    updatedAt: new Date().toISOString(),
+  };
+
+  await banners.updateOne({ _id: banner.id }, { $set: patch });
+  invalidate([tags.content]);
+
+  await audit.record({
+    actor,
+    action: 'cms.banner.update',
+    entityType: 'banner',
+    entityId: banner.id,
+    entityLabel: data.name,
+    changes: audit.diff(banner, patch, ['name', 'placement', 'headline', 'href', 'imageUrl']),
+  });
+
+  revalidatePath('/admin/cms');
+  revalidatePath('/');
+  return { ok: true };
+}
+
+/**
+ * Move a banner one place earlier or later in its row.
+ *
+ * The whole row is renumbered 0 to n as it goes, which also repairs any gaps
+ * or ties left by deletions.
+ */
+export async function moveBanner(input: {
+  bannerId: string;
+  direction: 'up' | 'down';
+}): Promise<ActionResult> {
+  const actor = await requirePermission('cms:write');
+
+  const banners = await collections.banners();
+  const banner = toEntity(await banners.findOne({ _id: input.bannerId }));
+  if (!banner) return { ok: false, error: 'Banner not found.' };
+
+  const row = toEntities(
+    await banners.find({ placement: banner.placement }).sort({ position: 1, createdAt: 1 }).toArray(),
+  );
+  const index = row.findIndex((entry) => entry.id === banner.id);
+  const target = input.direction === 'up' ? index - 1 : index + 1;
+  if (index < 0 || target < 0 || target >= row.length) return { ok: true };
+
+  [row[index], row[target]] = [row[target], row[index]];
+  await banners.bulkWrite(
+    row.map((entry, position) => ({
+      updateOne: { filter: { _id: entry.id }, update: { $set: { position } } },
+    })),
+  );
+  invalidate([tags.content]);
+
+  await audit.record({
+    actor,
+    action: 'cms.banner.move',
+    entityType: 'banner',
+    entityId: banner.id,
+    entityLabel: banner.name,
+    note: `${input.direction === 'up' ? 'earlier' : 'later'}, now ${target + 1} of ${row.length}`,
+  });
+
+  revalidatePath('/admin/cms');
+  revalidatePath('/');
+  return { ok: true };
+}
+
+/**
+ * Copy the built-in hero slides into real banners.
+ *
+ * The homepage shows them while no hero banner is live; this turns them into
+ * ordinary banners that can be edited, reordered, hidden or deleted. Refused
+ * once any hero banner exists, so it can never double up.
+ */
+export async function adoptDefaultHeroSlides(): Promise<ActionResult> {
+  const actor = await requirePermission('cms:write');
+
+  const banners = await collections.banners();
+  if ((await banners.countDocuments({ placement: 'HOME_HERO' })) > 0) {
+    return { ok: false, error: 'There are hero slides already. Edit those instead.' };
+  }
+
+  const { DEFAULT_HERO_SLIDES } = await import('@/config/home');
+  const now = new Date().toISOString();
+  const slides = DEFAULT_HERO_SLIDES.map((slide) => ({
+    ...slide,
+    id: entityId('bnr'),
+    createdAt: now,
+    updatedAt: now,
+  }));
+
+  await banners.insertMany(slides.map((slide) => toDoc(slide)));
+  invalidate([tags.content]);
+
+  await audit.record({
+    actor,
+    action: 'cms.banner.adopt-defaults',
+    entityType: 'banner',
+    entityId: slides[0]?.id ?? 'HOME_HERO',
+    entityLabel: 'Default hero slides',
+    note: `${slides.length} slides copied into banners`,
   });
 
   revalidatePath('/admin/cms');

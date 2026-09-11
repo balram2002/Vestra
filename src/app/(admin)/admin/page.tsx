@@ -50,9 +50,9 @@ async function Dashboard() {
       label: 'listings awaiting review',
     },
     {
-      href: '/admin/sellers?status=KYC_PENDING',
+      href: '/admin/sellers?status=PENDING',
       count: data.pendingSellers,
-      label: 'sellers awaiting KYC',
+      label: 'seller applications to review',
     },
     { href: '/admin/returns', count: data.openReturns, label: 'returns open' },
     {

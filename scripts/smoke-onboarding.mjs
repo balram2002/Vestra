@@ -4,11 +4,15 @@
  *     npm run start &
  *     node scripts/smoke-onboarding.mjs
  *
- * Takes a customer account through applying to sell, and checks the thing that
- * makes onboarding safe rather than merely present: an unverified store CANNOT
- * trade. The applicant gets the SELLER role the moment they apply — otherwise
- * they could not reach the screen that asks for their documents — so the
- * console has to gate on the store's STATUS, not on the role.
+ * Takes a customer through the whole journey to selling, and checks the two
+ * things that make it both easy and safe:
+ *
+ *   EASY  the application is business details only, goes straight to review,
+ *         and a rejected one is corrected and resent from the status screen;
+ *         the pickup address and bank account are added in the console later.
+ *   SAFE  a store that is not approved cannot trade. The applicant gets the
+ *         SELLER role the moment they apply, so the console gates on the
+ *         store's STATUS, and an admin rejection must carry a reason.
  */
 
 import { chromium } from '@playwright/test';
@@ -29,30 +33,15 @@ const check = (name, ok, detail = '') => {
   }
 };
 
-/** The words the applicant actually reads, from REQUIRED_DOCUMENTS. */
-const labelFor = (type) =>
-  ({
-    GST_CERTIFICATE: 'GST certificate',
-    PAN_CARD: 'PAN card',
-    CANCELLED_CHEQUE: 'Cancelled cheque',
-    ADDRESS_PROOF: 'Proof of the pickup address',
-  })[type] ?? type;
-
 const client = await MongoClient.connect(process.env.MONGODB_URI ?? 'mongodb://127.0.0.1:27017');
 const db = client.db(process.env.MONGODB_DB ?? 'vestra');
 
 console.log('\nSeller onboarding\n');
 
-/* ------------------------------------------------- a customer with no store */
-
 /*
- * Accounts other suites depend on, which this one must not touch.
- *
- * This test GRANTS its applicant the seller role and a store. Picking whoever
- * happens to be first meant picking ananya.iyer, whom eleven assertions across
- * the funnel, guest and accessibility suites shop as — so a crash here left her
- * owning an unverified store, and the next suite to run failed somewhere
- * unrelated and inexplicable.
+ * Accounts other suites shop as, which this one must not turn into sellers: a
+ * crash half-way would leave them owning a store, and the next suite would
+ * fail somewhere unrelated and inexplicable.
  */
 const RESERVED = ['ananya.iyer@example.com'];
 
@@ -83,32 +72,40 @@ const restore = async () => {
 
 await restore();
 
-/*
- * Everything from here runs inside a try/finally.
- *
- * This test mutates a real seeded account — it grants it a store and a role —
- * so a crash halfway through leaves behind an applicant who still owns an
- * unverified store. That residue is not inert: the next suite that reaches for
- * "some other seller" can pick it up and get a redirect where it expected a
- * refusal, which reads as a security failure that is really just litter.
- */
-const browser = await chromium.launch();
-try {
-  const context = await browser.newContext();
+async function signIn(context, email) {
   const page = await context.newPage();
-
-  await page.goto(`${BASE}/login`, { waitUntil: 'load' });
-  await page.fill('input[name="email"]', applicant.email);
+  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
+  await page.fill('input[name="email"]', email);
   await page.fill('input[name="password"]', PASSWORD);
   await Promise.all([
-    page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 30000 }),
+    page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 30000, waitUntil: 'domcontentloaded' }),
     page.click('button[type="submit"]'),
   ]);
+  return page;
+}
+
+async function storeNow() {
+  return db.collection('sellers').findOne({ ownerUserId: applicant._id });
+}
+
+/** Waits for the store to reach a status, since actions settle a beat after the click. */
+async function storeReaches(status) {
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const store = await storeNow();
+    if (store?.status === status) return store;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  return storeNow();
+}
+
+const browser = await chromium.launch();
+try {
+  const page = await signIn(await browser.newContext({ viewport: { width: 1280, height: 900 } }), applicant.email);
 
   /* -------------------------------------------------------- before applying */
 
-  const beforeConsole = await page.goto(`${BASE}/seller`, { waitUntil: 'load' });
-  await page.waitForTimeout(1000);
+  const beforeConsole = await page.goto(`${BASE}/seller`, { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(800);
   check(
     'a customer cannot reach the seller console',
     !new URL(page.url()).pathname.startsWith('/seller') || beforeConsole?.status() === 403,
@@ -118,177 +115,143 @@ try {
   /* ---------------------------------------------------------------- apply */
 
   const storeName = `Smoke Looms ${Date.now().toString().slice(-5)}`;
-
-  await page.goto(`${BASE}/sell-with-us/apply`, { waitUntil: 'load' });
-  /*
-   * Anchored label matches throughout.
-   *
-   * `getByLabel` matches the label element's raw text, which here includes the
-   * visible hint underneath it — so an exact match on "Store name" finds
-   * nothing, while a loose match for "PAN" hits the business-type select,
-   * because "Private limited company" contains those three letters. Anchoring to
-   * the start of the label is the one form that is both precise and true.
-   *
-   * The markup itself is fine: the hints are `aria-hidden`, so the field's
-   * ACCESSIBLE name — what a screen reader announces — is just the label.
-   */
-  await page.getByLabel(/^Store\ name/).waitFor({ state: 'visible', timeout: 20000 });
+  await page.goto(`${BASE}/sell-with-us/apply`, { waitUntil: 'domcontentloaded' });
+  const form = page.locator('form').filter({ has: page.locator('input[name="displayName"]') });
+  await form.waitFor({ state: 'visible', timeout: 20000 });
   check('the application form is reachable', true);
 
-  await page.getByLabel(/^Store\ name/).fill(storeName);
-  await page
-    .getByLabel(/^About\ your\ store/)
-    .fill('Handwoven cotton and linen made by a small workshop in Jaipur, dyed in small batches.');
-  await page.getByLabel(/^Registered\ business\ name/).fill('Smoke Looms Private Limited');
-
-  // Rajasthan is state code 08, so the GSTIN has to start with it.
-  await page.getByLabel(/^GSTIN/).fill('08ABCDE1234F1Z5');
-  await page.getByLabel(/^PAN/).fill('ABCDE1234F');
-  await page.getByLabel(/^Address/).fill('12, Amer Road');
-  await page.getByLabel(/^City/).fill('Jaipur');
-  await page.getByLabel(/^State/).selectOption('Rajasthan');
-  await page.getByLabel(/^Pincode/).fill('302002');
-  await page.getByLabel(/^Support\ email/).fill('help@smokelooms.example');
-  await page.getByLabel(/^Support\ phone/).fill('9812345671');
-  await page.getByLabel(/^Account\ holder\ name/).fill('Smoke Looms Private Limited');
-  await page.getByLabel(/^Bank\ name/).fill('HDFC Bank');
-  await page.getByLabel(/^Account\ number/).fill('50100123456789');
-  await page.getByLabel(/^IFSC/).fill('HDFC0001234');
-
-  // At least one category is required.
-  await page.locator('input[type="checkbox"]').first().check();
-
-  /* ----------------------------------------- the GSTIN must match the state */
-
-  await page.getByLabel(/^State/).selectOption('Karnataka');
-  await page.getByRole('button', { name: /Continue to documents/i }).click();
-  await page.waitForTimeout(2000);
-
-  const mismatch = await page.locator('[role="alert"]').first().innerText().catch(() => '');
+  const fields = await form.locator('input:not([type="hidden"]), select, textarea').count();
+  check('the application is short: eight fields or fewer', fields <= 8, `${fields} fields`);
   check(
-    'a GSTIN that disagrees with the state is refused',
-    /GSTIN|state/i.test(mismatch),
-    mismatch.slice(0, 90),
+    'it does not ask for bank or pickup details',
+    (await form.locator('input[name="accountNumber"], input[name="pincode"], input[name="ifsc"]').count()) === 0,
   );
 
-  /* ---------------------------------------------------------- submit for real */
+  await form.getByRole('button', { name: 'Send application' }).click();
+  await form.getByText('Give your store a name').waitFor({ timeout: 15000 }).catch(() => {});
+  check('an empty application names the missing field', await form.getByText('Give your store a name').isVisible());
 
-  await page.getByLabel(/^State/).selectOption('Rajasthan');
-  await page.getByRole('button', { name: /Continue to documents/i }).click();
-  await page.waitForURL(/\/seller\/onboarding/, { timeout: 30000 }).catch(() => {});
+  await page.fill('input[name="displayName"]', storeName);
+  await page.fill('input[name="supportPhone"]', '9812345671');
+  await page.fill('input[name="city"]', 'Jaipur');
+  await form.getByRole('button', { name: 'Women', exact: true }).click();
 
-  check('applying lands on the onboarding screen', /\/seller\/onboarding/.test(page.url()), page.url());
+  // Rajasthan is state code 08, so a GSTIN starting 08 with Karnataka is wrong.
+  await page.fill('input[name="gstin"]', '08ABCDE1234F1Z5');
+  await page.selectOption('select[name="state"]', 'Karnataka');
+  await form.getByRole('button', { name: 'Send application' }).click();
+  await form.getByText(/not the code for Karnataka/).waitFor({ timeout: 15000 }).catch(() => {});
+  check(
+    'a GSTIN that disagrees with the state is refused, under the field',
+    await form.getByText(/not the code for Karnataka/).isVisible(),
+  );
 
-  const store = await db.collection('sellers').findOne({ ownerUserId: applicant._id });
+  await page.selectOption('select[name="state"]', 'Rajasthan');
+  await Promise.all([
+    page.waitForURL(/\/seller\/onboarding/, { timeout: 30000 }).catch(() => {}),
+    form.getByRole('button', { name: 'Send application' }).click(),
+  ]);
+  check('applying lands on the status screen', /\/seller\/onboarding/.test(page.url()), page.url());
+
+  const store = await storeNow();
   check('a store was created', Boolean(store), store?.displayName ?? '');
+  if (!store) throw new Error('no store to continue with');
 
-  if (store) {
-    check('it starts in onboarding', store.status === 'ONBOARDING', store.status);
-    check('it has a unique store code', Boolean(store.code), store.code);
-    check('it has a slug', Boolean(store.slug), store.slug);
-    check(
-      'only the last four digits of the bank account are kept',
-      store.bank.accountNumberMasked === '••••6789',
-      store.bank.accountNumberMasked,
-    );
-    check(
-      'a pickup location was created',
-      (await db.collection('sellerLocations').countDocuments({ sellerId: store._id })) === 1,
-    );
+  check('it goes straight to review', store.status === 'KYC_SUBMITTED', store.status);
+  check('it has a unique store code and a slug', Boolean(store.code && store.slug), `${store.code} ${store.slug}`);
+  check('no bank account was needed', store.bank.accountNumberMasked === '');
+  check(
+    'no pickup address was needed',
+    (await db.collection('sellerLocations').countDocuments({ sellerId: store._id })) === 0,
+  );
 
-    const updated = await db.collection('users').findOne({ _id: applicant._id });
-    check('the applicant now owns the store', updated.sellerId === store._id);
-    check('and has the seller role', updated.roles.includes('SELLER'));
+  const updated = await db.collection('users').findOne({ _id: applicant._id });
+  check('the applicant owns the store and has the seller role', updated.sellerId === store._id && updated.roles.includes('SELLER'));
 
-    /* ------------------------------ an unverified store still cannot trade */
+  const status = await page.locator('body').innerText();
+  check('the status screen says it is being reviewed', /We are reviewing your application/.test(status));
 
-    for (const path of ['/seller', '/seller/products', '/seller/orders']) {
-      await page.goto(`${BASE}${path}`, { waitUntil: 'load' });
-      await page.waitForTimeout(700);
-      check(
-        `an unverified store is kept out of ${path}`,
-        new URL(page.url()).pathname === '/seller/onboarding',
-        page.url(),
-      );
-    }
+  /* ------------------------------------ a store in review still cannot trade */
 
-    /* ------------------------------------------- documents gate submission */
-
-    await page.goto(`${BASE}/seller/onboarding`, { waitUntil: 'load' });
-    await page.waitForTimeout(1200);
-
-    const sendForReview = page.getByRole('button', { name: /Send for review/i });
-    check('submission is blocked until documents are uploaded', await sendForReview.isDisabled());
-
-    const onboardingText = await page.locator('body').innerText();
-    check('it names what is still needed', /GST certificate/i.test(onboardingText));
-
-    /* --------------------------------- upload the four, then send for review */
-
-    const png = Buffer.from(
-      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
-      'base64',
-    );
-
-    for (const type of ['GST_CERTIFICATE', 'PAN_CARD', 'CANCELLED_CHEQUE', 'ADDRESS_PROOF']) {
-      /*
-       * The uploader is revealed per row rather than four drop zones stacked on
-       * one screen, so the row has to be opened before its input exists.
-       */
-      const row = page.locator('li').filter({ hasText: labelFor(type) }).first();
-      await row.getByRole('button', { name: /Upload|Replace/ }).click();
-      await page.locator(`#kyc-${type}`).waitFor({ state: 'attached', timeout: 10000 });
-      await page
-        .locator(`#kyc-${type}`)
-        .setInputFiles({ name: `${type.toLowerCase()}.png`, mimeType: 'image/png', buffer: png });
-      await page.waitForTimeout(2500);
-    }
-
-    const withDocuments = await db.collection('sellers').findOne({ _id: store._id });
-    check(
-      'all four documents were stored',
-      withDocuments.kyc.documents.length === 4,
-      `${withDocuments.kyc.documents.length} uploaded`,
-    );
-
-    await page.reload({ waitUntil: 'load' });
-    await page.waitForTimeout(1200);
-    await page.getByRole('button', { name: /Send for review/i }).click();
-
-    for (let attempt = 0; attempt < 40; attempt++) {
-      const now = await db.collection('sellers').findOne({ _id: store._id });
-      if (now.status !== 'ONBOARDING') break;
-      await page.waitForTimeout(250);
-    }
-
-    const submitted = await db.collection('sellers').findOne({ _id: store._id });
-    check('the application moved into review', submitted.status === 'KYC_SUBMITTED', submitted.status);
-
-    /* -------------------------------- documents lock once it is in review */
-
-    await page.reload({ waitUntil: 'load' });
-    await page.waitForTimeout(1200);
-    const lockedText = await page.locator('body').innerText();
-    check('documents lock while in review', /Locked while your application is in review/i.test(lockedText));
-
-    /* -------------------------------------------- it reaches the admin queue */
-
-    const adminContext = await browser.newContext();
-    const adminPage = await adminContext.newPage();
-    await adminPage.goto(`${BASE}/login`, { waitUntil: 'load' });
-    await adminPage.fill('input[name="email"]', 'admin@vestra.test');
-    await adminPage.fill('input[name="password"]', PASSWORD);
-    await Promise.all([
-      adminPage.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 30000 }),
-      adminPage.click('button[type="submit"]'),
-    ]);
-
-    await adminPage.goto(`${BASE}/admin/sellers?status=KYC_SUBMITTED`, { waitUntil: 'load' });
-    await adminPage.waitForTimeout(1800);
-    const queueText = await adminPage.locator('body').innerText();
-    check('the application appears in the admin queue', queueText.includes(storeName), storeName);
-    await adminContext.close();
+  for (const path of ['/seller', '/seller/products', '/seller/settings']) {
+    await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(600);
+    check(`a store in review is kept out of ${path}`, new URL(page.url()).pathname === '/seller/onboarding', page.url());
   }
+
+  /* ------------------------------------------------- admin: reject, with reason */
+
+  const adminContext = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const admin = await signIn(adminContext, 'admin@vestra.test');
+
+  await admin.goto(`${BASE}/admin/sellers?status=PENDING`, { waitUntil: 'domcontentloaded' });
+  const row = admin.locator(':is(tr, li)', { hasText: storeName }).first();
+  await row.waitFor({ timeout: 15000 }).catch(() => {});
+  check('the application is in the admin queue', await row.isVisible(), storeName);
+
+  await row.getByRole('button', { name: 'Reject' }).click();
+  const confirm = row.getByRole('button', { name: 'Reject' });
+  check('rejecting waits for a reason', await confirm.isDisabled());
+  await row.locator('textarea').fill('Please add the city your workshop is in, not the head office.');
+  await confirm.click();
+  const rejected = await storeReaches('REJECTED');
+  check('the application is sent back', rejected?.status === 'REJECTED', rejected?.status);
+  check('with the reason kept for the applicant', /workshop/.test(rejected?.kyc?.rejectionReason ?? ''));
+
+  /* ------------------------------------------------ applicant: correct, resend */
+
+  await page.goto(`${BASE}/seller/onboarding`, { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(800);
+  check('the applicant reads the reason', /workshop your workshop|workshop is in/.test(await page.locator('body').innerText()));
+
+  await page.fill('input[name="city"]', 'Sanganer');
+  await page.getByRole('button', { name: 'Send it again' }).click();
+  const resent = await storeReaches('KYC_SUBMITTED');
+  check('the corrected application goes back to review', resent?.status === 'KYC_SUBMITTED', resent?.status);
+  check('with the correction', resent?.kyc?.registeredAddress?.city === 'Sanganer', resent?.kyc?.registeredAddress?.city);
+
+  /* ---------------------------------------------------------- admin: approve */
+
+  await admin.goto(`${BASE}/admin/sellers/${store._id}`, { waitUntil: 'domcontentloaded' });
+  await admin.getByRole('button', { name: 'Approve' }).click();
+  const approved = await storeReaches('ACTIVE');
+  check('approving opens the store', approved?.status === 'ACTIVE' && Boolean(approved?.approvedAt), approved?.status);
+  await adminContext.close();
+
+  /* ------------------------------------------------ set up, when it is needed */
+
+  await page.goto(`${BASE}/seller`, { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(800);
+  check('the approved seller reaches the console', new URL(page.url()).pathname === '/seller', page.url());
+  check(
+    'the dashboard lists what is left to set up',
+    /Finish setting up your store/.test(await page.locator('body').innerText()),
+  );
+
+  await page.goto(`${BASE}/seller/settings#pickup`, { waitUntil: 'domcontentloaded' });
+  const pickup = page.locator('#pickup form');
+  await pickup.locator('input[name="line1"]').fill('12, Amer Road');
+  await pickup.locator('input[name="pincode"]').fill('302002');
+  await pickup.locator('select[name="state"]').selectOption('Rajasthan');
+  await pickup.getByRole('button', { name: 'Save' }).click();
+  await page.getByText('Pickup address saved').waitFor({ timeout: 15000 }).catch(() => {});
+  check(
+    'a pickup address can be added later',
+    (await db.collection('sellerLocations').countDocuments({ sellerId: store._id, isPickupEnabled: true })) === 1,
+  );
+
+  const bank = page.locator('#bank form');
+  await bank.locator('input[name="accountHolderName"]').fill('Smoke Looms');
+  await bank.locator('input[name="bankName"]').fill('HDFC Bank');
+  await bank.locator('input[name="accountNumber"]').fill('50100123456789');
+  await bank.locator('input[name="ifsc"]').fill('HDFC0001234');
+  await bank.getByRole('button', { name: 'Save' }).click();
+  await page.getByText('Payout account saved').waitFor({ timeout: 15000 }).catch(() => {});
+  const withBank = await storeNow();
+  check('a payout account can be added later, last four digits only', withBank?.bank?.accountNumberMasked === '••••6789', withBank?.bank?.accountNumberMasked);
+} catch (error) {
+  fail++;
+  console.log(`  FAIL  stopped early: ${String(error.message).split('\n')[0]}`);
 } finally {
   await restore();
 }

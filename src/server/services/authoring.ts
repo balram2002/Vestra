@@ -58,11 +58,12 @@ export async function createDraft(
 
   // A seller may only list in categories they are approved for. Checked here
   // rather than only in the form, because the form is a courtesy.
-  if (category && seller.approvedCategoryIds.length > 0) {
-    const allowed = category.path.some((ancestor) => seller.approvedCategoryIds.includes(ancestor));
-    if (!allowed && !seller.approvedCategoryIds.includes(category.id)) {
-      return { ok: false, error: 'Your store is not approved to list in that category.' };
-    }
+  if (
+    category &&
+    seller.approvedCategoryIds.length > 0 &&
+    !(await withinApproved(category, seller.approvedCategoryIds))
+  ) {
+    return { ok: false, error: 'Your store is not approved to list in that category.' };
   }
 
   const product: Product = {
@@ -664,21 +665,23 @@ export async function authoringOptions(sellerId: string) {
     (category) => !allCategories.some((other) => other.parentId === category.id),
   );
 
-  const approved = seller?.approvedCategoryIds ?? [];
+  // `path` holds slugs while approvals hold ids, so both go through the slug.
+  const slugOf = new Map(allCategories.map((category) => [category.id, category.slug]));
+  const nameOf = new Map(allCategories.map((category) => [category.slug, category.name]));
+  const approvedSlugs = new Set(
+    (seller?.approvedCategoryIds ?? []).flatMap((categoryId) => slugOf.get(categoryId) ?? []),
+  );
   const categories =
-    approved.length === 0
+    approvedSlugs.size === 0
       ? leaves
-      : leaves.filter(
-          (category) =>
-            approved.includes(category.id) ||
-            category.path.some((ancestor) => approved.includes(ancestor)),
-        );
+      : leaves.filter((category) => category.path.some((slug) => approvedSlugs.has(slug)));
 
   return {
     brands: brands.map((brand) => ({ id: brand.id, name: brand.name })),
     categories: categories.map((category) => ({
       id: category.id,
-      name: category.path.length > 1 ? category.path.join(' › ') : category.name,
+      // Names, not slugs: "Women › Ethnic Wear › Kurtas", not "women › ethnic-wear › kurtas".
+      name: category.path.map((slug) => nameOf.get(slug) ?? slug).join(' › '),
       attributeFamily: category.attributeFamily,
       sizeSystem: category.sizeSystem,
     })),
@@ -686,6 +689,24 @@ export async function authoringOptions(sellerId: string) {
 }
 
 /* --------------------------------------------------------------- helpers */
+
+/**
+ * Whether a seller may list in a category: it is approved itself, or it sits
+ * inside an approved one. A category's `path` holds SLUGS and approvals are
+ * ids, so the ancestors are looked up rather than compared directly, which is
+ * what let approving a whole department cover everything inside it.
+ */
+async function withinApproved(
+  category: { id: string; path: string[] },
+  approved: string[],
+): Promise<boolean> {
+  if (approved.includes(category.id)) return true;
+  const categories = await collections.categories();
+  const ancestors = await categories
+    .find({ slug: { $in: category.path } }, { projection: { _id: 1 } })
+    .toArray();
+  return ancestors.some((ancestor) => approved.includes(String(ancestor._id)));
+}
 
 async function findCategory(id: string) {
   const categories = await collections.categories();

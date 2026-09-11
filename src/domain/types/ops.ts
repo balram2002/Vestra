@@ -328,6 +328,8 @@ export interface Banner {
   id: string;
   name: string;
   placement: 'HOME_HERO' | 'HOME_GRID' | 'CATEGORY_TOP' | 'PLP_INLINE' | 'CHECKOUT' | 'APP_STRIP';
+  /** A short label over the headline, such as the department. */
+  eyebrow?: string | null;
   headline: string | null;
   subheadline: string | null;
   ctaLabel: string | null;

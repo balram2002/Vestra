@@ -7,6 +7,9 @@
  * generator seed. Destructive by design -- see `src/server/seed/run.ts`.
  */
 
+// First, before anything reads its configuration: no real email or SMS.
+import './quiet-notifications';
+
 import { closeDb, pingDb } from '@/server/db/client';
 import { seedDatabase } from '@/server/seed/run';
 

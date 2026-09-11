@@ -271,14 +271,17 @@ export async function listSellers(
   const { page, pageSize, skip } = paging(options);
 
   const filter: Record<string, unknown> = {};
-  if (options.status && options.status !== 'ALL') filter.status = options.status;
+  // Applications: every state that is still waiting for a decision.
+  if (options.status === 'PENDING') filter.status = { $in: ['ONBOARDING', 'KYC_SUBMITTED', 'KYC_PENDING'] };
+  else if (options.status && options.status !== 'ALL') filter.status = options.status;
   if (options.query) filter.displayName = { $regex: escapeRegex(options.query), $options: 'i' };
 
   const sellers = await collections.sellers();
   const [docs, total] = await Promise.all([
     sellers
       .find(filter)
-      .sort({ 'metrics.lifetimeGmv': -1 })
+      // Applications oldest first, so nobody waits longest by accident.
+      .sort(options.status === 'PENDING' ? { joinedAt: 1 } : { 'metrics.lifetimeGmv': -1 })
       .skip(skip)
       .limit(pageSize)
       .toArray(),

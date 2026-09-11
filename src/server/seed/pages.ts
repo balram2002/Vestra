@@ -375,9 +375,9 @@ three-times markup, and shoppers should be able to see who they are buying from.
 
 ## How we are different
 
-**Every seller is verified.** GST registration and KYC are checked before a
-store's first listing goes live, and the store's real operating record —
-dispatch time, return rate, rating — is shown on its page.
+**Every seller is reviewed.** Our team reviews every store before it can
+sell, and the store's real operating record — dispatch time, return rate,
+rating — is shown on its page.
 
 **Product information is specific.** Fabric weight, actual garment
 measurements, what the model is wearing, whether the colour varies by batch.
@@ -420,9 +420,10 @@ the next payout run.
 
 ## Getting started
 
-Register, submit GST and PAN, add a pickup address and a bank account. Most
-sellers are verified within two working days, and you can build your catalogue
-while verification is in progress.
+Apply with your business details: it takes about two minutes, and no
+documents are needed. Most applications are answered within two working days.
+Once approved, you list products and add a pickup address, your GST details
+and a bank account from your console, each when you first need it.
     `,
   },
 ];
