@@ -1,19 +1,26 @@
 'use client';
 
-import { deliveryReady, ikUrl } from './imagekit-url';
+import { ikServes, ikUrl } from './imagekit-url';
 
 /**
  * The `next/image` loader.
  *
  * Registered as `images.loaderFile` in `next.config.ts`, so EVERY `<Image>` in
- * the app resolves through here — product photography, category tiles, avatars,
- * CMS banners. That is what makes "all images are served by ImageKit" true of
- * the whole app rather than of the few components someone remembered to change.
+ * the app resolves through here: product photography, category tiles, banners,
+ * avatars, brand marks.
  *
- * A `loaderFile` replaces Next's built-in optimiser rather than sitting beside
- * it, so this has to keep working when ImageKit is not configured. In that case
- * it hands the request back to `/_next/image`, which is exactly what Next would
- * have done on its own — the fallback is the default behaviour, spelled out.
+ * It never sends anything to `/_next/image`. With a custom loader set, a host
+ * such as Vercel does not provision Next's own optimiser at all, so a fallback
+ * to it is a fallback to a 404 in production. Each source goes to something
+ * that can really resize it instead:
+ *
+ *   1. An ImageKit upload, or any remote image when ImageKit's web proxy is
+ *      switched on: ImageKit, with the transformation in the path.
+ *   2. Unsplash photography (the category tiles and the default hero slides):
+ *      Unsplash's own image CDN, which takes width and quality as parameters.
+ *   3. Anything else, a path this app serves (`/api/media/...`, generated SVG)
+ *      or a link pasted from another host: the source as it is. An image at its
+ *      own size is slower than a resized one, and far better than a broken one.
  *
  * Runs in the browser, so it may only read `NEXT_PUBLIC_` values and must stay
  * synchronous and cheap: it is called once per image per breakpoint.
@@ -27,44 +34,44 @@ export default function imageLoader({
   width: number;
   quality?: number;
 }): string {
-  if (deliveryReady()) {
-    return ikUrl(src, { width, quality: quality ?? 75, crop: 'maintain_ratio' });
+  const q = quality ?? 75;
+
+  if (ikServes(src)) {
+    return ikUrl(src, { width, quality: q, crop: 'maintain_ratio' });
   }
 
-  /*
-   * No ImageKit. Two cases:
-   *
-   * A relative path can go to Next's own optimiser. An absolute URL can too,
-   * but only if its host is in `remotePatterns` — and an unlisted host makes
-   * the optimiser return 400, so those are passed through untouched instead.
-   * Serving an unoptimised remote image is worse than optimising it and much
-   * better than a broken one.
-   */
-  if (/^https?:\/\//i.test(src) && !isConfiguredRemoteHost(src)) {
-    return src;
-  }
+  if (isUnsplash(src)) return unsplashUrl(src, width, q);
 
-  const params = new URLSearchParams({
-    url: src,
-    w: String(width),
-    q: String(quality ?? 75),
-  });
-  return `/_next/image?${params.toString()}`;
+  return src;
 }
 
-/**
- * Hosts listed in `next.config.ts`'s `remotePatterns`.
- *
- * Duplicated here because a loader cannot read the Next config at runtime. Kept
- * to the one list that matters and checked by a test, so the two cannot drift
- * apart silently.
- */
-export const OPTIMISABLE_REMOTE_HOSTS = ['images.unsplash.com', 'cdn.vestrawab.example'];
+const UNSPLASH_HOST = 'images.unsplash.com';
 
-function isConfiguredRemoteHost(src: string): boolean {
+function isUnsplash(src: string): boolean {
   try {
-    return OPTIMISABLE_REMOTE_HOSTS.includes(new URL(src).hostname);
+    return new URL(src).hostname === UNSPLASH_HOST;
   } catch {
     return false;
   }
+}
+
+/**
+ * An Unsplash photograph at one width.
+ *
+ * The stored URL often fixes a height as well, to crop to an aspect ratio, so
+ * the height is scaled with the width: changing one without the other would
+ * re-crop the picture at every breakpoint.
+ */
+export function unsplashUrl(src: string, width: number, quality: number): string {
+  const url = new URL(src);
+  const storedWidth = Number(url.searchParams.get('w'));
+  const storedHeight = Number(url.searchParams.get('h'));
+
+  if (storedWidth > 0 && storedHeight > 0) {
+    url.searchParams.set('h', String(Math.round((storedHeight * width) / storedWidth)));
+  }
+  url.searchParams.set('w', String(Math.round(width)));
+  url.searchParams.set('q', String(quality));
+  url.searchParams.set('auto', 'format');
+  return url.toString();
 }

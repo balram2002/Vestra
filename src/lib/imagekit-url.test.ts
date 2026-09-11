@@ -11,8 +11,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const ENDPOINT = 'https://ik.imagekit.io/vestra';
 
-async function load(configured: boolean) {
+async function load(configured: boolean, proxy = false) {
   vi.resetModules();
+  if (proxy) process.env.NEXT_PUBLIC_IMAGEKIT_WEB_PROXY = 'true';
+  else delete process.env.NEXT_PUBLIC_IMAGEKIT_WEB_PROXY;
   if (configured) {
     process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT = ENDPOINT;
     process.env.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY = 'public_test';
@@ -48,8 +50,8 @@ describe('with ImageKit configured', () => {
    * which is what makes "all images are served by ImageKit" true of the seeded
    * catalogue too, not only of what sellers upload.
    */
-  it('routes a remote image through the web-proxy origin', async () => {
-    const { ikUrl } = await load(true);
+  it('routes a remote image through the web-proxy origin when it is on', async () => {
+    const { ikUrl } = await load(true, true);
     const remote = 'https://images.unsplash.com/photo-1?w=900';
     expect(ikUrl(remote, { width: 400 })).toBe(`${ENDPOINT}/tr:w-400,f-auto/${remote}`);
   });
@@ -87,11 +89,23 @@ describe('with ImageKit configured', () => {
     expect(ikUrl(`${ENDPOINT}/a.jpg`, { width: 100.6 })).toContain('w-101');
   });
 
-  it('builds a small blurred placeholder for a remote source', async () => {
+  /*
+   * Off by default: ImageKit answers 404 for a remote source unless the web
+   * proxy is switched on for the endpoint.
+   */
+  it('leaves a remote image alone when the web proxy is off', async () => {
+    const { ikUrl, ikServes } = await load(true);
+    const remote = 'https://images.unsplash.com/photo-1?w=900';
+    expect(ikServes(remote)).toBe(false);
+    expect(ikUrl(remote, { width: 400 })).toBe(remote);
+  });
+
+  it('builds a small blurred placeholder for a source it can serve', async () => {
     const { ikPlaceholder } = await load(true);
-    const placeholder = ikPlaceholder('https://images.unsplash.com/photo-1');
+    const placeholder = ikPlaceholder(`${ENDPOINT}/a.jpg`);
     expect(placeholder).toContain('w-24');
     expect(placeholder).toContain('bl-12');
+    expect(ikPlaceholder('https://images.unsplash.com/photo-1')).toBeNull();
   });
 });
 

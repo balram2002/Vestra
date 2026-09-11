@@ -21,9 +21,27 @@
 
 const URL_ENDPOINT = (process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT ?? '').replace(/\/+$/, '');
 const PUBLIC_KEY = process.env.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY ?? '';
+/**
+ * Whether the endpoint's web-proxy origin is switched on (ImageKit dashboard,
+ * External storage, Web proxy). Off by default: without it ImageKit answers
+ * 404 for every remote source, which is how a whole catalogue of seeded
+ * photography once rendered as empty frames.
+ */
+const WEB_PROXY = process.env.NEXT_PUBLIC_IMAGEKIT_WEB_PROXY === 'true';
 
 export function deliveryReady(): boolean {
   return Boolean(URL_ENDPOINT && PUBLIC_KEY);
+}
+
+/**
+ * Whether ImageKit can deliver this source: its own files always, and a remote
+ * URL only through the web proxy. A path on this app never, since ImageKit
+ * cannot reach it.
+ */
+export function ikServes(src: string): boolean {
+  if (!src || !deliveryReady()) return false;
+  if (src.startsWith(`${URL_ENDPOINT}/`)) return true;
+  return WEB_PROXY && /^https?:\/\//i.test(src);
 }
 
 export interface Transform {
@@ -72,9 +90,9 @@ export function ikUrl(src: string, transform: Transform = {}): string {
     return `${URL_ENDPOINT}/tr:${tr}/${filePath}`;
   }
 
-  // 2. Remote: delivered through the web-proxy origin.
+  // 2. Remote: delivered through the web-proxy origin, when it is switched on.
   if (/^https?:\/\//i.test(src)) {
-    return `${URL_ENDPOINT}/tr:${tr}/${src}`;
+    return WEB_PROXY ? `${URL_ENDPOINT}/tr:${tr}/${src}` : src;
   }
 
   // 3. A path on this app. ImageKit cannot fetch it; serve it ourselves.
@@ -88,7 +106,6 @@ export function ikUrl(src: string, transform: Transform = {}): string {
  * real image starts painting.
  */
 export function ikPlaceholder(src: string): string | null {
-  if (!deliveryReady()) return null;
-  if (!/^https?:\/\//i.test(src)) return null;
+  if (!ikServes(src)) return null;
   return ikUrl(src, { width: 24, quality: 30, blur: 12 });
 }

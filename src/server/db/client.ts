@@ -26,10 +26,18 @@ import { MongoClient, type Db, type MongoClientOptions } from 'mongodb';
 const DEFAULT_URI = 'mongodb://127.0.0.1:27017';
 const DEFAULT_DB = 'vestra';
 
+/*
+ * The build prerenders pages from the database with several workers dialling
+ * a hosted cluster at once, and a cold DNS lookup plus a first TLS handshake
+ * can outlast five seconds: one slow connection used to fail the whole build.
+ * A build can afford to wait; a shopper's request cannot.
+ */
+const building = process.env.NEXT_PHASE === 'phase-production-build';
+
 const options: MongoClientOptions = {
   // Fail fast rather than hanging a request for 30s when Mongo is down: the
   // service layer turns this into a visible error state instead of a spinner.
-  serverSelectionTimeoutMS: 5_000,
+  serverSelectionTimeoutMS: building ? 30_000 : 5_000,
   connectTimeoutMS: 10_000,
   maxPoolSize: 20,
   minPoolSize: 2,
