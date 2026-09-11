@@ -87,6 +87,11 @@ async function Reviews() {
                   {formatDate(review.createdAt)}
                   {review.sizePurchased ? ` - size ${review.sizePurchased}` : ''}
                   {review.verifiedPurchase ? ' - verified purchase' : ''}
+                  {review.status === 'PENDING'
+                    ? ' - publishing after a quick check'
+                    : review.status === 'REJECTED'
+                      ? ' - not published'
+                      : ''}
                 </p>
               </div>
 

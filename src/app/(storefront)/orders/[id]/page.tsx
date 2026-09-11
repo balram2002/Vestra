@@ -9,10 +9,12 @@ import { Breadcrumbs } from '@/components/commerce/breadcrumbs';
 import { OrderStatusTimeline } from '@/components/commerce/order-status-timeline';
 import { ShipmentTracker } from '@/components/commerce/shipment-tracker';
 import { OrderItemActions } from '@/components/orders/order-item-actions';
+import { WriteReview } from '@/components/orders/write-review';
 import { StatusBadge } from '@/components/ui/badge';
 import { FULFILLMENT_STATUS_META } from '@/domain/enums';
 import { formatDate, formatMoney } from '@/lib/format';
 import { getSessionUser } from '@/server/auth/session';
+import { collections, toEntities } from '@/server/db/collections';
 import { exchangeOptionsFor } from '@/server/services/exchanges';
 import { getOrderForViewer } from '@/server/services/orders';
 
@@ -86,6 +88,23 @@ async function OrderDetail({
         ),
       )
     : {};
+
+  /*
+   * What this shopper has already said about each delivered item, so the
+   * button reads "You rated it" rather than offering a second review. Guests
+   * have no account to review from, so they are offered none.
+   */
+  const delivered = items.filter((item) => item.status === 'DELIVERED').map((item) => item.id);
+  const reviewed: Record<string, { rating: number; status: string }> =
+    user && delivered.length > 0
+      ? Object.fromEntries(
+          toEntities(
+            await (await collections.reviews())
+              .find({ userId: user.id, orderItemId: { $in: delivered } })
+              .toArray(),
+          ).map((review) => [review.orderItemId ?? '', { rating: review.rating, status: review.status }]),
+        )
+      : {};
 
   return (
     <>
@@ -290,6 +309,15 @@ async function OrderDetail({
                           productTitle={item.productTitle}
                           exchangeOptions={exchangeOptions[item.id]}
                         />
+
+                        {user && item.status === 'DELIVERED' ? (
+                          <WriteReview
+                            orderItemId={item.id}
+                            productTitle={item.productTitle}
+                            size={item.size}
+                            existing={reviewed[item.id] ?? null}
+                          />
+                        ) : null}
                       </div>
                     </li>
                   ))}

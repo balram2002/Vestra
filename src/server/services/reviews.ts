@@ -2,7 +2,7 @@ import 'server-only';
 
 import { cacheLife, cacheTag } from 'next/cache';
 
-import type { Review } from '@/domain/types';
+import type { ProductRating, Review } from '@/domain/types';
 
 import { collections, toEntities } from '../db/collections';
 import { tags } from './cache-tags';
@@ -98,4 +98,44 @@ export async function getFitSummary(productId: string): Promise<FitSummary | nul
     tooLargePercent: Math.round((pick('TOO_LARGE') / total) * 100),
     sampleSize: total,
   };
+}
+
+/* ---------------------------------------------------------------- writing */
+
+/**
+ * Move a product's rating by one review, in or out.
+ *
+ * Incremental rather than recounted from the review collection: a product's
+ * rating also carries stars given without a written review, so counting review
+ * documents would turn "4.3 from 512" into "4.0 from 3" the first time
+ * somebody posted one. The count is re-derived from the distribution, so the
+ * two can never drift apart.
+ */
+export async function applyRating(
+  productId: string,
+  rating: number,
+  direction: 1 | -1,
+): Promise<void> {
+  const products = await collections.products();
+  const product = await products.findOne({ _id: productId }, { projection: { rating: 1 } });
+  if (!product) return;
+
+  const star = Math.min(5, Math.max(1, Math.round(rating))) - 1;
+  const distribution = [...product.rating.distribution] as ProductRating['distribution'];
+  distribution[star] = Math.max(0, (distribution[star] ?? 0) + direction);
+
+  const count = distribution.reduce((sum, value) => sum + value, 0);
+  const weighted = distribution.reduce((sum, value, index) => sum + value * (index + 1), 0);
+  const average = count > 0 ? Number((weighted / count).toFixed(1)) : 0;
+
+  await products.updateOne(
+    { _id: productId },
+    {
+      $set: {
+        'rating.average': average,
+        'rating.count': count,
+        'rating.distribution': distribution,
+      },
+    },
+  );
 }
