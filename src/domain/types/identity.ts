@@ -102,6 +102,20 @@ export interface SellerLocation {
   state: string;
   pincode: string;
   country: string;
+  /**
+   * Where the shop actually is.
+   *
+   * Added for live commerce: the matcher ranks shops by how far they are from
+   * the shopper, and a pincode cannot answer that — two addresses in 201301 can
+   * be nine kilometres apart, which is the difference between "round the
+   * corner" and "not local at all".
+   *
+   * Nullable because it is geocoded rather than typed in, and a seller whose
+   * address has not resolved yet must still be able to sell. A location with no
+   * coordinates is simply never matched for a live call.
+   */
+  latitude: number | null;
+  longitude: number | null;
   /** Eshopbox facility code once the location is registered with the 3PL. */
   eshopboxFacilityCode: string | null;
   isPrimary: boolean;

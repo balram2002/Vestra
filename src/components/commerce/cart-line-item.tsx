@@ -1,12 +1,13 @@
 'use client';
 
-import { AlertTriangle, Heart, Info, Trash2 } from 'lucide-react';
+import { AlertTriangle, Heart, Info, Radio, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useTransition } from 'react';
 import { toast } from 'sonner';
 
 import { PriceBlock } from '@/components/commerce/price-block';
+import { Stepper } from '@/components/ui/stepper';
 import type { CartLine } from '@/domain/types';
 import { cn } from '@/lib/cn';
 import { removeFromBag, saveItemForLater, setBagQuantity } from '@/server/actions/cart';
@@ -42,13 +43,13 @@ export function CartLineItem({ line }: { line: CartLine }) {
   return (
     <li
       className={cn(
-        'border-line flex gap-3 border-t py-4 transition-opacity first:border-t-0',
+        'border-line flex gap-3.5 border-t py-5 transition-opacity first:border-t-0',
         pending && 'pointer-events-none opacity-60',
       )}
     >
       <Link
         href={`/product/${line.productSlug}`}
-        className="bg-sunken relative aspect-3/4 w-20 shrink-0 overflow-hidden rounded-md sm:w-24"
+        className="bg-sunken relative aspect-4/5 w-20 shrink-0 overflow-hidden rounded-lg ring-1 ring-inset ring-black/[0.07] sm:w-24"
       >
         <Image
           src={line.image}
@@ -79,6 +80,13 @@ export function CartLineItem({ line }: { line: CartLine }) {
                 {line.sellerName}
               </Link>
             </p>
+
+            {line.liveOffer ? (
+              <p className="bg-accent-soft text-accent-ink mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-medium">
+                <Radio className="size-3" aria-hidden />
+                Live price from {line.liveOffer.sellerName}
+              </p>
+            ) : null}
           </div>
 
           <PriceBlock
@@ -142,29 +150,28 @@ export function CartLineItem({ line }: { line: CartLine }) {
         {/* ------------------------------------------------------ controls */}
 
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-1.5">
-            <span className="text-faint text-2xs uppercase tracking-wider">Qty</span>
-            <select
-              value={line.quantity}
-              disabled={pending || line.maxQuantity < 1}
-              onChange={(event) =>
-                run(() =>
-                  setBagQuantity({
-                    variantId: line.variantId,
-                    quantity: Number(event.target.value),
-                  }),
-                )
-              }
-              className="border-line-strong bg-raised text-ink h-8 rounded-sm border px-2 text-sm"
-              aria-label={`Quantity for ${line.productTitle}`}
-            >
-              {Array.from({ length: Math.max(1, line.maxQuantity) }, (_, i) => i + 1).map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
-          </label>
+          {/*
+            A stepper, not a `<select>` of every legal quantity.
+
+            The select had two problems the stepper does not. It enumerated
+            options up to `maxQuantity`, so a line with 40 in stock rendered a
+            forty-option native picker — a scroll wheel to go from 1 to 2. And
+            going from 1 to 3 was three interactions (open, scroll, choose)
+            where the stepper is two taps, with the number itself still
+            typeable for a large jump.
+
+            `max` is the real available stock, so the plus disables at the bound
+            rather than accepting the tap and failing on the server.
+          */}
+          <Stepper
+            value={line.quantity}
+            onChange={(quantity) => run(() => setBagQuantity({ variantId: line.variantId, quantity }))}
+            min={1}
+            max={Math.max(1, line.maxQuantity)}
+            size="sm"
+            disabled={pending || line.maxQuantity < 1}
+            label={`Quantity for ${line.productTitle}`}
+          />
 
           <button
             type="button"

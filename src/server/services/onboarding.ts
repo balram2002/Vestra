@@ -60,6 +60,16 @@ export async function applyToSell(
   const plans = await collections.commissionPlans();
   const defaultPlan = toEntity(await plans.findOne({ isDefault: true }));
 
+  /*
+   * No coordinates at sign-up.
+   *
+   * The address is typed by hand and has not been geocoded yet, and guessing
+   * from a pincode would be worse than admitting ignorance: the live matcher
+   * ranks shops by distance, so a wrong pin would put a shop in the wrong
+   * neighbourhood and match it to people it cannot reach. A location with null
+   * coordinates is simply never matched for a live call, which is the correct
+   * behaviour for a seller who has not been placed on the map yet.
+   */
   const registeredAddress = {
     name: `${input.displayName} Warehouse`,
     contactName: input.accountHolderName,
@@ -70,6 +80,8 @@ export async function applyToSell(
     state: input.state,
     pincode: input.pincode,
     country: 'IN',
+    latitude: null,
+    longitude: null,
   };
 
   const seller: Seller = {
@@ -157,6 +169,8 @@ export async function applyToSell(
     state: input.state,
     pincode: input.pincode,
     country: 'IN',
+    latitude: null,
+    longitude: null,
     eshopboxFacilityCode: null,
     isPrimary: true,
     isPickupEnabled: true,

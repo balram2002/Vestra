@@ -73,6 +73,60 @@ export const DEMO_PASSWORD = 'vestra123';
 
 /* --------------------------------------------------------------- helpers */
 
+/**
+ * Approximate city centroids, for seeded shop coordinates.
+ *
+ * These are city CENTRES, not real shop addresses — the seed catalogue is
+ * invented, so there is no real building to geocode. Each location is jittered
+ * around its centre so a city's shops are spread out rather than stacked on one
+ * pin, which is what makes the distance ranking in the live matcher do anything
+ * visible at all.
+ *
+ * A city absent from this table yields `null`, and a location with no
+ * coordinates is never matched for a live call — see `SellerLocation`.
+ */
+const CITY_CENTRES: Record<string, [number, number]> = {
+  Ahmedabad: [23.0225, 72.5714],
+  Bengaluru: [12.9716, 77.5946],
+  Bhubaneswar: [20.2961, 85.8245],
+  Bhuj: [23.242, 69.6669],
+  Chandigarh: [30.7333, 76.7794],
+  Chennai: [13.0827, 80.2707],
+  Guwahati: [26.1445, 91.7362],
+  Hyderabad: [17.385, 78.4867],
+  Indore: [22.7196, 75.8577],
+  Jaipur: [26.9124, 75.7873],
+  Kanchipuram: [12.8342, 79.7036],
+  Kanpur: [26.4499, 80.3319],
+  Kochi: [9.9312, 76.2673],
+  Kolkata: [22.5726, 88.3639],
+  Lucknow: [26.8467, 80.9462],
+  Mumbai: [19.076, 72.8777],
+  'New Delhi': [28.6139, 77.209],
+  Patiala: [30.3398, 76.3869],
+  Pune: [18.5204, 73.8567],
+  Tiruppur: [11.1085, 77.3411],
+  Varanasi: [25.3176, 82.9739],
+};
+
+/**
+ * A point near a city centre.
+ *
+ * 0.055 degrees is roughly 6km of latitude, and the same figure is used for
+ * longitude rather than being corrected by the cosine of the latitude. At
+ * India's latitudes that makes the east-west spread about 12% wider than the
+ * north-south one — invisible in seed data, and it keeps this two lines long.
+ */
+function nearCity(rng: Rng, city: string): { latitude: number | null; longitude: number | null } {
+  const centre = CITY_CENTRES[city];
+  if (!centre) return { latitude: null, longitude: null };
+  const spread = 0.055;
+  return {
+    latitude: Number((centre[0] + (rng.next() - 0.5) * spread * 2).toFixed(6)),
+    longitude: Number((centre[1] + (rng.next() - 0.5) * spread * 2).toFixed(6)),
+  };
+}
+
 function pick<T>(rng: Rng, items: readonly T[]): T {
   return items[Math.floor(rng.next() * items.length)] as T;
 }
@@ -184,7 +238,7 @@ export function generateCategories(now: Date): Category[] {
     productCount: 0,
     taxRatePercent: node.taxRatePercent,
     returnable: node.returnable,
-    metaTitle: `${node.name} — Buy ${node.name} Online | Vestra`,
+    metaTitle: `${node.name} — Buy ${node.name} Online | VestraWAB`,
     metaDescription: node.description,
     createdAt: daysAgo(400, now),
     updatedAt: daysAgo(30, now),
@@ -208,7 +262,7 @@ export function generateBrands(now: Date): Brand[] {
     productCount: 0,
     averageRating: 0,
     categoryIds: [],
-    metaTitle: `${seed.name} — Shop ${seed.name} Online | Vestra`,
+    metaTitle: `${seed.name} — Shop ${seed.name} Online | VestraWAB`,
     metaDescription: seed.description.slice(0, 155),
     createdAt: daysAgo(500, now),
     updatedAt: daysAgo(20, now),
@@ -273,6 +327,7 @@ export function generateSellers(
       state: seed.state,
       pincode: seed.pincode,
       country: 'India',
+      ...nearCity(rng, seed.city),
     };
 
     locations.push({
@@ -559,7 +614,7 @@ export function generateProducts(ctx: ProductContext, now: Date): Product[] {
       // A shelf with no label behind it would render as a permanently empty
       // category. Fail loudly at seed time rather than shipping a dead page.
       throw new Error(
-        `[vestra:seed] no brand declares "${leaf.slug}" in its \`sells\` list. ` +
+        `[vestrawab:seed] no brand declares "${leaf.slug}" in its \`sells\` list. ` +
           `Add it to a brand in seed/sources.ts, or remove the archetype.`,
       );
     }
@@ -879,7 +934,7 @@ function buildProduct({ rng, archetype, category, brand, seller, now }: BuildPro
     createdAt: daysAgo(publishedDaysAgo + rng.int(1, 20), now),
     updatedAt: daysAgo(rng.int(0, 40), now),
 
-    metaTitle: `${title} — Buy Online at Vestra`,
+    metaTitle: `${title} — Buy Online at VestraWAB`,
     metaDescription: `${title}. ${archetype.highlights[0]}. Free delivery above ₹1,199, ${category.returnable ? `${seller.policies.returnWindowDays}-day returns` : 'non-returnable'}.`,
 
     tags: [

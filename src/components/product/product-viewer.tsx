@@ -1,18 +1,178 @@
 'use client';
 
-import { Check, Heart, ShoppingBag } from 'lucide-react';
+import {
+  motion,
+  useMotionTemplate,
+  useReducedMotion,
+  useSpring,
+} from 'framer-motion';
+import { ShoppingBag } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 
+import { SeeLiveButton } from '@/components/live/see-live-button';
+import { PriceBlock } from '@/components/commerce/price-block';
+import { SizeGuide } from '@/components/product/size-guide';
+import { WishlistButton } from '@/components/commerce/wishlist-button';
 import { Button } from '@/components/ui/button';
+import { ChipButton, ChipSwatch } from '@/components/ui/chip';
 import { INVENTORY } from '@/config/business';
 import type { Media, ProductVariant } from '@/domain/types';
-import { Carousel, CarouselItem } from '@/components/ui/carousel';
+import { Carousel, CarouselItem, useSlideParallax } from '@/components/ui/carousel';
 import { cn } from '@/lib/cn';
-import { formatMoney } from '@/lib/format';
+import { spring } from '@/lib/motion';
 import { addToBag } from '@/server/actions/cart';
+
+/**
+ * One gallery photograph, with pointer-tracked zoom.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THIS IS NOT A LENS
+ * ---------------------------------------------------------------------------
+ * The usual implementation floats a magnified square beside the image. It needs
+ * a second copy of the photograph at a much larger size, it covers whatever is
+ * next to it (which on this page is the price and the size picker), and it has
+ * nothing sensible to do on a phone.
+ *
+ * This scales the image INSIDE its own frame instead, and moves its
+ * transform-origin toward the cursor. One image, no extra request, no overlay
+ * over the buy box, and the frame keeps its exact layout box so nothing on the
+ * page moves.
+ *
+ * ---------------------------------------------------------------------------
+ * THE MOTION
+ * ---------------------------------------------------------------------------
+ * The origin is driven by two springs from `lib/motion`, not written straight
+ * from the pointer. Tracking a cursor exactly produces a second cursor: the
+ * image snaps to every jitter of the hand and the effect feels nervous.
+ * `spring.follow` is soft and heavily damped, so the image TRAILS the pointer
+ * and settles — which is what reads as glass being moved over a print.
+ *
+ * Scale gets its own, stiffer spring so the zoom engages promptly while the
+ * pan stays languid. One spring for both makes the entry feel sluggish.
+ *
+ * ---------------------------------------------------------------------------
+ * WHEN IT DOES NOT RUN
+ * ---------------------------------------------------------------------------
+ *  - `pointerType === 'touch'`: a finger has no hover, and the carousel needs
+ *    that gesture for swiping. Hijacking it would break the primary way anyone
+ *    moves the gallery on the device most people use.
+ *  - `prefers-reduced-motion`: the zoom is decoration, so it simply does not
+ *    happen. The photograph is fully legible without it.
+ */
+function ZoomShot({ media, priority = false }: { media: Media; priority?: boolean }) {
+  const reduced = useReducedMotion() ?? false;
+  const [zoomed, setZoomed] = useState(false);
+
+  /*
+   * Origin as a percentage, springed.
+   *
+   * Starting at the centre matters: if the springs began at 0,0 the first hover
+   * would visibly whip the image in from the top-left corner before settling
+   * under the cursor.
+   */
+  const originX = useSpring(50, spring.follow);
+  const originY = useSpring(50, spring.follow);
+  const scale = useSpring(1, spring.base);
+
+  const track = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === 'touch' || reduced) return;
+    const box = event.currentTarget.getBoundingClientRect();
+    originX.set(((event.clientX - box.left) / box.width) * 100);
+    originY.set(((event.clientY - box.top) / box.height) * 100);
+  };
+
+  const enter = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === 'touch' || reduced) return;
+    // Jump the origin to where the pointer entered rather than springing to it,
+    // so the zoom opens under the cursor instead of sliding across to meet it.
+    const box = event.currentTarget.getBoundingClientRect();
+    originX.jump(((event.clientX - box.left) / box.width) * 100);
+    originY.jump(((event.clientY - box.top) / box.height) * 100);
+    scale.set(1.75);
+    setZoomed(true);
+  };
+
+  const leave = () => {
+    scale.set(1);
+    originX.set(50);
+    originY.set(50);
+    setZoomed(false);
+  };
+
+  /*
+   * Composed here rather than inline in `style`.
+   *
+   * `useMotionTemplate` is a hook, and a hook called inside a JSX expression is
+   * a rule-of-hooks violation waiting for the first conditional render. It also
+   * has to be a template rather than motion's own `originX`/`originY` props,
+   * which take 0-1 fractions — `transform-origin` wants percentages, and the
+   * springs are already in those units.
+   */
+  const origin = useMotionTemplate`${originX}% ${originY}%`;
+
+  /*
+   * 24px of counter-drift as the gallery is swiped — smaller than the hero's
+   * 44px, and deliberately.
+   *
+   * This photograph is being STUDIED, not glanced at. A shopper checking a seam
+   * does not want the garment sliding under their eye, so the drift is just
+   * enough to give the swipe somewhere to come from.
+   *
+   * The layer is already `scale-105` at rest, which covers it: 5% of a 600px
+   * well is 30px of headroom on each side.
+   */
+  const parallaxX = useSlideParallax(24);
+
+  return (
+    <div
+      onPointerEnter={enter}
+      onPointerMove={track}
+      onPointerLeave={leave}
+      className={cn(
+        'bg-sunken relative aspect-4/5 w-full overflow-hidden rounded-xl sm:aspect-3/4',
+        // Only advertise the affordance where it exists.
+        !reduced && 'lg:cursor-zoom-in',
+      )}
+    >
+      <motion.div
+        className="absolute inset-0 scale-105"
+        style={{ scale, transformOrigin: origin, x: parallaxX }}
+      >
+        <Image
+          src={media.url}
+          alt={media.alt}
+          fill
+          // Only the first is the LCP candidate; the rest are a swipe away.
+          priority={priority}
+          sizes="(max-width: 64rem) 100vw, 46vw"
+          className="object-cover"
+        />
+      </motion.div>
+
+      {/*
+        A quiet hint, and only while zoomed.
+
+        Without it a shopper who moves the pointer over the photograph gets an
+        unexplained effect; with it the interaction names itself. It fades with
+        the zoom rather than sitting there permanently, because a permanent
+        label over the merchandise is worse than no label.
+      */}
+      <span
+        aria-hidden
+        className={cn(
+          'glass text-muted pointer-events-none absolute bottom-3 left-3 hidden rounded-full px-2.5 py-1',
+          'text-2xs font-medium transition-opacity duration-(--duration-base) lg:block',
+          zoomed ? 'opacity-100' : 'opacity-0',
+        )}
+      >
+        Move to explore
+      </span>
+    </div>
+  );
+}
 
 /**
  * Gallery and buy box, as one client island.
@@ -139,11 +299,27 @@ export function ProductViewer({
                 aria-current={index === shot}
                 onClick={() => setShot(index)}
                 className={cn(
-                  'bg-sunken relative aspect-3/4 w-14 shrink-0 overflow-hidden rounded-md transition-[outline-color] outline outline-2 outline-offset-2 lg:w-full',
+                  'bg-sunken relative aspect-4/5 w-14 shrink-0 overflow-hidden rounded-md lg:w-full',
+                  'transition-[outline-color,transform] duration-(--duration-base) ease-(--ease-out)',
+                  'outline-2 outline-offset-2',
+                  'motion-safe:hover:scale-[1.04] motion-safe:active:scale-95',
                   index === shot ? 'outline-ink' : 'outline-transparent hover:outline-line-bold',
                 )}
               >
-                <Image src={item.thumbnailUrl} alt="" fill sizes="72px" loading="lazy" className="object-cover" />
+                <Image
+                  src={item.thumbnailUrl}
+                  alt=""
+                  fill
+                  sizes="72px"
+                  loading="lazy"
+                  className={cn(
+                    'object-cover transition-opacity duration-(--duration-base)',
+                    // The unselected shots recede rather than sitting at full
+                    // strength — four equally bright thumbnails give the eye no
+                    // clue which one is on screen.
+                    index === shot ? 'opacity-100' : 'opacity-60 hover:opacity-100',
+                  )}
+                />
               </button>
             ))}
           </div>
@@ -163,23 +339,26 @@ export function ProductViewer({
               index={index + 1}
               total={gallery.length}
               className="w-full"
+              /*
+               * Depth, and a smaller parallax than the hero's.
+               *
+               * A PDP gallery is one photograph at a time with no peek, so the
+               * neighbours receding is what gives a swipe somewhere to come
+               * from. The drift is 28px rather than 56: this image is being
+               * STUDIED, not glanced at, and a shopper checking a seam does not
+               * want the garment sliding under their eye.
+               *
+               * The drift itself is applied inside `ZoomShot`, on the image
+               * layer — see `useSlideParallax`.
+               */
+              depth
             >
               {/*
                 Shorter than 3:4 on a phone. A full-width 3:4 photo is 520px
                 tall before the header and breadcrumb are counted, which put the
                 title and the price below the fold on every phone made.
               */}
-              <div className="bg-sunken relative aspect-[4/5] w-full overflow-hidden rounded-xl sm:aspect-3/4">
-                <Image
-                  src={item.url}
-                  alt={item.alt}
-                  fill
-                  // Only the first is the LCP candidate; the rest are a swipe away.
-                  priority={index === 0}
-                  sizes="(max-width: 64rem) 100vw, 46vw"
-                  className="object-cover"
-                />
-              </div>
+              <ZoomShot media={item} priority={index === 0} />
             </CarouselItem>
           ))}
         </Carousel>
@@ -192,62 +371,51 @@ export function ProductViewer({
 
         <div className="space-y-6">
           {quoted ? (
-            <div className="tabular flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <span className="text-ink text-3xl font-semibold">
-                {formatMoney(quoted.sellingPrice)}
-              </span>
-              {discountPercent > 0 ? (
-                <>
-                  <span className="text-faint text-md line-through">{formatMoney(quoted.mrp)}</span>
-                  <span className="text-ember-600 text-md font-medium">{discountPercent}% off</span>
-                </>
-              ) : null}
-              <span className="text-faint w-full text-xs">Inclusive of all taxes</span>
+            <div>
+              <PriceBlock
+                sellingPrice={quoted.sellingPrice}
+                mrp={quoted.mrp}
+                discountPercent={discountPercent}
+                size="xl"
+              />
+              <p className="text-faint mt-1 text-xs">Inclusive of all taxes</p>
             </div>
           ) : null}
 
           {colorOptions.length > 1 ? (
             <fieldset>
-              <legend className="text-faint text-2xs font-medium uppercase tracking-[0.14em]">
+              <legend className="text-faint text-2xs font-semibold uppercase tracking-[0.14em]">
                 Colour —{' '}
                 <span className="text-ink normal-case tracking-normal">
                   {colorOptions.find((c) => c.value === color)?.label}
                 </span>
               </legend>
 
-              <div className="mt-3 flex flex-wrap gap-2.5">
-                {colorOptions.map((option) => {
-                  const activeColor = option.value === color;
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => {
-                        setColor(option.value);
-                        // A new colour may not stock the chosen size, and its
-                        // gallery is different, so both reset rather than
-                        // silently pointing at something that no longer exists.
-                        setSize(null);
-                        setShot(0);
-                      }}
-                      aria-pressed={activeColor}
-                      aria-label={option.label}
-                      title={option.label}
-                      className={cn(
-                        'relative flex size-9 items-center justify-center rounded-full outline outline-1 outline-offset-2 transition-[outline-color,outline-width]',
-                        activeColor ? 'outline-2 outline-ink' : 'outline-line-strong hover:outline-line-bold',
-                      )}
-                      style={{ backgroundColor: option.hex }}
-                    >
-                      {activeColor ? (
-                        <Check
-                          className="size-4"
-                          style={{ color: isLight(option.hex) ? '#1a1815' : '#ffffff' }}
-                        />
-                      ) : null}
-                    </button>
-                  );
-                })}
+              {/*
+                The same `ChipSwatch` the filter rail uses.
+
+                Two implementations of "a colour you can pick" is how the swatch
+                on the listing page and the swatch on the product page end up
+                different sizes with different selection rings — which reads as
+                two different products having been designed by two people.
+              */}
+              <div className="mt-2 flex flex-wrap gap-1">
+                {colorOptions.map((option) => (
+                  <ChipSwatch
+                    key={option.value}
+                    hex={option.hex}
+                    label={option.label}
+                    active={option.value === color}
+                    onClick={() => {
+                      setColor(option.value);
+                      // A new colour may not stock the chosen size, and its
+                      // gallery is different, so both reset rather than
+                      // silently pointing at something that no longer exists.
+                      setSize(null);
+                      setShot(0);
+                    }}
+                  />
+                ))}
               </div>
             </fieldset>
           ) : null}
@@ -257,45 +425,40 @@ export function ProductViewer({
               <legend className="text-faint text-2xs font-medium uppercase tracking-[0.14em]">
                 Size
               </legend>
-              <button
-                type="button"
-                className="text-ink border-b border-current pb-px text-xs font-medium"
-                onClick={() => toast.info('The size chart drawer lands with the PDP polish pass.')}
-              >
-                Size guide
-              </button>
+              <SizeGuide sizes={sizeOptions} />
             </div>
 
-            <div className="mt-3 flex flex-wrap gap-2">
+            {/*
+              A sold-out size stays visible and stays announceable.
+
+              `ChipButton` sets `aria-disabled` rather than `disabled` for
+              exactly this: "Size 32, unavailable" is information a shopper
+              needs, and a truly disabled button is skipped by the keyboard
+              entirely — so the one fact the chip exists to convey never reaches
+              anyone browsing without a pointer.
+            */}
+            <div className="mt-2 flex flex-wrap gap-1.5">
               {sizeOptions.map((option) => {
                 const variant = bySize.get(option);
                 const available = variant?.inventory.available ?? 0;
                 const soldOut = !variant || available <= 0;
-                const activeSize = option === size;
 
                 return (
-                  <button
+                  <ChipButton
                     key={option}
-                    type="button"
+                    active={option === size}
+                    unavailable={soldOut}
                     onClick={() => !soldOut && setSize(option)}
-                    aria-pressed={activeSize}
-                    aria-disabled={soldOut}
                     title={soldOut ? `${option} — sold out` : option}
-                    className={cn(
-                      'relative flex h-11 min-w-12 items-center justify-center rounded-md border px-3.5 text-sm transition-colors',
-                      activeSize && 'border-ink bg-ink text-canvas font-semibold',
-                      !activeSize && !soldOut && 'border-line-strong text-ink hover:border-ink',
-                      soldOut && 'border-line text-faint cursor-not-allowed line-through',
-                    )}
                   >
                     {option}
-                  </button>
+                  </ChipButton>
                 );
               })}
             </div>
 
             {selected && selected.inventory.available <= INVENTORY.urgencyThreshold ? (
-              <p className="text-ember-600 mt-2.5 text-xs font-medium">
+              <p className="text-danger-600 mt-2.5 text-xs font-medium">
                 Only {selected.inventory.available} left in size {selected.size}
               </p>
             ) : null}
@@ -313,30 +476,59 @@ export function ProductViewer({
             It duplicates no logic: same handler, same disabled state, same
             pending flag. Only the position differs.
           */}
-          <div className="border-line bg-raised/95 fixed inset-x-0 bottom-14 z-30 flex items-center gap-3 border-t px-4 py-2.5 backdrop-blur-md lg:hidden">
+          <div
+            className={cn(
+              'glass border-line fixed inset-x-0 z-30 flex items-center gap-3 border-t px-4 py-2.5 lg:hidden',
+              // Sits directly on top of the bottom navigation, using its own
+              // token rather than a hardcoded 3.5rem — the two used to drift
+              // apart every time the bar's height changed.
+              'bottom-(--spacing-bottom-nav)',
+            )}
+          >
             {quoted ? (
               <div className="min-w-0 shrink-0">
-                <p className="text-ink tabular text-md font-semibold leading-tight">
-                  {formatMoney(quoted.sellingPrice)}
+                <PriceBlock
+                  sellingPrice={quoted.sellingPrice}
+                  mrp={quoted.mrp}
+                  discountPercent={0}
+                  size="md"
+                />
+                <p className="text-faint text-2xs leading-tight">
+                  {size ? `Size ${size}` : 'Choose a size'}
                 </p>
-                {size ? (
-                  <p className="text-faint text-2xs leading-tight">Size {size}</p>
-                ) : (
-                  <p className="text-faint text-2xs leading-tight">Choose a size</p>
-                )}
               </div>
             ) : null}
 
-            <button
-              type="button"
-              onClick={() => toast.info('Wishlist from the product page lands with the next pass.')}
-              aria-label="Save to wishlist"
-              className="border-line-strong text-muted hover:border-ink hover:text-ink flex size-11 shrink-0 items-center justify-center rounded-md border transition-colors"
-            >
-              <Heart className="size-5" />
-            </button>
+            {/*
+              On a phone the live button is an ICON in the pinned bar, not a
+              second full-width pill.
+              
+              The bar already carries a price, a wishlist heart and Add to bag
+              across 390px. A fourth full-width control would either push Add to
+              bag under the fold of its own bar or shrink both to the point
+              where neither is comfortably tappable. The icon keeps its 44px
+              target and its label reaches assistive tech; the desktop layout,
+              which has the room, spells it out.
+            */}
+            <SeeLiveButton
+              productId={productId}
+              variantId={selected?.id ?? null}
+              sizeLabel={selected?.size ?? null}
+              size="icon-touch"
+              variant="secondary"
+              iconOnly
+              label="See this product live"
+              className="shrink-0"
+            />
 
-            <Button size="cta" onClick={handleAdd} loading={pending} className="flex-1">
+            <WishlistButton
+              productId={productId}
+              productTitle={title}
+              size="lg"
+              variant="outline"
+            />
+
+            <Button size="cta" shape="pill" onClick={handleAdd} loading={pending} className="flex-1">
               {!pending ? <ShoppingBag className="size-4" /> : null}
               Add to bag
             </Button>
@@ -347,20 +539,43 @@ export function ProductViewer({
             the action on a phone, this row owns it from `lg` up — two visible
             copies of the same button is a control people press twice.
           */}
-          <div className="hidden gap-2.5 lg:flex">
-            <Button size="cta" onClick={handleAdd} loading={pending} className="flex-1">
-              {!pending ? <ShoppingBag className="size-4" /> : null}
-              Add to bag
-            </Button>
+          <div className="hidden lg:block">
+            <div className="flex gap-2.5">
+              <Button
+                size="cta"
+                shape="pill"
+                onClick={handleAdd}
+                loading={pending}
+                className="flex-1"
+              >
+                {!pending ? <ShoppingBag className="size-4" /> : null}
+                Add to bag
+              </Button>
 
-            <button
-              type="button"
-              onClick={() => toast.info('Wishlist from the product page lands with the next pass.')}
-              aria-label="Save to wishlist"
-              className="border-line-strong text-muted hover:border-ink hover:text-ink flex size-12 shrink-0 items-center justify-center rounded-md border transition-colors"
-            >
-              <Heart className="size-5" />
-            </button>
+              <WishlistButton
+                productId={productId}
+                productTitle={title}
+                size="lg"
+                variant="outline"
+                className="size-12"
+              />
+            </div>
+
+            {/*
+              The second CTA sits BELOW the first, full width, not beside it.
+              
+              Side by side, two pill buttons of equal width read as a choice
+              between equals — and they are not: one of them takes money and the
+              other starts a conversation. Stacked, the hierarchy is stated by
+              position and the live option still gets a full-width target, which
+              it needs because it is the unfamiliar one.
+            */}
+            <SeeLiveButton
+              productId={productId}
+              variantId={selected?.id ?? null}
+              sizeLabel={selected?.size ?? null}
+              className="mt-2.5"
+            />
           </div>
         </div>
 
@@ -368,12 +583,4 @@ export function ProductViewer({
       </div>
     </div>
   );
-}
-
-function isLight(hex: string): boolean {
-  const c = hex.replace('#', '');
-  const r = Number.parseInt(c.slice(0, 2), 16);
-  const g = Number.parseInt(c.slice(2, 4), 16);
-  const b = Number.parseInt(c.slice(4, 6), 16);
-  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.6;
 }

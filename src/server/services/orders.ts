@@ -575,6 +575,29 @@ async function writeOrder(args: {
     sellerOrderCol.insertMany(sellerOrders.map((s) => ({ ...s, _id: s.id }))),
     itemCol.insertMany(items.map((i) => ({ ...i, _id: i.id }))),
   ]);
+
+  /*
+   * Credit the live calls this order came from.
+   *
+   * A shop's live conversion is counted from ORDERS, not from Buy presses in
+   * the room, which is where most of them really finish: in the bag a few
+   * minutes later, often after the call has closed.
+   */
+  const liveSessionIds = Array.from(
+    new Set(
+      cart.groups
+        .flatMap((group) => group.lines)
+        .map((line) => (line.liveOffer ? line.item.liveOffer?.sessionId : undefined))
+        .filter((id): id is string => Boolean(id)),
+    ),
+  );
+  if (liveSessionIds.length > 0) {
+    const sessions = await collections.liveSessions();
+    await sessions.updateMany(
+      { _id: { $in: liveSessionIds } },
+      { $set: { orderId, outcome: 'PURCHASED', updatedAt: iso } },
+    );
+  }
 }
 
 /**

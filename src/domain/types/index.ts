@@ -3,12 +3,14 @@
 // import site for the whole domain vocabulary.
 export type * from '../enums';
 export type * from '../attributes';
+export type * from '../live';
 
 export type * from './identity';
 export type * from './catalog';
 export type * from './commerce';
 export type * from './orders';
 export type * from './ops';
+export type * from './live';
 
 // Value exports (const arrays / label maps) need a runtime re-export.
 export { PERMISSIONS } from './identity';

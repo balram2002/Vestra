@@ -9,9 +9,10 @@ import type {
   CartLineIssue,
   CartSellerGroup,
   CartView,
+  LiveOfferHold,
   Product,
-  Promotion,
   ProductVariant,
+  Promotion,
 } from '@/domain/types';
 import { entityId } from '@/lib/ids';
 import {
@@ -123,6 +124,13 @@ export async function addItem(
 
   const cart = await ensureCart(owner);
   const existing = cart.items.find((item) => item.variantId === input.variantId);
+
+  // A line at a live price is one piece. More of the same size is a new
+  // decision at the listed price, not a way to multiply a negotiated one.
+  if (existing?.liveOffer && Date.parse(existing.liveOffer.expiresAt) > Date.now()) {
+    return { ok: false, error: 'This size is in your bag at a live price, for one piece.' };
+  }
+
   const desired = (existing?.quantity ?? 0) + input.quantity;
 
   // Two independent caps: what the shopper is allowed to buy, and what exists.
@@ -186,6 +194,11 @@ export async function setQuantity(
 
   const cart = await findCart(owner);
   if (!cart) return { ok: false, error: 'Your bag is empty.' };
+
+  const held = cart.items.find((item) => item.variantId === variantId)?.liveOffer;
+  if (quantity > 1 && held && Date.parse(held.expiresAt) > Date.now()) {
+    return { ok: false, error: 'A live price is for one piece.' };
+  }
 
   const products = await collections.products();
   const doc = await products.findOne(
@@ -291,10 +304,17 @@ export async function mergeGuestCart(guestToken: string, userId: string): Promis
   for (const item of guest.items) {
     const existing = merged.find((i) => i.variantId === item.variantId);
     if (existing) {
-      existing.quantity = Math.min(
-        CART.maxQuantityPerVariant,
-        existing.quantity + item.quantity,
-      );
+      if (item.liveOffer) {
+        // The live price wins: it was quoted to this shopper, for one piece.
+        existing.liveOffer = item.liveOffer;
+        existing.priceAtAdd = item.priceAtAdd;
+        existing.quantity = 1;
+      } else if (!existing.liveOffer) {
+        existing.quantity = Math.min(
+          CART.maxQuantityPerVariant,
+          existing.quantity + item.quantity,
+        );
+      }
     } else if (merged.length < CART.maxDistinctItems) {
       merged.push(item);
     }
@@ -425,7 +445,15 @@ export async function getCartView(owner: Owner): Promise<CartView> {
     // dropped rather than rendered as a broken row.
     if (!product || !variant) continue;
 
-    const issues = detectIssues(item, product, variant, Boolean(seller && seller.status === 'ACTIVE'));
+    const hold = activeLiveOffer(item, variant.sellingPrice);
+    const price = hold ? hold.price : variant.sellingPrice;
+    const issues = detectIssues(
+      item,
+      product,
+      variant,
+      Boolean(seller && seller.status === 'ACTIVE'),
+      price,
+    );
 
     lines.push({
       item,
@@ -443,19 +471,18 @@ export async function getCartView(owner: Owner): Promise<CartView> {
       colorHex: variant.colorHex,
       image: variant.media[0]?.url ?? product.media[0]?.url ?? '',
       mrp: variant.mrp,
-      sellingPrice: variant.sellingPrice,
-      discountPercent:
-        variant.mrp > variant.sellingPrice
-          ? Math.round(((variant.mrp - variant.sellingPrice) / variant.mrp) * 100)
-          : 0,
+      sellingPrice: price,
+      discountPercent: variant.mrp > price ? Math.round(((variant.mrp - price) / variant.mrp) * 100) : 0,
       quantity: item.quantity,
-      maxQuantity: Math.min(CART.maxQuantityPerVariant, variant.inventory.available),
+      // A live price is for one piece.
+      maxQuantity: hold ? 1 : Math.min(CART.maxQuantityPerVariant, variant.inventory.available),
       available: variant.inventory.available,
       stockLevel: stockLevelOf(variant.inventory, variant.isActive),
       returnable: product.returnable,
       returnWindowDays: product.returnWindowDays,
       estimatedDelivery: null,
       issues,
+      liveOffer: hold ? { sellerName: hold.sellerName, expiresAt: hold.expiresAt } : null,
     });
   }
 
@@ -560,8 +587,11 @@ export async function getCartView(owner: Owner): Promise<CartView> {
       .toArray(),
   );
 
+  // A price negotiated on a live call is already the shop's best. An automatic
+  // offer on top would discount the same piece twice.
+  const liveRefs = new Set(lines.filter((line) => line.liveOffer).map((line) => line.item.id));
   const promotionResult = evaluatePromotions(promotions, {
-    lines: offerContext,
+    lines: offerContext.filter((line) => !liveRefs.has(line.refId)),
     paymentMethod: cart.paymentMethod,
     now,
   });
@@ -708,6 +738,7 @@ function detectIssues(
   product: Product,
   variant: ProductVariant,
   sellerActive: boolean,
+  effectivePrice: number,
 ): CartLineIssue[] {
   const issues: CartLineIssue[] = [];
 
@@ -763,14 +794,17 @@ function detectIssues(
 
   // A price move is never applied silently. An increase blocks until the
   // shopper acknowledges it; a decrease is good news and merely announced.
-  if (variant.sellingPrice > item.priceAtAdd) {
+  if (effectivePrice > item.priceAtAdd) {
     issues.push({
       kind: 'PRICE_INCREASED',
       blocking: true,
-      message: 'The price went up since you added this.',
+      message:
+        item.liveOffer && effectivePrice === variant.sellingPrice
+          ? `Your live price from ${item.liveOffer.sellerName} has ended.`
+          : 'The price went up since you added this.',
       resolution: 'ACCEPT_PRICE',
     });
-  } else if (variant.sellingPrice < item.priceAtAdd) {
+  } else if (effectivePrice < item.priceAtAdd) {
     issues.push({
       kind: 'PRICE_DECREASED',
       blocking: false,
@@ -793,4 +827,75 @@ function detectIssues(
   }
 
   return issues;
+}
+
+/* ------------------------------------------------------------- live offers */
+
+/** The live price on a line, if it is still current and still a saving. */
+function activeLiveOffer(item: CartItem, listPrice: number, now = Date.now()): LiveOfferHold | null {
+  const hold = item.liveOffer;
+  if (!hold) return null;
+  if (Date.parse(hold.expiresAt) <= now) return null;
+  if (hold.price >= listPrice) return null;
+  return hold;
+}
+
+/**
+ * Add ONE piece at a live price, or move an existing line onto it.
+ *
+ * The caller has already verified the call (see `buyAtLivePrice`); this checks
+ * what the bag always checks, stock and caps. A line is keyed by its size and
+ * can carry only one price, so an existing line for the same size is re-priced
+ * and set to one piece rather than duplicated. The shopper sees it in the bag.
+ */
+export async function addLiveOfferItem(
+  owner: Owner,
+  input: { productId: string; variantId: string; hold: LiveOfferHold },
+): Promise<CartMutationResult> {
+  const products = await collections.products();
+  const product = toEntity(await products.findOne({ _id: input.productId }));
+  if (!product || product.status !== 'PUBLISHED') {
+    return { ok: false, error: 'This product is no longer available.' };
+  }
+
+  const variant = product.variants.find((v) => v.id === input.variantId);
+  if (!variant || !variant.isActive) return { ok: false, error: 'That size is no longer available.' };
+  if (variant.inventory.available < 1) return { ok: false, error: 'This size just sold out.' };
+
+  const cart = await ensureCart(owner);
+  const existing = cart.items.find((item) => item.variantId === input.variantId);
+  if (!existing && cart.items.length >= CART.maxDistinctItems) {
+    return { ok: false, error: 'Your bag is full. Remove something to add more.' };
+  }
+
+  const carts = await collections.carts();
+  const now = new Date().toISOString();
+
+  if (existing) {
+    await carts.updateOne(
+      { _id: cart.id, 'items.variantId': input.variantId },
+      {
+        $set: {
+          'items.$.quantity': 1,
+          'items.$.priceAtAdd': input.hold.price,
+          'items.$.liveOffer': input.hold,
+          updatedAt: now,
+        },
+      },
+    );
+  } else {
+    const item: CartItem = {
+      id: entityId('cri'),
+      productId: product.id,
+      variantId: variant.id,
+      sellerId: product.sellerId,
+      quantity: 1,
+      priceAtAdd: input.hold.price,
+      addedAt: now,
+      liveOffer: input.hold,
+    };
+    await carts.updateOne({ _id: cart.id }, { $push: { items: item }, $set: { updatedAt: now } });
+  }
+
+  return { ok: true, cart: (await findCart(owner)) ?? cart };
 }

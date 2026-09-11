@@ -36,7 +36,7 @@ export interface PriceBreakdown {
   /** GST, extracted from the tax-inclusive selling price. */
   taxTotal: number;
   taxBreakup: TaxLine[];
-  /** Vestra Credit / wallet applied. */
+  /** VestraWAB Credit / wallet applied. */
   creditApplied: number;
   /** What the customer actually pays now. */
   payable: number;
@@ -113,6 +113,24 @@ export interface CartItem {
    */
   priceAtAdd: number;
   addedAt: string;
+  /**
+   * A price a store quoted on a live call, held for ONE piece.
+   *
+   * Verified against the call when the line is added (this shopper owned it,
+   * the offer was current). After that only its expiry is re-checked, so
+   * signing in at checkout, which moves the line to another cart, keeps it.
+   */
+  liveOffer?: LiveOfferHold | null;
+}
+
+/** A live-call price held on a bag line. See `CartItem.liveOffer`. */
+export interface LiveOfferHold {
+  sessionId: string;
+  /** Paise, for one piece. */
+  price: number;
+  expiresAt: string;
+  /** For the bag line: "Live price from {sellerName}". */
+  sellerName: string;
 }
 
 /**
@@ -145,6 +163,8 @@ export interface CartLine {
   returnWindowDays: number;
   estimatedDelivery: { from: string; to: string } | null;
   issues: CartLineIssue[];
+  /** Set while this line is at a price quoted on a live call. */
+  liveOffer: { sellerName: string; expiresAt: string } | null;
 }
 
 export type CartIssueKind =
