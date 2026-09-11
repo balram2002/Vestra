@@ -1,4 +1,6 @@
 import { Landmark } from 'lucide-react';
+import { PageHeader } from '@/components/console/page-header';
+import { Card } from '@/components/ui/card';
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
@@ -22,11 +24,10 @@ export const metadata: Metadata = { title: 'Settlements' };
 export default function SellerSettlementsPage() {
   return (
     <>
-      <h1 className="font-display text-ink text-xl">Settlements</h1>
-      <p className="text-muted mt-1 text-sm">
-        Money clears {FINANCE.settlementHoldDays} days after delivery, once the return window has
-        closed on it.
-      </p>
+      <PageHeader
+        title="Settlements"
+        description={<>Money clears {FINANCE.settlementHoldDays} days after delivery, once the return window has closed on it.</>}
+      />
 
       <Suspense fallback={<div className="skeleton mt-6 h-96 rounded-lg" aria-hidden />}>
         <Settlements />
@@ -82,7 +83,7 @@ async function Settlements() {
       ) : (
         <ul className="space-y-4">
           {settlements.map((settlement) => (
-            <li key={settlement.id} className="border-line bg-raised rounded-lg border">
+            <Card as="li" key={settlement.id} pad="none">
               <header className="border-line flex flex-wrap items-start justify-between gap-3 border-b p-5">
                 <div>
                   <p className="text-ink tabular text-sm font-semibold">
@@ -155,7 +156,7 @@ async function Settlements() {
                   </span>
                 ) : null}
               </footer>
-            </li>
+            </Card>
           ))}
         </ul>
       )}

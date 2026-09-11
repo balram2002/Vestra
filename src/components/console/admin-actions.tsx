@@ -1,16 +1,23 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogClose, DialogContent, DialogTrigger } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 
 import { cn } from '@/lib/cn';
 import {
   reviewProduct,
+  setCategoryActive,
   setCouponActive,
   setPromotionActive,
   setSectionActive,
   setSellerStatus,
+  setUserStatus,
 } from '@/server/actions/admin';
+import { moderateReview } from '@/server/actions/reviews';
 
 /**
  * Admin write actions.
@@ -62,16 +69,18 @@ export function ProductReviewActions({
   if (rejecting) {
     return (
       <div className="w-56">
-        <textarea
+        <Textarea
+          label="Reason"
+          hideLabel
           value={reason}
           onChange={(event) => setReason(event.target.value)}
           rows={2}
           maxLength={400}
           placeholder="Why? The seller reads this."
-          className="border-line-strong bg-canvas text-ink placeholder:text-faint w-full rounded-sm border px-2 py-1.5 text-2xs"
+          className="text-xs"
         />
         <div className="mt-1.5 flex gap-1.5">
-          <button
+          <Button
             type="button"
             disabled={pending || reason.trim().length < 8}
             onClick={() =>
@@ -81,18 +90,20 @@ export function ProductReviewActions({
                 () => setRejecting(false),
               )
             }
-            className="bg-danger-600 disabled:bg-line-strong rounded-sm px-2 py-1 text-2xs font-medium text-white disabled:cursor-not-allowed"
+            variant="danger"
+          size="xs"
           >
             Confirm
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={() => setRejecting(false)}
             disabled={pending}
-            className="text-muted hover:text-ink px-1.5 py-1 text-2xs"
+            variant="ghost"
+          size="xs"
           >
             Cancel
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -100,24 +111,26 @@ export function ProductReviewActions({
 
   return (
     <div className="flex shrink-0 gap-1.5">
-      <button
+      <Button
         type="button"
         disabled={pending}
         onClick={() =>
           run(() => reviewProduct({ productId, decision: 'APPROVE' }), `"${title}" is live`)
         }
-        className="bg-ink text-canvas rounded-sm px-2.5 py-1 text-2xs font-medium disabled:opacity-50"
+        size="xs"
+        loading={pending}
       >
-        {pending ? '…' : 'Approve'}
-      </button>
-      <button
+        Approve
+      </Button>
+      <Button
         type="button"
         disabled={pending}
         onClick={() => setRejecting(true)}
-        className="border-line-strong text-muted hover:border-ink hover:text-ink rounded-sm border px-2.5 py-1 text-2xs transition-colors"
+        variant="secondary"
+        size="xs"
       >
         Reject
-      </button>
+      </Button>
     </div>
   );
 }
@@ -142,16 +155,18 @@ export function SellerStatusActions({
   if (suspending) {
     return (
       <div className="w-56">
-        <textarea
+        <Textarea
+          label="Reason"
+          hideLabel
           value={reason}
           onChange={(event) => setReason(event.target.value)}
           rows={2}
           maxLength={400}
           placeholder="Reason. This takes a business offline."
-          className="border-line-strong bg-canvas text-ink placeholder:text-faint w-full rounded-sm border px-2 py-1.5 text-2xs"
+          className="text-xs"
         />
         <div className="mt-1.5 flex gap-1.5">
-          <button
+          <Button
             type="button"
             disabled={pending || reason.trim().length < 8}
             onClick={() =>
@@ -161,18 +176,20 @@ export function SellerStatusActions({
                 () => setSuspending(false),
               )
             }
-            className="bg-danger-600 disabled:bg-line-strong rounded-sm px-2 py-1 text-2xs font-medium text-white disabled:cursor-not-allowed"
+            variant="danger"
+          size="xs"
           >
             Suspend
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={() => setSuspending(false)}
             disabled={pending}
-            className="text-muted hover:text-ink px-1.5 py-1 text-2xs"
+            variant="ghost"
+          size="xs"
           >
             Cancel
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -181,25 +198,26 @@ export function SellerStatusActions({
   return (
     <div className="flex shrink-0 gap-1.5">
       {suspended ? (
-        <button
+        <Button
           type="button"
           disabled={pending}
           onClick={() =>
             run(() => setSellerStatus({ sellerId, status: 'ACTIVE' }), `${name} reinstated`)
           }
-          className="bg-ink text-canvas rounded-sm px-2.5 py-1 text-2xs font-medium disabled:opacity-50"
+          size="xs"
         >
-          {pending ? '…' : 'Reinstate'}
-        </button>
+          Reinstate
+        </Button>
       ) : (
-        <button
+        <Button
           type="button"
           disabled={pending}
           onClick={() => setSuspending(true)}
-          className="border-line-strong text-muted hover:border-danger-600 hover:text-danger-600 rounded-sm border px-2.5 py-1 text-2xs transition-colors"
+          variant="secondary"
+          size="xs"
         >
           Suspend
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -275,7 +293,7 @@ function Toggle({
   onClick: () => void;
 }) {
   return (
-    <button
+    <Button
       type="button"
       role="switch"
       aria-checked={on}
@@ -290,8 +308,8 @@ function Toggle({
         aria-hidden
         className={cn('size-1.5 rounded-full', on ? 'bg-success-500' : 'bg-line-bold')}
       />
-      {pending ? '…' : on ? onLabel : offLabel}
-    </button>
+      {on ? onLabel : offLabel}
+    </Button>
   );
 }
 
@@ -319,5 +337,229 @@ export function PromotionToggle({
         )
       }
     />
+  );
+}
+
+/* ------------------------------------------------------------ user status */
+
+/**
+ * Suspend or reactivate a person.
+ *
+ * Suspension is enforced where the session is read, not here: a suspended
+ * account resolves to no user on its very next request, so it is signed out on
+ * every device at once without any session list to hunt through.
+ *
+ * The reason goes to a dialog rather than an inline textarea. This control
+ * sits in a dense directory table, and a row that grows a form in place
+ * shoves every row below it down under the pointer.
+ */
+export function UserStatusActions({
+  userId,
+  name,
+  status,
+}: {
+  userId: string;
+  name: string;
+  status: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState('');
+  const { pending, run } = useAction();
+
+  if (status === 'SUSPENDED') {
+    return (
+      <Button
+        type="button"
+        size="xs"
+        variant="secondary"
+        loading={pending}
+        onClick={() => run(() => setUserStatus({ userId, status: 'ACTIVE' }), `${name} reactivated`)}
+      >
+        Reactivate
+      </Button>
+    );
+  }
+
+  const close = () => {
+    setOpen(false);
+    setReason('');
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(next) => (next ? setOpen(true) : close())}>
+      <DialogTrigger asChild>
+        <Button type="button" size="xs" variant="ghost" className="text-danger-600 hover:text-danger-700">
+          Suspend
+        </Button>
+      </DialogTrigger>
+      <DialogContent
+        title={`Suspend ${name}?`}
+        description="They are signed out everywhere on their next request and cannot sign in until an admin reactivates them. Orders already placed carry on."
+      >
+        <form
+          className="space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            run(
+              () => setUserStatus({ userId, status: 'SUSPENDED', reason: reason.trim() }),
+              `${name} suspended`,
+              close,
+            );
+          }}
+        >
+          <Textarea
+            label="Reason"
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            rows={3}
+            maxLength={400}
+            placeholder="Recorded in the audit log with your name."
+            hint="At least 8 characters."
+            required
+          />
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="ghost" size="sm" onClick={close} disabled={pending}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="danger"
+              size="sm"
+              loading={pending}
+              disabled={reason.trim().length < 8}
+            >
+              Suspend account
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+/* --------------------------------------------------------------- category */
+
+export function CategoryToggle({
+  categoryId,
+  name,
+  isActive,
+}: {
+  categoryId: string;
+  name: string;
+  isActive: boolean;
+}) {
+  const { pending, run } = useAction();
+
+  return (
+    <Toggle
+      pending={pending}
+      on={isActive}
+      onLabel="Visible"
+      offLabel="Hidden"
+      onClick={() =>
+        run(
+          () => setCategoryActive({ categoryId, isActive: !isActive }),
+          isActive ? `${name} hidden from the shop` : `${name} is back in the shop`,
+        )
+      }
+    />
+  );
+}
+
+/* ---------------------------------------------------------------- reviews */
+
+/**
+ * Publish, reject or take down one review.
+ *
+ * Rejecting asks for a reason in a dialog rather than a textarea in the row,
+ * for the same reason as suspension: a row that grows a form shoves every row
+ * below it under the pointer.
+ */
+export function ReviewModerationActions({
+  reviewId,
+  status,
+}: {
+  reviewId: string;
+  status: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState('');
+  const { pending, run } = useAction();
+  const live = status === 'PUBLISHED';
+
+  const close = () => {
+    setOpen(false);
+    setNote('');
+  };
+
+  return (
+    <div className="flex shrink-0 gap-1.5">
+      {live ? null : (
+        <Button
+          type="button"
+          size="xs"
+          loading={pending}
+          onClick={() => run(() => moderateReview({ reviewId, decision: 'PUBLISH' }), 'Review published')}
+        >
+          Publish
+        </Button>
+      )}
+
+      {status === 'REJECTED' ? null : (
+        <Dialog open={open} onOpenChange={(next) => (next ? setOpen(true) : close())}>
+          <DialogTrigger asChild>
+            <Button
+              type="button"
+              size="xs"
+              variant="ghost"
+              className="text-danger-600 hover:text-danger-700"
+            >
+              {live ? 'Take down' : 'Reject'}
+            </Button>
+          </DialogTrigger>
+          <DialogContent
+            title={live ? 'Take this review down?' : 'Reject this review?'}
+            description={
+              live
+                ? 'It stops showing on the product page and no longer counts towards its rating.'
+                : 'It will not be published. The reason stays in the audit log.'
+            }
+            footer={
+              <>
+                <DialogClose asChild>
+                  <Button variant="ghost" size="sm" disabled={pending}>
+                    Cancel
+                  </Button>
+                </DialogClose>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  loading={pending}
+                  disabled={note.trim().length < 4}
+                  onClick={() =>
+                    run(
+                      () => moderateReview({ reviewId, decision: 'REJECT', note: note.trim() }),
+                      live ? 'Review taken down' : 'Review rejected',
+                      close,
+                    )
+                  }
+                >
+                  {live ? 'Take down' : 'Reject'}
+                </Button>
+              </>
+            }
+          >
+            <Textarea
+              label="Reason"
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              rows={3}
+              maxLength={300}
+              placeholder="Recorded in the audit log with your name."
+              hint="At least 4 characters."
+            />
+          </DialogContent>
+        </Dialog>
+      )}
+    </div>
   );
 }

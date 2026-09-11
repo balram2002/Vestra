@@ -1,8 +1,23 @@
+import {
+  BarChart3,
+  Boxes,
+  LayoutDashboard,
+  Package,
+  Receipt,
+  RotateCcw,
+  Settings,
+  ShoppingCart,
+  Truck,
+  Wallet,
+} from 'lucide-react';
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
 import { QueueBadge } from '@/components/console/queue-badge';
+import { SellerLiveDesk } from '@/components/live/seller-live-desk';
 import { ConsoleShell } from '@/components/layout/console-shell';
+import { ConsoleUserMenu } from '@/components/layout/console-user-menu';
+import { Avatar } from '@/components/ui/avatar';
 import { SELLER_ACTIONABLE } from '@/domain/enums';
 import { requireSellerAccount } from '@/server/auth/session';
 import { collections } from '@/server/db/collections';
@@ -29,20 +44,46 @@ export default function SellerLayout({ children }: { children: React.ReactNode }
   return (
     <ConsoleShell
       homeHref="/seller"
+      brand={
+        <Suspense fallback={<span className="skeleton size-8 rounded-lg" aria-hidden />}>
+          <StoreBrand />
+        </Suspense>
+      }
       title={
         <Suspense fallback={<span className="text-faint">Your store</span>}>
           <StoreName />
         </Suspense>
       }
       subtitle="Seller console"
+      user={
+        <Suspense fallback={<UserSkeleton />}>
+          <SellerUser />
+        </Suspense>
+      }
+      headerEnd={
+        /*
+          The live switch, and nothing else, in the header.
+
+          It is on EVERY seller screen because a shopkeeper who has gone live is
+          packing orders or updating stock, not waiting on one page. It is one
+          compact row now: the call cards it raises portal themselves to the
+          corner of the viewport, and the signed-in name moved to the rail's
+          user menu. Together those were what pushed the old header's content
+          below the header.
+        */
+        <Suspense fallback={<span className="skeleton h-9 w-24 rounded-full" aria-hidden />}>
+          <LiveDesk />
+        </Suspense>
+      }
       groups={[
         {
           label: 'Trade',
           items: [
-            { href: '/seller', label: 'Dashboard' },
+            { href: '/seller', label: 'Dashboard', icon: <LayoutDashboard aria-hidden /> },
             {
               href: '/seller/orders',
               label: 'Orders',
+              icon: <ShoppingCart aria-hidden />,
               badge: (
                 <Suspense fallback={null}>
                   <OrderQueueBadge />
@@ -52,6 +93,7 @@ export default function SellerLayout({ children }: { children: React.ReactNode }
             {
               href: '/seller/shipments',
               label: 'Shipments',
+              icon: <Truck aria-hidden />,
               badge: (
                 <Suspense fallback={null}>
                   <ShipmentQueueBadge />
@@ -61,6 +103,7 @@ export default function SellerLayout({ children }: { children: React.ReactNode }
             {
               href: '/seller/returns',
               label: 'Returns',
+              icon: <RotateCcw aria-hidden />,
               badge: (
                 <Suspense fallback={null}>
                   <ReturnQueueBadge />
@@ -72,25 +115,20 @@ export default function SellerLayout({ children }: { children: React.ReactNode }
         {
           label: 'Catalogue',
           items: [
-            { href: '/seller/products', label: 'Products' },
-            { href: '/seller/inventory', label: 'Inventory' },
+            { href: '/seller/products', label: 'Products', icon: <Package aria-hidden /> },
+            { href: '/seller/inventory', label: 'Inventory', icon: <Boxes aria-hidden /> },
           ],
         },
         {
           label: 'Business',
           items: [
-            { href: '/seller/earnings', label: 'Earnings' },
-            { href: '/seller/settlements', label: 'Settlements' },
-            { href: '/seller/analytics', label: 'Analytics' },
-            { href: '/seller/settings', label: 'Settings' },
+            { href: '/seller/earnings', label: 'Earnings', icon: <Wallet aria-hidden /> },
+            { href: '/seller/settlements', label: 'Settlements', icon: <Receipt aria-hidden /> },
+            { href: '/seller/analytics', label: 'Analytics', icon: <BarChart3 aria-hidden /> },
+            { href: '/seller/settings', label: 'Settings', icon: <Settings aria-hidden /> },
           ],
         },
       ]}
-      accessory={
-        <Suspense fallback={null}>
-          <WhoAmI />
-        </Suspense>
-      }
     >
       {children}
     </ConsoleShell>
@@ -152,14 +190,90 @@ async function ReturnQueueBadge() {
   return <QueueBadge count={returnCount + exchangeCount} />;
 }
 
-async function WhoAmI() {
+/**
+ * The live desk, wired to this seller's primary location.
+ *
+ * Presence is keyed by LOCATION rather than by seller — a chain with three
+ * shops has three shutters, and only the branch that is actually staffed can
+ * take a call about the stock on its own shelves.
+ *
+ * The primary location is used because that is the one a single-shop seller
+ * has, which is almost all of them. A multi-location seller choosing which
+ * branch is live is a real requirement and a later one; picking the primary is
+ * correct for one shop and a defensible default for several, whereas guessing
+ * would put calls in the wrong postcode.
+ *
+ * A seller with no location at all renders nothing rather than a switch that
+ * cannot work — there is nowhere for a shopper to be matched to.
+ */
+async function LiveDesk() {
   const user = await requireSellerAccount();
+
+  const locations = await collections.sellerLocations();
+  const primary =
+    (await locations.findOne({ sellerId: user.sellerId, isPrimary: true })) ??
+    (await locations.findOne({ sellerId: user.sellerId }));
+
+  if (!primary) return null;
+
+  const { getPresence } = await import('@/server/services/live');
+  const presence = await getPresence(user.sellerId);
+
   return (
-    <span className="text-muted text-xs">
-      {user.fullName}{' '}
-      <span className="text-faint">
-        · {user.activeRole === 'SELLER' ? 'Owner' : 'Staff'}
+    <SellerLiveDesk locationId={primary.id} initialState={presence?.state ?? 'OFFLINE'} />
+  );
+}
+
+/** The store's own mark for the top of the rail: its logo, or its initials. */
+async function StoreBrand() {
+  const user = await requireSellerAccount();
+  const sellers = await collections.sellers();
+  const seller = await sellers.findOne(
+    { _id: user.sellerId },
+    { projection: { displayName: 1, logoUrl: 1 } },
+  );
+  return (
+    <Avatar
+      name={seller?.displayName ?? 'Store'}
+      src={seller?.logoUrl || null}
+      size="sm"
+      square
+    />
+  );
+}
+
+/**
+ * The signed-in person, for the rail's user menu.
+ *
+ * Carries the store's public URL so "View your storefront" opens the page
+ * shoppers actually see — the single most common thing a seller checks after
+ * changing a listing.
+ */
+async function SellerUser() {
+  const user = await requireSellerAccount();
+  const sellers = await collections.sellers();
+  const seller = await sellers.findOne({ _id: user.sellerId }, { projection: { slug: 1 } });
+
+  return (
+    <ConsoleUserMenu
+      name={user.fullName}
+      role={user.activeRole === 'SELLER' ? 'Store owner' : 'Store staff'}
+      email={user.email}
+      avatarUrl={user.avatarUrl}
+      storeHref={seller?.slug ? `/store/${seller.slug}` : undefined}
+    />
+  );
+}
+
+/** The user card's geometry, so nothing shifts when the identity lands. */
+function UserSkeleton() {
+  return (
+    <div className="flex items-center gap-2.5 p-1.5" aria-hidden>
+      <span className="skeleton size-8 shrink-0 rounded-full" />
+      <span className="flex-1 space-y-1.5">
+        <span className="skeleton block h-3 w-3/4 rounded" />
+        <span className="skeleton block h-2.5 w-1/2 rounded" />
       </span>
-    </span>
+    </div>
   );
 }

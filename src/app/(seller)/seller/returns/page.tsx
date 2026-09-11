@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import { PageHeader } from '@/components/console/page-header';
+import { Card } from '@/components/ui/card';
 import { Suspense } from 'react';
 
 import { ExchangeDecision } from '@/components/console/exchange-decision';
@@ -26,10 +28,10 @@ export const metadata: Metadata = { title: 'Returns' };
 export default function SellerReturnsPage() {
   return (
     <>
-      <h1 className="font-display text-ink text-xl">Returns and exchanges</h1>
-      <p className="text-muted mt-1 text-sm">
-        Approve or decline requests, then record the quality check when the parcel arrives.
-      </p>
+      <PageHeader
+        title="Returns and exchanges"
+        description="Approve or decline requests, then record the quality check when the parcel arrives."
+      />
 
       <Suspense fallback={<div className="skeleton mt-6 h-96 rounded-lg" aria-hidden />}>
         <ExchangeQueue />
@@ -63,7 +65,7 @@ async function ReturnQueue() {
   return (
     <ul className="mt-6 space-y-3">
       {requests.map((request) => (
-        <li key={request.id} className="border-line bg-raised rounded-lg border p-5">
+        <Card as="li" key={request.id}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-ink tabular text-sm font-semibold">{request.returnNumber}</p>
@@ -133,7 +135,7 @@ async function ReturnQueue() {
             status={request.status}
             qcDone={Boolean(request.qcResult)}
           />
-        </li>
+        </Card>
       ))}
     </ul>
   );

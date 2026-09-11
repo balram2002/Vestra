@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
+import { PageHeader } from '@/components/console/page-header';
 import { DataTable, TableEmpty, type Column } from '@/components/console/data-table';
 import { StatusBadge } from '@/components/ui/badge';
 import { FULFILLMENT_STATUS_META, RETURN_REASON_LABEL } from '@/domain/enums';
@@ -14,10 +15,10 @@ export const metadata: Metadata = { title: 'Returns' };
 export default function AdminReturnsPage() {
   return (
     <>
-      <h1 className="font-display text-ink text-xl">Returns</h1>
-      <p className="text-muted mt-1 text-sm">
-        Every return across the platform, with who is liable for the cost.
-      </p>
+      <PageHeader
+        title="Returns"
+        description="Every return across the platform, with who is liable for the cost."
+      />
 
       <Suspense fallback={<div className="skeleton mt-6 h-96 rounded-lg" aria-hidden />}>
         <ReturnTable />

@@ -4,8 +4,11 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
 import { PRODUCT_STATUS_META, SELLER_STATUS_META } from '@/domain/enums';
-
+import type { Category, Coupon, Promotion } from '@/domain/types';
+import { formatMoney } from '@/lib/format';
+import { entityId } from '@/lib/ids';
 import { toPaise } from '@/lib/money';
+import { slugify } from '@/lib/slug';
 
 import { requirePermission } from '../auth/session';
 import { issueManualRefund } from '../services/returns';
@@ -15,7 +18,7 @@ import {
   markSettlementPaid,
   runSettlement,
 } from '../services/settlements';
-import { collections, toEntity } from '../db/collections';
+import { collections, toDoc, toEntity } from '../db/collections';
 import * as audit from '../services/audit';
 import { invalidate } from '../services/cache-invalidation';
 import { productTags, tags } from '../services/cache-tags';
@@ -40,6 +43,8 @@ import { notifyQuietly } from '../services/notifications';
 export interface ActionResult {
   ok: boolean;
   error?: string;
+  /** The form field the error belongs to, so a form can show it under that input. */
+  field?: string;
 }
 
 /* --------------------------------------------------------------- catalogue */
@@ -520,5 +525,460 @@ export async function refundOrderManually(input: {
 
   revalidatePath('/admin/refunds');
   revalidatePath(`/admin/orders/${order?.orderNumber ?? ''}`);
+  return { ok: true };
+}
+
+/* ------------------------------------------------------------ create flows */
+
+/*
+ * Money arrives from these forms in RUPEES and is stored in paise. The
+ * conversion happens here and nowhere else, so no client can send a paise
+ * figure and have it taken a hundred times too large.
+ */
+
+function fail(field: string, error: string): ActionResult {
+  return { ok: false, error, field };
+}
+
+function firstIssue(error: z.ZodError): ActionResult {
+  const issue = error.issues[0];
+  return {
+    ok: false,
+    error: issue?.message ?? 'Check the form and try again.',
+    field: issue?.path[0] !== undefined ? String(issue.path[0]) : undefined,
+  };
+}
+
+/** Parse a date the form sent, or report which field was wrong. */
+function parseWindow(startsAt: string, endsAt: string): ActionResult | { starts: number; ends: number } {
+  const starts = Date.parse(startsAt);
+  const ends = Date.parse(endsAt);
+  if (Number.isNaN(starts)) return fail('startsAt', 'Pick a start date.');
+  if (Number.isNaN(ends)) return fail('endsAt', 'Pick an end date.');
+  if (ends <= starts) return fail('endsAt', 'The end date must be after the start date.');
+  if (ends <= Date.now()) return fail('endsAt', 'That end date has already passed.');
+  return { starts, ends };
+}
+
+/* ------------------------------------------------------------------ coupon */
+
+const createCouponSchema = z.object({
+  code: z.string().trim().min(1, 'Give it a code.'),
+  title: z.string().trim().min(4, 'Give it a title of at least 4 characters.').max(80),
+  description: z.string().trim().max(240),
+  type: z.enum(['PERCENTAGE', 'FIXED', 'FREE_SHIPPING']),
+  /** Percent for PERCENTAGE, rupees for FIXED, ignored for FREE_SHIPPING. */
+  value: z.number().min(0),
+  /** Rupees. Only meaningful for a percentage, where it caps the discount. */
+  maxDiscount: z.number().min(0).nullable(),
+  minCartValue: z.number().min(0).max(1_000_000),
+  audience: z.enum(['ALL', 'NEW_CUSTOMER', 'EXISTING_CUSTOMER']),
+  /** null means unlimited. */
+  totalUsageLimit: z.number().int().min(1, 'At least 1, or leave it blank.').max(10_000_000).nullable(),
+  perUserLimit: z.number().int().min(1, 'At least once per customer.').max(100),
+  startsAt: z.string(),
+  endsAt: z.string(),
+  visible: z.boolean(),
+});
+
+export type CreateCouponInput = z.infer<typeof createCouponSchema>;
+
+/** The small print, written from the rules so it can never disagree with them. */
+function couponTerms(coupon: {
+  audience: Coupon['audience'];
+  minCartValue: number;
+  maxDiscount: number | null;
+  perUserLimit: number;
+}): string[] {
+  const terms: string[] = [];
+  if (coupon.audience === 'NEW_CUSTOMER') terms.push('Valid on your first order only.');
+  if (coupon.audience === 'EXISTING_CUSTOMER') terms.push('Valid for customers who have ordered before.');
+  if (coupon.minCartValue > 0) {
+    terms.push(`Minimum order value ${formatMoney(coupon.minCartValue)} after other discounts.`);
+  }
+  if (coupon.maxDiscount) terms.push(`Maximum discount ${formatMoney(coupon.maxDiscount)}.`);
+  terms.push(
+    coupon.perUserLimit === 1 ? 'One use per account.' : `Up to ${coupon.perUserLimit} uses per account.`,
+  );
+  terms.push('Cannot be combined with another coupon.');
+  return terms;
+}
+
+/**
+ * Create a platform-wide coupon.
+ *
+ * It goes live on its start date with no further step: a code is inert until a
+ * shopper types it, so unlike a promotion there is nothing to review first.
+ * Scoped coupons (one brand, one seller) are not offered here yet; the scope is
+ * PLATFORM and the checkout already honours that.
+ */
+export async function createCoupon(input: CreateCouponInput): Promise<ActionResult> {
+  const actor = await requirePermission('coupon:write');
+
+  const parsed = createCouponSchema.safeParse(input);
+  if (!parsed.success) return firstIssue(parsed.error);
+  const data = parsed.data;
+
+  // The bag uppercases what a shopper types, so the stored code must be upper too.
+  const code = data.code.toUpperCase().replace(/\s+/g, '');
+  if (!/^[A-Z0-9]{4,20}$/.test(code)) {
+    return fail('code', 'Codes are 4 to 20 letters or digits, with no spaces.');
+  }
+
+  if (data.type === 'PERCENTAGE' && (data.value < 1 || data.value > 90)) {
+    return fail('value', 'A percentage coupon takes between 1% and 90% off.');
+  }
+  if (data.type === 'FIXED') {
+    if (data.value < 1) return fail('value', 'Enter the amount to take off.');
+    if (data.minCartValue <= data.value) {
+      return fail('minCartValue', 'Set a minimum above the discount, or an order could come out free.');
+    }
+  }
+
+  const window = parseWindow(data.startsAt, data.endsAt);
+  if ('ok' in window) return window;
+
+  const coupons = await collections.coupons();
+  if (await coupons.findOne({ code })) return fail('code', `${code} is already taken.`);
+
+  const maxDiscount =
+    data.type === 'PERCENTAGE' && data.maxDiscount ? toPaise(data.maxDiscount) : null;
+  const minCartValue = toPaise(data.minCartValue);
+  const now = new Date().toISOString();
+
+  const coupon: Coupon = {
+    id: entityId('cpn'),
+    code,
+    title: data.title,
+    description: data.description || data.title,
+    type: data.type,
+    scope: 'PLATFORM',
+    value:
+      data.type === 'PERCENTAGE'
+        ? Math.round(data.value)
+        : data.type === 'FIXED'
+          ? toPaise(data.value)
+          : 0,
+    maxDiscount,
+    minCartValue,
+    categoryIds: [],
+    brandIds: [],
+    sellerIds: [],
+    productIds: [],
+    excludedProductIds: [],
+    audience: data.audience,
+    segmentKey: null,
+    paymentMethods: [],
+    totalUsageLimit: data.totalUsageLimit,
+    perUserLimit: data.perUserLimit,
+    usedCount: 0,
+    startsAt: new Date(window.starts).toISOString(),
+    endsAt: new Date(window.ends).toISOString(),
+    isActive: true,
+    stackableWithOffers: false,
+    fundedBy: 'PLATFORM',
+    visible: data.visible,
+    termsAndConditions: couponTerms({
+      audience: data.audience,
+      minCartValue,
+      maxDiscount,
+      perUserLimit: data.perUserLimit,
+    }),
+    createdByUserId: actor.id,
+    createdAt: now,
+    updatedAt: now,
+    buyXGetY: null,
+  };
+
+  try {
+    await coupons.insertOne(toDoc(coupon));
+  } catch (error) {
+    // The unique index is the real guard; the lookup above only makes the
+    // common case readable. Two admins racing for one code land here.
+    if ((error as { code?: number }).code === 11000) return fail('code', `${code} is already taken.`);
+    throw error;
+  }
+
+  invalidate([tags.coupons]);
+
+  await audit.record({
+    actor,
+    action: 'coupon.create',
+    entityType: 'coupon',
+    entityId: coupon.id,
+    entityLabel: code,
+    severity: 'NOTICE',
+  });
+
+  revalidatePath('/admin/coupons');
+  return { ok: true };
+}
+
+/* ---------------------------------------------------------------- category */
+
+const GST_SLABS = [0, 5, 12, 18, 28];
+
+const createCategorySchema = z.object({
+  parentId: z.string().min(1, 'Choose where it sits in the tree.'),
+  name: z.string().trim().min(2, 'Give it a name.').max(60),
+  description: z.string().trim().max(300),
+  /** null means inherit the parent's slab. */
+  taxRatePercent: z.number().int().nullable(),
+  /** null means inherit the parent's policy. */
+  returnable: z.boolean().nullable(),
+  featured: z.boolean(),
+});
+
+export type CreateCategoryInput = z.infer<typeof createCategorySchema>;
+
+/**
+ * Add a category under an existing one.
+ *
+ * Departments (Men, Women, Kids) are structural and are not created here: each
+ * carries an attribute family that drives the facets and listing form, and a
+ * new one is a catalogue project rather than a form. A child inherits its
+ * family, size system and imagery from the parent, and its tax slab and return
+ * policy unless the form overrides them.
+ */
+export async function createCategory(input: CreateCategoryInput): Promise<ActionResult> {
+  const actor = await requirePermission('catalog:write');
+
+  const parsed = createCategorySchema.safeParse(input);
+  if (!parsed.success) return firstIssue(parsed.error);
+  const data = parsed.data;
+
+  if (data.taxRatePercent !== null && !GST_SLABS.includes(data.taxRatePercent)) {
+    return fail('taxRatePercent', 'Pick one of the GST slabs.');
+  }
+
+  const categories = await collections.categories();
+  const parent = toEntity(await categories.findOne({ _id: data.parentId }));
+  if (!parent) return fail('parentId', 'That parent category no longer exists.');
+  if (parent.depth >= 2) {
+    return fail('parentId', 'The tree goes three levels deep at most. Pick a higher parent.');
+  }
+
+  const base = slugify(data.name);
+  if (!base) return fail('name', 'Use letters or digits in the name.');
+
+  // Slugs are global, so Kurtas under Men and under Women cannot both own
+  // /category/kurtas. The second one is prefixed with its parent.
+  const taken = async (slug: string) =>
+    Boolean(await categories.findOne({ $or: [{ slug }, { slugHistory: slug }] }));
+  let slug = base;
+  if (await taken(slug)) {
+    slug = `${parent.slug}-${base}`.slice(0, 80);
+    if (await taken(slug)) return fail('name', 'A category with that name already exists here.');
+  }
+
+  const [last] = await categories
+    .find({ parentId: parent.id })
+    .sort({ position: -1 })
+    .limit(1)
+    .toArray();
+  const now = new Date().toISOString();
+
+  const category: Category = {
+    id: entityId('cat'),
+    slug,
+    slugHistory: [],
+    name: data.name,
+    path: [...parent.path, slug],
+    parentId: parent.id,
+    depth: parent.depth + 1,
+    attributeFamily: parent.attributeFamily,
+    gender: parent.gender,
+    sizeSystem: parent.sizeSystem,
+    sizeChart: null,
+    description: data.description || `${data.name} from independent labels, delivered across India.`,
+    seoIntro: null,
+    imageUrl: parent.imageUrl,
+    bannerUrl: null,
+    iconKey: parent.iconKey,
+    position: (last?.position ?? 0) + 1,
+    isActive: true,
+    featured: data.featured,
+    productCount: 0,
+    taxRatePercent: data.taxRatePercent ?? parent.taxRatePercent,
+    returnable: data.returnable ?? parent.returnable,
+    metaTitle: `${data.name} \u2014 Buy ${data.name} Online | VestraWAB`,
+    metaDescription: data.description || null,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await categories.insertOne(toDoc(category));
+  invalidate([tags.taxonomy, tags.category(parent.slug)]);
+
+  await audit.record({
+    actor,
+    action: 'category.create',
+    entityType: 'category',
+    entityId: category.id,
+    entityLabel: `${parent.name} / ${category.name}`,
+    severity: 'NOTICE',
+  });
+
+  revalidatePath('/admin/categories');
+  return { ok: true };
+}
+
+/**
+ * Show or hide a category in the shop.
+ *
+ * Hiding takes it out of the menu, the facets and its own page. Its products
+ * stay reachable by direct link, because a shopper holding an order
+ * confirmation must still be able to open what they bought.
+ */
+export async function setCategoryActive(input: {
+  categoryId: string;
+  isActive: boolean;
+}): Promise<ActionResult> {
+  const actor = await requirePermission('catalog:write');
+
+  const categories = await collections.categories();
+  const category = toEntity(await categories.findOne({ _id: input.categoryId }));
+  if (!category) return { ok: false, error: 'Category not found.' };
+
+  // A department going dark takes a whole column of the menu with it.
+  if (category.depth === 0 && !input.isActive) {
+    return { ok: false, error: 'Departments cannot be hidden from here.' };
+  }
+
+  const patch = { isActive: input.isActive, updatedAt: new Date().toISOString() };
+  await categories.updateOne({ _id: category.id }, { $set: patch });
+  invalidate([tags.taxonomy, tags.category(category.slug), tags.productList]);
+
+  await audit.record({
+    actor,
+    action: input.isActive ? 'category.show' : 'category.hide',
+    entityType: 'category',
+    entityId: category.id,
+    entityLabel: category.name,
+    changes: audit.diff(category, patch, ['isActive']),
+    severity: 'NOTICE',
+  });
+
+  revalidatePath('/admin/categories');
+  return { ok: true };
+}
+/* --------------------------------------------------------------- promotion */
+
+const createPromotionSchema = z.object({
+  title: z.string().trim().min(4, 'Give it a title of at least 4 characters.').max(80),
+  description: z.string().trim().min(8, 'Say what the offer is in a sentence.').max(240),
+  badgeText: z.string().trim().max(24),
+  type: z.enum(['PERCENT_DISCOUNT', 'FLAT_DISCOUNT', 'FLASH_SALE', 'CATEGORY_OFFER', 'FESTIVAL_CAMPAIGN']),
+  valueKind: z.enum(['PERCENT', 'AMOUNT']),
+  /** Percent, or rupees when valueKind is AMOUNT. */
+  value: z.number().min(0),
+  /** Rupees. Caps a percentage; ignored for an amount. */
+  maxDiscount: z.number().min(0).nullable(),
+  minOrderValue: z.number().min(0).max(1_000_000),
+  /** null means every category. */
+  categoryId: z.string().nullable(),
+  priority: z.number().int().min(0).max(100),
+  /** Units at the promo price; null means unlimited. */
+  stockLimit: z.number().int().min(1, 'At least 1, or leave it blank.').max(1_000_000).nullable(),
+  startsAt: z.string(),
+  endsAt: z.string(),
+});
+
+export type CreatePromotionInput = z.infer<typeof createPromotionSchema>;
+
+/**
+ * Create an automatic offer.
+ *
+ * Always created PAUSED. A promotion needs no code, so the moment it is live it
+ * changes what every shopper pays on their next page view; a typo in the value
+ * would reprice the whole shop. It is saved, reviewed in the table, and then
+ * switched on with the toggle that is already audited.
+ */
+export async function createPromotion(input: CreatePromotionInput): Promise<ActionResult> {
+  const actor = await requirePermission('promotion:write');
+
+  const parsed = createPromotionSchema.safeParse(input);
+  if (!parsed.success) return firstIssue(parsed.error);
+  const data = parsed.data;
+
+  // The type names a campaign; valueKind says how to read the number. Where
+  // the type DOES imply one, the two must agree.
+  if (data.type === 'PERCENT_DISCOUNT' && data.valueKind !== 'PERCENT') {
+    return fail('value', 'A percentage discount must take a percentage off.');
+  }
+  if (data.type === 'FLAT_DISCOUNT' && data.valueKind !== 'AMOUNT') {
+    return fail('value', 'A flat discount must take an amount off.');
+  }
+  if (data.valueKind === 'PERCENT' && (data.value < 1 || data.value > 80)) {
+    return fail('value', 'An automatic offer takes between 1% and 80% off.');
+  }
+  if (data.valueKind === 'AMOUNT' && data.value < 1) {
+    return fail('value', 'Enter the amount to take off.');
+  }
+  if (data.type === 'CATEGORY_OFFER' && !data.categoryId) {
+    return fail('categoryId', 'A category offer needs a category.');
+  }
+
+  if (data.categoryId) {
+    const categories = await collections.categories();
+    if (!(await categories.findOne({ _id: data.categoryId }))) {
+      return fail('categoryId', 'That category no longer exists.');
+    }
+  }
+
+  const window = parseWindow(data.startsAt, data.endsAt);
+  if ('ok' in window) return window;
+
+  const promotions = await collections.promotions();
+  const id = entityId('prm');
+  let slug = slugify(data.title) || id.toLowerCase();
+  if (await promotions.findOne({ slug })) slug = `${slug}-${id.slice(-6).toLowerCase()}`;
+  const now = new Date().toISOString();
+
+  const promotion: Promotion = {
+    id,
+    slug,
+    title: data.title,
+    subtitle: null,
+    description: data.description,
+    type: data.type,
+    valueKind: data.valueKind,
+    value: data.valueKind === 'PERCENT' ? Math.round(data.value) : toPaise(data.value),
+    maxDiscount:
+      data.valueKind === 'PERCENT' && data.maxDiscount ? toPaise(data.maxDiscount) : null,
+    minOrderValue: toPaise(data.minOrderValue),
+    categoryIds: data.categoryId ? [data.categoryId] : [],
+    brandIds: [],
+    sellerIds: [],
+    productIds: [],
+    paymentMethods: [],
+    bankName: null,
+    startsAt: new Date(window.starts).toISOString(),
+    endsAt: new Date(window.ends).toISOString(),
+    isActive: false,
+    priority: data.priority,
+    fundedBy: 'PLATFORM',
+    bannerUrl: null,
+    badgeText: data.badgeText || null,
+    buyXGetY: null,
+    stockLimit: data.type === 'FLASH_SALE' ? data.stockLimit : null,
+    stockSold: 0,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await promotions.insertOne(toDoc(promotion));
+  invalidate([tags.promotions]);
+
+  await audit.record({
+    actor,
+    action: 'promotion.create',
+    entityType: 'promotion',
+    entityId: promotion.id,
+    entityLabel: promotion.title,
+    severity: 'NOTICE',
+  });
+
+  revalidatePath('/admin/promotions');
   return { ok: true };
 }

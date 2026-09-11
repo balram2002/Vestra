@@ -80,7 +80,7 @@ export function SellerApplicationForm({
       ) : null}
 
       <Section title="Your store" description="What shoppers will see.">
-        <Field label="Store name" hint="This is how you appear across Vestra.">
+        <Field label="Store name" hint="This is how you appear across VestraWAB.">
           <input
             value={form.displayName}
             onChange={(event) => set('displayName', event.target.value)}

@@ -1,6 +1,7 @@
 'use client';
 
 import { Plus, Trash2 } from 'lucide-react';
+import { Card } from '@/components/ui/card';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 
@@ -103,7 +104,7 @@ export function VariantGrid({
   };
 
   return (
-    <section className="border-line bg-raised rounded-lg border p-5">
+    <Card as="section">
       <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-ink text-md font-semibold">Sizes and stock</h2>
@@ -272,7 +273,7 @@ export function VariantGrid({
           {pending ? 'Saving…' : 'Save sizes'}
         </button>
       </div>
-    </section>
+    </Card>
   );
 }
 

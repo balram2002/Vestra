@@ -1,8 +1,10 @@
+import { ExternalLink } from 'lucide-react';
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 
+import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/console/page-header';
 import { ListingForm } from '@/components/seller/listing-form';
 import { ListingStatus } from '@/components/seller/listing-status';
 import { MediaManager } from '@/components/seller/media-manager';
@@ -44,31 +46,26 @@ async function Editor({ params }: { params: Promise<{ id: string }> }) {
 
   return (
     <>
-      <nav className="text-2xs mb-3">
-        <Link href="/seller/products" className="text-muted hover:text-ink">
-          ← All products
-        </Link>
-      </nav>
-
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="font-display text-ink truncate text-xl">{product.title}</h1>
-          <p className="text-faint mt-1 font-mono text-2xs">{product.styleCode}</p>
-        </div>
-        <div className="flex items-center gap-3">
-          {product.status === 'PUBLISHED' ? (
-            <a
-              href={`/product/${product.slug}`}
-              target="_blank"
-              rel="noreferrer"
-              className="text-muted hover:text-ink text-2xs underline-offset-2 hover:underline"
-            >
-              View on the shop
-            </a>
-          ) : null}
-          <StatusBadge meta={PRODUCT_STATUS_META[product.status]} size="sm" />
-        </div>
-      </div>
+      <PageHeader
+        back={{ href: '/seller/products', label: 'All products' }}
+        title={product.title}
+        meta={
+          <>
+            <StatusBadge meta={PRODUCT_STATUS_META[product.status]} size="sm" />
+            <span className="text-faint font-mono text-2xs">{product.styleCode}</span>
+          </>
+        }
+        actions={
+          product.status === 'PUBLISHED' ? (
+            <Button asChild size="sm" variant="secondary">
+              <a href={`/product/${product.slug}`} target="_blank" rel="noreferrer">
+                <ExternalLink className="size-3.5" aria-hidden />
+                View on the shop
+              </a>
+            </Button>
+          ) : null
+        }
+      />
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="min-w-0 space-y-6">

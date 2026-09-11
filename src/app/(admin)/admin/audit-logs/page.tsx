@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
+import { PageHeader } from '@/components/console/page-header';
 import { DataTable, TableEmpty, type Column } from '@/components/console/data-table';
 import { Badge } from '@/components/ui/badge';
 import type { AuditLog } from '@/domain/types';
@@ -20,10 +21,10 @@ export const metadata: Metadata = { title: 'Audit log' };
 export default function AdminAuditPage() {
   return (
     <>
-      <h1 className="font-display text-ink text-xl">Audit log</h1>
-      <p className="text-muted mt-1 text-sm">
-        Every sensitive action, with the before and after. Read-only.
-      </p>
+      <PageHeader
+        title="Audit log"
+        description="Every sensitive action, with the before and after. Read-only."
+      />
 
       <Suspense fallback={<div className="skeleton mt-6 h-96 rounded-lg" aria-hidden />}>
         <AuditTable />

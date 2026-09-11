@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import { PageHeader } from '@/components/console/page-header';
+import { Card } from '@/components/ui/card';
 import { Suspense } from 'react';
 
 import { RunSettlement } from '@/components/console/run-settlement';
@@ -24,11 +26,10 @@ export const metadata: Metadata = { title: 'Settlements' };
 export default function AdminSettlementsPage() {
   return (
     <>
-      <h1 className="font-display text-ink text-xl">Settlements</h1>
-      <p className="text-muted mt-1 text-sm">
-        Seller payouts. Money clears {FINANCE.settlementHoldDays} days after delivery, once its
-        return window has closed.
-      </p>
+      <PageHeader
+        title="Settlements"
+        description={<>Seller payouts. Money clears {FINANCE.settlementHoldDays} days after delivery, once its return window has closed.</>}
+      />
 
       <Suspense fallback={<div className="skeleton mt-6 h-96 rounded-lg" aria-hidden />}>
         <SettlementsView />
@@ -88,7 +89,7 @@ async function SettlementsView() {
       ) : (
         <ul className="space-y-3">
           {settlements.map((settlement) => (
-            <li key={settlement.id} className="border-line bg-raised rounded-lg border p-5">
+            <Card as="li" key={settlement.id}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-ink text-sm font-semibold">{settlement.sellerName}</p>
@@ -123,7 +124,7 @@ async function SettlementsView() {
               {canPay ? (
                 <SettlementActions settlementId={settlement.id} status={settlement.status} />
               ) : null}
-            </li>
+            </Card>
           ))}
         </ul>
       )}
@@ -133,10 +134,10 @@ async function SettlementsView() {
 
 function Figure({ label, value }: { label: string; value: string }) {
   return (
-    <div className="border-line bg-raised rounded-lg border p-4">
+    <Card as="div" pad="tight">
       <p className="text-faint text-2xs uppercase tracking-[0.12em]">{label}</p>
       <p className="text-ink tabular mt-1 text-xl font-semibold">{value}</p>
-    </div>
+    </Card>
   );
 }
 

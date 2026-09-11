@@ -14,7 +14,7 @@ export function QueueBadge({ count, tone = 'urgent' }: { count: number; tone?: '
     <span
       className={cn(
         'tabular rounded-full px-1.5 py-0.5 text-2xs font-semibold',
-        tone === 'urgent' ? 'bg-ember-50 text-ember-700' : 'bg-sunken text-muted',
+        tone === 'urgent' ? 'bg-danger-50 text-danger-700' : 'bg-sunken text-muted',
       )}
     >
       {count > 99 ? '99+' : count}

@@ -1,8 +1,29 @@
+import {
+  BarChart3,
+  BadgePercent,
+  CreditCard,
+  FolderTree,
+  LayoutDashboard,
+  LayoutTemplate,
+  LifeBuoy,
+  MessageSquareQuote,
+  Package,
+  Receipt,
+  RotateCcw,
+  ScrollText,
+  Settings,
+  ShoppingCart,
+  Store,
+  Ticket,
+  Users,
+} from 'lucide-react';
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
 import { QueueBadge } from '@/components/console/queue-badge';
 import { ConsoleShell } from '@/components/layout/console-shell';
+import { ConsoleUserMenu } from '@/components/layout/console-user-menu';
+import { BrandMark } from '@/components/layout/wordmark';
 import { USER_ROLE_LABEL } from '@/domain/enums';
 import { requireAnyRole } from '@/server/auth/session';
 import { STAFF_ROLES } from '@/server/auth/rbac';
@@ -31,34 +52,42 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <ConsoleShell
       homeHref="/admin"
-      title="Vestra"
+      brand={<BrandMark className="size-8" />}
+      title="VestraWAB"
       subtitle="Admin console"
+      user={
+        <Suspense fallback={<UserSkeleton />}>
+          <AdminUser />
+        </Suspense>
+      }
       groups={[
         {
           label: 'Overview',
           items: [
-            { href: '/admin', label: 'Dashboard' },
-            { href: '/admin/analytics', label: 'Analytics' },
+            { href: '/admin', label: 'Dashboard', icon: <LayoutDashboard aria-hidden /> },
+            { href: '/admin/analytics', label: 'Analytics', icon: <BarChart3 aria-hidden /> },
           ],
         },
         {
           label: 'Commerce',
           items: [
-            { href: '/admin/orders', label: 'Orders' },
+            { href: '/admin/orders', label: 'Orders', icon: <ShoppingCart aria-hidden /> },
             {
               href: '/admin/returns',
               label: 'Returns',
+              icon: <RotateCcw aria-hidden />,
               badge: (
                 <Suspense fallback={null}>
                   <ReturnsBadge />
                 </Suspense>
               ),
             },
-            { href: '/admin/payments', label: 'Payments' },
-            { href: '/admin/settlements', label: 'Settlements' },
+            { href: '/admin/payments', label: 'Payments', icon: <CreditCard aria-hidden /> },
+            { href: '/admin/settlements', label: 'Settlements', icon: <Receipt aria-hidden /> },
             {
               href: '/admin/support',
               label: 'Support',
+              icon: <LifeBuoy aria-hidden />,
               badge: (
                 <Suspense fallback={null}>
                   <SupportBadge />
@@ -73,13 +102,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             {
               href: '/admin/products',
               label: 'Products',
+              icon: <Package aria-hidden />,
               badge: (
                 <Suspense fallback={null}>
                   <ReviewQueueBadge />
                 </Suspense>
               ),
             },
-            { href: '/admin/categories', label: 'Categories' },
+            { href: '/admin/reviews', label: 'Reviews', icon: <MessageSquareQuote aria-hidden /> },
+            { href: '/admin/categories', label: 'Categories', icon: <FolderTree aria-hidden /> },
           ],
         },
         {
@@ -88,36 +119,32 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             {
               href: '/admin/sellers',
               label: 'Sellers',
+              icon: <Store aria-hidden />,
               badge: (
                 <Suspense fallback={null}>
                   <SellerApprovalBadge />
                 </Suspense>
               ),
             },
-            { href: '/admin/users', label: 'Users' },
+            { href: '/admin/users', label: 'Users', icon: <Users aria-hidden /> },
           ],
         },
         {
           label: 'Marketing',
           items: [
-            { href: '/admin/coupons', label: 'Coupons' },
-            { href: '/admin/promotions', label: 'Promotions' },
-            { href: '/admin/cms', label: 'Homepage' },
+            { href: '/admin/coupons', label: 'Coupons', icon: <Ticket aria-hidden /> },
+            { href: '/admin/promotions', label: 'Promotions', icon: <BadgePercent aria-hidden /> },
+            { href: '/admin/cms', label: 'Homepage', icon: <LayoutTemplate aria-hidden /> },
           ],
         },
         {
           label: 'Governance',
           items: [
-            { href: '/admin/audit-logs', label: 'Audit log' },
-            { href: '/admin/settings', label: 'Settings' },
+            { href: '/admin/audit-logs', label: 'Audit log', icon: <ScrollText aria-hidden /> },
+            { href: '/admin/settings', label: 'Settings', icon: <Settings aria-hidden /> },
           ],
         },
       ]}
-      accessory={
-        <Suspense fallback={null}>
-          <WhoAmI />
-        </Suspense>
-      }
     >
       {children}
     </ConsoleShell>
@@ -156,11 +183,33 @@ async function SellerApprovalBadge() {
   return <QueueBadge count={count} />;
 }
 
-async function WhoAmI() {
+/**
+ * The signed-in staff member, for the rail's user menu.
+ *
+ * Its own Suspense island: the rail prerenders and the identity streams in, so
+ * reading the session never holds up the console shell.
+ */
+async function AdminUser() {
   const user = await requireAnyRole(STAFF_ROLES);
   return (
-    <span className="text-muted text-xs">
-      {user.fullName} <span className="text-faint">· {USER_ROLE_LABEL[user.activeRole]}</span>
-    </span>
+    <ConsoleUserMenu
+      name={user.fullName}
+      role={USER_ROLE_LABEL[user.activeRole]}
+      email={user.email}
+      avatarUrl={user.avatarUrl}
+    />
+  );
+}
+
+/** The user card's geometry, so nothing shifts when the identity lands. */
+function UserSkeleton() {
+  return (
+    <div className="flex items-center gap-2.5 p-1.5" aria-hidden>
+      <span className="skeleton size-8 shrink-0 rounded-full" />
+      <span className="flex-1 space-y-1.5">
+        <span className="skeleton block h-3 w-3/4 rounded" />
+        <span className="skeleton block h-2.5 w-1/2 rounded" />
+      </span>
+    </div>
   );
 }

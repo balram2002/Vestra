@@ -1,6 +1,7 @@
 'use client';
 
 import { FileText } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { useTransition } from 'react';
 import { toast } from 'sonner';
 
@@ -46,14 +47,15 @@ export function ManifestBar({
         </div>
       </div>
 
-      <button
+      <Button
         type="button"
         onClick={run}
         disabled={pending}
-        className="bg-ink text-canvas disabled:bg-line-strong shrink-0 rounded-md px-3.5 py-2 text-xs font-medium disabled:cursor-wait"
+        size="sm"
+        className="shrink-0"
       >
-        {pending ? 'Closing…' : 'Close manifest'}
-      </button>
+        Close manifest
+      </Button>
     </div>
   );
 }

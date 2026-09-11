@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import { PageHeader } from '@/components/console/page-header';
+import { Card } from '@/components/ui/card';
 import { Suspense } from 'react';
 
 import { DataTable, TableEmpty, type Column } from '@/components/console/data-table';
@@ -22,10 +24,10 @@ export const metadata: Metadata = { title: 'Analytics' };
 export default function AdminAnalyticsPage() {
   return (
     <>
-      <h1 className="font-display text-ink text-xl">Analytics</h1>
-      <p className="text-muted mt-1 text-sm">
-        Trade, revenue and what the platform actually keeps.
-      </p>
+      <PageHeader
+        title="Analytics"
+        description="Trade, revenue and what the platform actually keeps."
+      />
 
       <Suspense fallback={<div className="skeleton mt-6 h-96 rounded-lg" aria-hidden />}>
         <Analytics />
@@ -111,15 +113,15 @@ async function Analytics() {
         />
       </div>
 
-      <section className="border-line bg-raised rounded-lg border p-5">
+      <Card as="section">
         <div className="flex items-baseline justify-between gap-4">
           <h2 className="text-ink text-md font-semibold">GMV over time</h2>
           <p className="text-faint text-xs">Daily, last 90 days</p>
         </div>
         <RevenueChart data={dashboard.trend} className="mt-4 h-72" />
-      </section>
+      </Card>
 
-      <section className="border-line bg-raised rounded-lg border p-5">
+      <Card as="section">
         <h2 className="text-ink text-md font-semibold">Where the money goes</h2>
         <p className="text-muted mt-1 text-xs">
           Lifetime, across every seller. GMV is what customers paid; the platform keeps only the
@@ -146,7 +148,7 @@ async function Analytics() {
             />
           </div>
         </dl>
-      </section>
+      </Card>
 
       <section>
         <h2 className="text-ink mb-2 text-md font-semibold">By month</h2>

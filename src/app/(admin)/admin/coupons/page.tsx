@@ -1,12 +1,15 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
+import { PageHeader } from '@/components/console/page-header';
 import { CouponToggle } from '@/components/console/admin-actions';
+import { CreateCouponDialog } from '@/components/console/admin-create';
 import { DataTable, TableEmpty, type Column } from '@/components/console/data-table';
 import { Badge } from '@/components/ui/badge';
 import type { Coupon } from '@/domain/types';
 import { formatDateShort, formatMoney } from '@/lib/format';
-import { requirePermission } from '@/server/auth/session';
+import { hasPermission } from '@/server/auth/rbac';
+import { getSessionUser, requirePermission } from '@/server/auth/session';
 import { collections, toEntities } from '@/server/db/collections';
 
 export const metadata: Metadata = { title: 'Coupons' };
@@ -21,10 +24,15 @@ export const metadata: Metadata = { title: 'Coupons' };
 export default function AdminCouponsPage() {
   return (
     <>
-      <h1 className="font-display text-ink text-xl">Coupons</h1>
-      <p className="text-muted mt-1 text-sm">
-        Discount codes, their rules and how much they have been used.
-      </p>
+      <PageHeader
+        title="Coupons"
+        description="Discount codes, their rules and how much they have been used."
+        actions={
+          <Suspense fallback={null}>
+            <NewCouponAction />
+          </Suspense>
+        }
+      />
 
       <Suspense fallback={<div className="skeleton mt-6 h-96 rounded-lg" aria-hidden />}>
         <CouponTable />
@@ -141,4 +149,11 @@ async function CouponTable() {
       />
     </div>
   );
+}
+
+/** Only someone who can write coupons gets the button; everyone else reads the list. */
+async function NewCouponAction() {
+  const user = await getSessionUser();
+  if (!user || !hasPermission(user.permissions, 'coupon:write')) return null;
+  return <CreateCouponDialog />;
 }

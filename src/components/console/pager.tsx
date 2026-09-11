@@ -44,11 +44,14 @@ export function Pager({
 
       <div className="flex items-center gap-4">
         {page > 1 ? (
-          <Link href={href(page - 1)} className="text-ink text-xs font-medium hover:underline">
+          <Link
+            href={href(page - 1)}
+            className="text-ink inline-flex min-h-11 min-w-11 items-center justify-center px-1 text-xs font-medium hover:underline lg:min-h-0 lg:min-w-0"
+          >
             Previous
           </Link>
         ) : (
-          <span className="text-faint text-xs">Previous</span>
+          <span className="text-faint inline-flex min-h-11 min-w-11 items-center justify-center px-1 text-xs lg:min-h-0 lg:min-w-0">Previous</span>
         )}
 
         <span className="text-faint tabular text-xs">
@@ -56,11 +59,14 @@ export function Pager({
         </span>
 
         {page < pageCount ? (
-          <Link href={href(page + 1)} className="text-ink text-xs font-medium hover:underline">
+          <Link
+            href={href(page + 1)}
+            className="text-ink inline-flex min-h-11 min-w-11 items-center justify-center px-1 text-xs font-medium hover:underline lg:min-h-0 lg:min-w-0"
+          >
             Next
           </Link>
         ) : (
-          <span className="text-faint text-xs">Next</span>
+          <span className="text-faint inline-flex min-h-11 min-w-11 items-center justify-center px-1 text-xs lg:min-h-0 lg:min-w-0">Next</span>
         )}
       </div>
     </div>

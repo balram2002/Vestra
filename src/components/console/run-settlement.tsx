@@ -1,6 +1,10 @@
 'use client';
 
 import { Play } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+
+import { Button } from '@/components/ui/button';
+import { Select } from '@/components/ui/select';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 
@@ -39,19 +43,19 @@ export function RunSettlement({ sellers }: { sellers: Array<{ id: string; name: 
   };
 
   return (
-    <section className="border-line bg-raised rounded-lg border p-5">
+    <Card as="section">
       <h2 className="text-ink text-md font-semibold">Run a payout</h2>
       <p className="text-muted mt-1 text-sm">
         Settles every delivered order that has cleared the hold and is not already on a statement.
       </p>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <label className="min-w-0 flex-1">
-          <span className="sr-only">Seller</span>
-          <select
+      <div className="mt-3 flex flex-wrap items-end gap-2">
+        <div className="min-w-48 flex-1">
+          <Select
+            label="Seller"
+            hideLabel
             value={sellerId}
             onChange={(event) => setSellerId(event.target.value)}
-            className="border-line-strong bg-canvas text-ink h-9 w-full min-w-48 rounded-sm border px-2 text-sm"
           >
             <option value="">Choose a seller…</option>
             {sellers.map((seller) => (
@@ -59,19 +63,20 @@ export function RunSettlement({ sellers }: { sellers: Array<{ id: string; name: 
                 {seller.name}
               </option>
             ))}
-          </select>
-        </label>
+          </Select>
+        </div>
 
-        <button
-          type="button"
-          onClick={run}
-          disabled={pending || !sellerId}
-          className="bg-ink text-canvas disabled:bg-line-strong inline-flex shrink-0 items-center gap-1.5 rounded-sm px-3 py-2 text-xs font-medium disabled:cursor-not-allowed"
-        >
+        {/*
+          `loading` keeps the label mounted and the width stable, so the row does
+          not reflow the moment this is pressed — which matters more here than
+          most places, because the button sits beside a select that would jump
+          with it.
+        */}
+        <Button type="button" onClick={run} disabled={!sellerId} loading={pending} className="shrink-0">
           <Play className="size-3.5" aria-hidden />
-          {pending ? 'Running…' : 'Run settlement'}
-        </button>
+          Run settlement
+        </Button>
       </div>
-    </section>
+    </Card>
   );
 }

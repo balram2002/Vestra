@@ -1,5 +1,9 @@
 import { Plus } from 'lucide-react';
 import type { Metadata } from 'next';
+
+import { PageHeader } from '@/components/console/page-header';
+import { Button } from '@/components/ui/button';
+import { Tabs } from '@/components/ui/tabs';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Suspense } from 'react';
@@ -23,21 +27,18 @@ export default function SellerProductsPage({
 }) {
   return (
     <>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="font-display text-ink text-xl">Products</h1>
-          <p className="text-muted mt-1 text-sm">
-            Every style you list, with the stock and price shoppers actually see.
-          </p>
-        </div>
-        <Link
-          href="/seller/products/new"
-          className="bg-ink text-canvas inline-flex shrink-0 items-center gap-1.5 rounded-md px-3.5 py-2 text-xs font-medium"
-        >
-          <Plus className="size-3.5" aria-hidden />
-          New listing
-        </Link>
-      </div>
+      <PageHeader
+        title="Products"
+        description="Every style you list, with the stock and price shoppers actually see."
+        actions={
+          <Button asChild size="sm">
+            <Link href="/seller/products/new">
+              <Plus className="size-3.5" aria-hidden />
+              New listing
+            </Link>
+          </Button>
+        }
+      />
 
       <Suspense fallback={<div className="skeleton mt-6 h-96 rounded-lg" aria-hidden />}>
         <ProductTable searchParams={searchParams} />
@@ -83,7 +84,7 @@ async function ProductTable({
             */}
             <Link
               href={`/seller/products/${product.id}`}
-              className="text-ink block truncate text-xs font-medium hover:underline"
+              className="row-link text-ink block truncate text-xs font-medium hover:underline"
             >
               {product.title}
             </Link>
@@ -109,7 +110,7 @@ async function ProductTable({
             {formatMoney(product.priceRange.minSellingPrice)}
           </p>
           {product.maxDiscountPercent > 0 ? (
-            <p className="text-ember-600 text-2xs">{product.maxDiscountPercent}% off</p>
+            <p className="text-danger-600 text-2xs">{product.maxDiscountPercent}% off</p>
           ) : null}
         </div>
       ),
@@ -154,22 +155,12 @@ async function ProductTable({
 
   return (
     <div className="mt-6">
-      <nav className="scrollbar-none -mx-1 flex gap-1 overflow-x-auto px-1 pb-1" aria-label="Filter products">
-        {TABS.map((tab) => (
-          <Link
-            key={tab}
-            href={`/seller/products?status=${tab}`}
-            aria-current={tab === status ? 'page' : undefined}
-            className={
-              tab === status
-                ? 'bg-ink text-canvas shrink-0 rounded-md px-3 py-1.5 text-xs font-medium'
-                : 'text-muted hover:bg-sunken hover:text-ink shrink-0 rounded-md px-3 py-1.5 text-xs transition-colors'
-            }
-          >
-            {tab === 'ALL' ? 'All' : PRODUCT_STATUS_META[tab].label}
-          </Link>
-        ))}
-      </nav>
+      <Tabs
+        label="Filter products"
+        items={TABS.map((tab) => ({ value: tab, label: tab === 'ALL' ? 'All' : PRODUCT_STATUS_META[tab].label }))}
+        current={status}
+        href={(value) => `/seller/products?status=${value}`}
+      />
 
       <p className="text-faint mt-4 text-xs">
         {total} {total === 1 ? 'style' : 'styles'}

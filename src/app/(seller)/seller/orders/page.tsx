@@ -1,5 +1,8 @@
 import { AlertTriangle } from 'lucide-react';
 import type { Metadata } from 'next';
+
+import { PageHeader } from '@/components/console/page-header';
+import { Tabs } from '@/components/ui/tabs';
 import Link from 'next/link';
 import { Suspense } from 'react';
 
@@ -36,10 +39,10 @@ export default function SellerOrdersPage({
 }) {
   return (
     <>
-      <h1 className="font-display text-ink text-xl">Orders</h1>
-      <p className="text-muted mt-1 text-sm">
-        Dispatch within your SLA to protect your fulfilment score.
-      </p>
+      <PageHeader
+        title="Orders"
+        description="Dispatch within your SLA to protect your fulfilment score."
+      />
 
       <Suspense fallback={<div className="skeleton mt-6 h-96 rounded-lg" aria-hidden />}>
         <OrderQueue searchParams={searchParams} />
@@ -136,22 +139,12 @@ async function OrderQueue({
 
   return (
     <div className="mt-6">
-      <nav className="scrollbar-none -mx-1 flex gap-1 overflow-x-auto px-1 pb-1" aria-label="Filter orders">
-        {TABS.map((tab) => (
-          <Link
-            key={tab.value}
-            href={`/seller/orders?status=${tab.value}`}
-            aria-current={tab.value === status ? 'page' : undefined}
-            className={
-              tab.value === status
-                ? 'bg-ink text-canvas shrink-0 rounded-md px-3 py-1.5 text-xs font-medium'
-                : 'text-muted hover:bg-sunken hover:text-ink shrink-0 rounded-md px-3 py-1.5 text-xs transition-colors'
-            }
-          >
-            {tab.label}
-          </Link>
-        ))}
-      </nav>
+      <Tabs
+        label="Filter orders"
+        items={[...TABS]}
+        current={status}
+        href={(value) => `/seller/orders?status=${value}`}
+      />
 
       <p className="text-faint mt-4 text-xs">
         {total} {total === 1 ? 'order' : 'orders'}
@@ -203,11 +196,14 @@ function PageLink({
   disabled: boolean;
   label: string;
 }) {
+  const shape =
+    'inline-flex min-h-11 min-w-11 items-center justify-center px-1 text-xs lg:min-h-0 lg:min-w-0';
+
   if (disabled) {
-    return <span className="text-faint text-xs">{label}</span>;
+    return <span className={`text-faint ${shape}`}>{label}</span>;
   }
   return (
-    <Link href={href} className="text-ink text-xs font-medium hover:underline">
+    <Link href={href} className={`text-ink font-medium hover:underline ${shape}`}>
       {label}
     </Link>
   );

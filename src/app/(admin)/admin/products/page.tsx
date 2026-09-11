@@ -3,6 +3,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Suspense } from 'react';
 
+import { PageHeader } from '@/components/console/page-header';
 import { ProductReviewActions } from '@/components/console/admin-actions';
 import { ConsoleTabs } from '@/components/console/console-tabs';
 import { DataTable, TableEmpty, type Column } from '@/components/console/data-table';
@@ -38,10 +39,10 @@ export default function AdminProductsPage({
 }) {
   return (
     <>
-      <h1 className="font-display text-ink text-xl">Products</h1>
-      <p className="text-muted mt-1 text-sm">
-        Approve listings before they reach shoppers, and audit what is already live.
-      </p>
+      <PageHeader
+        title="Products"
+        description="Approve listings before they reach shoppers, and audit what is already live."
+      />
 
       <Suspense fallback={<div className="skeleton mt-6 h-96 rounded-lg" aria-hidden />}>
         <ProductTable searchParams={searchParams} />
@@ -75,7 +76,7 @@ async function ProductTable({
           <div className="min-w-0">
             <Link
               href={`/product/${product.slug}`}
-              className="text-ink block truncate text-xs font-medium hover:underline"
+              className="row-link text-ink block truncate text-xs font-medium hover:underline"
             >
               {product.title}
             </Link>

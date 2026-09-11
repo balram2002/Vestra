@@ -1,4 +1,6 @@
 import { ArrowRight } from 'lucide-react';
+import { PageHeader } from '@/components/console/page-header';
+import { Card } from '@/components/ui/card';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Suspense } from 'react';
@@ -15,8 +17,10 @@ export const metadata: Metadata = { title: 'Dashboard' };
 export default function AdminDashboardPage() {
   return (
     <>
-      <h1 className="font-display text-ink text-xl">Platform overview</h1>
-      <p className="text-muted mt-1 text-sm">Last 30 days, against the 30 before it.</p>
+      <PageHeader
+        title="Platform overview"
+        description="Last 30 days, against the 30 before it."
+      />
 
       <Suspense fallback={<DashboardSkeleton />}>
         <Dashboard />
@@ -80,16 +84,22 @@ async function Dashboard() {
 
       {canReadAnalytics ? (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {/*
+            Same trailing-30-day series the chart below plots, so the tile shows
+            the shape of the period rather than only its endpoint.
+          */}
           <StatCard
             label="GMV"
             value={formatMoneyCompact(data.gmv.current)}
             delta={data.gmv.delta}
             hint="gross merchandise value"
+            series={data.trend.map((day) => day.revenue)}
           />
           <StatCard
             label="Orders"
             value={formatCompactNumber(data.orders.current)}
             delta={data.orders.delta}
+            series={data.trend.map((day) => day.orders)}
           />
           <StatCard label="Average order" value={formatMoney(data.averageOrderValue)} />
           <StatCard
@@ -117,13 +127,13 @@ async function Dashboard() {
       </div>
 
       {canReadAnalytics ? (
-        <section className="border-line bg-raised rounded-lg border p-5">
+        <Card as="section">
           <div className="flex items-baseline justify-between gap-4">
             <h2 className="text-ink text-md font-semibold">GMV</h2>
             <p className="text-faint text-xs">Daily, last 30 days</p>
           </div>
           <RevenueChart data={data.trend} className="mt-4" />
-        </section>
+        </Card>
       ) : null}
 
       {canReadAnalytics ? (
@@ -165,31 +175,46 @@ function Leaderboard({
   rows: Array<{ id: string; label: string; meta: string; value: string }>;
 }) {
   return (
-    <section className="border-line bg-raised rounded-lg border">
-      <div className="border-line flex items-center justify-between border-b px-5 py-3.5">
+    <Card as="section" pad="none">
+      <div className="border-line flex items-center justify-between border-b px-4 py-3.5 sm:px-5">
         <h2 className="text-ink text-md font-semibold">{title}</h2>
-        <Link href={href} className="text-muted hover:text-ink text-xs">
+        <Link
+          href={href}
+          className="text-muted hover:text-ink inline-flex min-h-11 min-w-11 items-center justify-end text-xs lg:min-h-0 lg:min-w-0"
+        >
           See all
         </Link>
       </div>
 
       {rows.length === 0 ? (
-        <p className="text-muted px-5 py-8 text-center text-sm">Nothing in this period.</p>
+        <p className="text-muted px-4 py-8 text-center text-sm sm:px-5">Nothing in this period.</p>
       ) : (
         <ol className="divide-line divide-y">
           {rows.map((row, index) => (
-            <li key={row.id} className="flex items-center gap-3 px-5 py-3">
+            /*
+              At 320px this row overflowed the page by 10px, measured by
+              `audit-layout.mjs`. Three unshrinkable columns plus a fixed 6rem
+              value column left the label nothing to give back, and `truncate`
+              on the label cannot rescue a row whose siblings refuse to yield.
+              The meta is context rather than identity, so it is the one that
+              goes; the value keeps its fixed width only once there is room for
+              it, so a column of money still aligns on every screen that has the
+              space to align it.
+            */
+            <li key={row.id} className="flex items-center gap-3 px-4 py-3 sm:px-5">
               <span className="text-faint tabular w-5 shrink-0 text-xs">{index + 1}</span>
               <span className="text-ink min-w-0 flex-1 truncate text-sm">{row.label}</span>
-              <span className="text-faint tabular shrink-0 text-xs">{row.meta}</span>
-              <span className="text-ink tabular w-24 shrink-0 text-right text-sm font-semibold">
+              <span className="text-faint tabular hidden shrink-0 text-xs sm:block">
+                {row.meta}
+              </span>
+              <span className="text-ink tabular shrink-0 text-right text-sm font-semibold sm:w-24">
                 {row.value}
               </span>
             </li>
           ))}
         </ol>
       )}
-    </section>
+    </Card>
   );
 }
 

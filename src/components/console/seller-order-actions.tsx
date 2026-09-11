@@ -1,6 +1,8 @@
 'use client';
 
 import { useTransition } from 'react';
+
+import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
 import { FULFILLMENT_TRANSITIONS, FULFILLMENT_STATUS_META, type FulfillmentStatus } from '@/domain/enums';
@@ -79,13 +81,15 @@ export function SellerOrderActions({
   };
 
   return (
-    <button
+    <Button
       type="button"
       onClick={run}
-      disabled={pending}
-      className="border-line-strong text-ink hover:border-ink disabled:text-faint shrink-0 rounded-sm border px-2.5 py-1 text-2xs font-medium transition-colors disabled:cursor-wait"
+      loading={pending}
+      variant="secondary"
+      size="xs"
+      className="shrink-0"
     >
-      {pending ? 'Working…' : (LABEL[next] ?? 'Advance')}
-    </button>
+      {(LABEL[next] ?? 'Advance')}
+    </Button>
   );
 }

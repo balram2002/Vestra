@@ -1,12 +1,15 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
+import { PageHeader } from '@/components/console/page-header';
 import { PromotionToggle } from '@/components/console/admin-actions';
+import { CreatePromotionDialog } from '@/components/console/admin-create';
 import { DataTable, TableEmpty, type Column } from '@/components/console/data-table';
 import { Badge } from '@/components/ui/badge';
 import type { Promotion } from '@/domain/types';
 import { formatDateShort, formatMoney } from '@/lib/format';
-import { requirePermission } from '@/server/auth/session';
+import { hasPermission } from '@/server/auth/rbac';
+import { getSessionUser, requirePermission } from '@/server/auth/session';
 import { collections, toEntities } from '@/server/db/collections';
 
 export const metadata: Metadata = { title: 'Promotions' };
@@ -22,10 +25,15 @@ export const metadata: Metadata = { title: 'Promotions' };
 export default function AdminPromotionsPage() {
   return (
     <>
-      <h1 className="font-display text-ink text-xl">Promotions</h1>
-      <p className="text-muted mt-1 text-sm">
-        Offers that apply on their own, with no code. Only the best one applies to any item.
-      </p>
+      <PageHeader
+        title="Promotions"
+        description="Offers that apply on their own, with no code. Only the best one applies to any item."
+        actions={
+          <Suspense fallback={null}>
+            <NewPromotionAction />
+          </Suspense>
+        }
+      />
 
       <Suspense fallback={<div className="skeleton mt-6 h-96 rounded-lg" aria-hidden />}>
         <PromotionTable />
@@ -101,7 +109,7 @@ async function PromotionTable() {
       secondary: true,
       render: (promotion) => (
         <span className="text-muted text-xs">
-          {promotion.fundedBy === 'SELLER' ? 'Seller' : 'Vestra'}
+          {promotion.fundedBy === 'SELLER' ? 'Seller' : 'VestraWAB'}
         </span>
       ),
     },
@@ -162,9 +170,38 @@ async function PromotionTable() {
       empty={
         <TableEmpty
           title="No promotions"
-          body="Automatic offers appear here once marketing creates them."
+          body="Create one to run an offer that applies on its own, with no code."
         />
       }
     />
   );
+}
+
+/**
+ * The create button, for someone who can write promotions. It carries the
+ * departments and their first level, which is as fine as an automatic offer
+ * is ever scoped; anything narrower is a coupon.
+ */
+async function NewPromotionAction() {
+  const user = await getSessionUser();
+  if (!user || !hasPermission(user.permissions, 'promotion:write')) return null;
+
+  const categoryCol = await collections.categories();
+  const rows = toEntities(
+    await categoryCol
+      .find({ isActive: true, depth: { $lte: 1 } })
+      .sort({ depth: 1, position: 1 })
+      .toArray(),
+  );
+  const nameById = new Map(rows.map((category) => [category.id, category.name]));
+  const categories = rows
+    .map((category) => ({
+      id: category.id,
+      label: category.parentId
+        ? `${nameById.get(category.parentId) ?? ''} / ${category.name}`
+        : category.name,
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+
+  return <CreatePromotionDialog categories={categories} />;
 }

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { Suspense } from 'react';
 
+import { PageHeader } from '@/components/console/page-header';
 import { ListingForm } from '@/components/seller/listing-form';
 import { requireSeller } from '@/server/auth/session';
 import { authoringOptions } from '@/server/services/authoring';
@@ -18,16 +18,11 @@ export const metadata: Metadata = { title: 'New listing' };
 export default function NewListingPage() {
   return (
     <>
-      <nav className="text-2xs mb-3">
-        <Link href="/seller/products" className="text-muted hover:text-ink">
-          &larr; All products
-        </Link>
-      </nav>
-
-      <h1 className="font-display text-ink text-xl">New listing</h1>
-      <p className="text-muted mt-1 text-sm">
-        Start with the details. You can add sizes and photos once it is saved.
-      </p>
+      <PageHeader
+        back={{ href: '/seller/products', label: 'All products' }}
+        title="New listing"
+        description="Start with the details. You can add sizes and photos once it is saved."
+      />
 
       <div className="mt-6 max-w-3xl">
         <Suspense fallback={<div className="skeleton h-96 rounded-lg" aria-hidden />}>

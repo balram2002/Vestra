@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import { PageHeader } from '@/components/console/page-header';
+import { Card } from '@/components/ui/card';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
@@ -40,27 +42,23 @@ async function Ticket({ params }: { params: Promise<{ id: string }> }) {
 
   return (
     <>
-      <nav className="text-2xs mb-3">
-        <Link href="/admin/support" className="text-muted hover:text-ink">
-          ← All tickets
-        </Link>
-      </nav>
-
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="font-display text-ink text-xl">{ticket.subject}</h1>
-          <p className="text-faint mt-1 text-2xs">
+      <PageHeader
+        back={{ href: '/admin/support', label: 'All tickets' }}
+        title={ticket.subject}
+        description={
+          <>
             <span className="tabular">{ticket.ticketNumber}</span> ·{' '}
             {SUPPORT_CATEGORY_LABEL[ticket.category]} · raised{' '}
             {formatRelative(ticket.createdAt)}
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <StatusBadge meta={TICKET_PRIORITY_META[ticket.priority]} size="sm" />
-          <StatusBadge meta={TICKET_STATUS_META[ticket.status]} size="sm" />
-        </div>
-      </div>
+          </>
+        }
+        meta={
+          <>
+            <StatusBadge meta={TICKET_PRIORITY_META[ticket.priority]} size="sm" />
+            <StatusBadge meta={TICKET_STATUS_META[ticket.status]} size="sm" />
+          </>
+        }
+      />
 
       {breached ? (
         <p className="border-danger-100 bg-danger-50 text-danger-700 mt-4 rounded-md border p-3 text-sm">
@@ -78,7 +76,7 @@ async function Ticket({ params }: { params: Promise<{ id: string }> }) {
         </div>
 
         <aside className="space-y-4">
-          <section className="border-line bg-raised rounded-lg border p-5">
+          <Card as="section">
             <h2 className="text-faint text-2xs uppercase tracking-[0.12em]">Raised by</h2>
             <p className="text-ink mt-2 text-sm font-medium">{ticket.requesterName}</p>
             {/*
@@ -87,10 +85,10 @@ async function Ticket({ params }: { params: Promise<{ id: string }> }) {
               common place customer contact details leak.
             */}
             <p className="text-muted text-sm">{maskEmail(ticket.requesterEmail)}</p>
-          </section>
+          </Card>
 
           {ticket.orderNumber ? (
-            <section className="border-line bg-raised rounded-lg border p-5">
+            <Card as="section">
               <h2 className="text-faint text-2xs uppercase tracking-[0.12em]">About</h2>
               <Link
                 href={`/admin/orders/${ticket.orderNumber}`}
@@ -98,10 +96,10 @@ async function Ticket({ params }: { params: Promise<{ id: string }> }) {
               >
                 {ticket.orderNumber}
               </Link>
-            </section>
+            </Card>
           ) : null}
 
-          <section className="border-line bg-raised rounded-lg border p-5">
+          <Card as="section">
             <h2 className="text-faint text-2xs uppercase tracking-[0.12em]">Handling</h2>
             <dl className="mt-2 space-y-1.5 text-sm">
               <Row label="Assigned to" value={ticket.assignedToName ?? 'Unassigned'} />
@@ -116,7 +114,7 @@ async function Ticket({ params }: { params: Promise<{ id: string }> }) {
                 <Row label="Resolved" value={formatRelative(ticket.resolvedAt)} />
               ) : null}
             </dl>
-          </section>
+          </Card>
         </aside>
       </div>
     </>

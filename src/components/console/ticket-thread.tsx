@@ -1,6 +1,8 @@
 'use client';
 
 import { Lock, Send } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 
@@ -114,7 +116,7 @@ export function TicketThread({
 
       {/* ------------------------------------------------------- compose */}
 
-      <div className="border-line bg-raised rounded-lg border p-4">
+      <Card as="div" pad="tight">
         <label htmlFor="agent-reply" className="text-ink block text-xs font-medium">
           {internal ? 'Internal note' : 'Reply to the customer'}
         </label>
@@ -143,32 +145,34 @@ export function TicketThread({
             <span className="text-muted text-xs">Internal note</span>
           </label>
 
-          <button
+          <Button
             type="button"
             onClick={send}
-            disabled={pending || body.trim().length < 2}
-            className="bg-ink text-canvas disabled:bg-line-strong inline-flex items-center gap-1.5 rounded-md px-3.5 py-2 text-xs font-medium disabled:cursor-not-allowed"
+            loading={pending}
+            disabled={body.trim().length < 2}
+            size="sm"
           >
             <Send className="size-3.5" aria-hidden />
             {pending ? 'Sending…' : internal ? 'Add note' : 'Send reply'}
-          </button>
+          </Button>
         </div>
-      </div>
+      </Card>
 
       {/* -------------------------------------------------------- status */}
 
       <div className="border-line flex flex-wrap items-center gap-2 border-t pt-4">
         <span className="text-faint text-2xs uppercase tracking-[0.12em]">Move to</span>
         {TICKET_STATUSES.filter((value) => value !== status).map((value) => (
-          <button
+          <Button
             key={value}
             type="button"
-            disabled={pending}
+            loading={pending}
             onClick={() => move(value)}
-            className="border-line-strong text-muted hover:border-ink hover:text-ink rounded-sm border px-2.5 py-1.5 text-xs transition-colors disabled:opacity-50"
+            variant="secondary"
+            size="sm"
           >
             {TICKET_STATUS_META[value].label}
-          </button>
+          </Button>
         ))}
       </div>
     </div>

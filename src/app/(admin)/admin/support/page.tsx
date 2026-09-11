@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Suspense } from 'react';
 
+import { PageHeader } from '@/components/console/page-header';
 import { ConsoleTabs } from '@/components/console/console-tabs';
 import { DataTable, TableEmpty, type Column } from '@/components/console/data-table';
 import { StatusBadge } from '@/components/ui/badge';
@@ -36,10 +37,10 @@ export default function AdminSupportPage({
 }) {
   return (
     <>
-      <h1 className="font-display text-ink text-xl">Support</h1>
-      <p className="text-muted mt-1 text-sm">
-        Urgent first, then oldest. Anything past its SLA is flagged.
-      </p>
+      <PageHeader
+        title="Support"
+        description="Urgent first, then oldest. Anything past its SLA is flagged."
+      />
 
       <Suspense fallback={<div className="skeleton mt-6 h-96 rounded-lg" aria-hidden />}>
         <TicketQueue searchParams={searchParams} />
@@ -67,7 +68,7 @@ async function TicketQueue({
         <div className="min-w-0">
           <Link
             href={`/admin/support/${ticket.id}`}
-            className="text-ink hover:text-accent block truncate text-xs font-medium underline-offset-2 hover:underline"
+            className="row-link text-ink hover:text-accent block truncate text-xs font-medium underline-offset-2 hover:underline"
           >
             {ticket.subject}
           </Link>

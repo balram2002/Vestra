@@ -1,6 +1,10 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 
 import type { SettlementStatus } from '@/domain/enums';
@@ -48,17 +52,16 @@ export function SettlementActions({
   if (mode === 'pay') {
     return (
       <div className="border-line bg-sunken mt-3 rounded-md border p-3">
-        <label className="block">
-          <span className="text-faint text-2xs uppercase tracking-[0.12em]">Bank UTR</span>
-          <input
-            value={utr}
-            onChange={(event) => setUtr(event.target.value)}
-            placeholder="HDFCR52025082512345678"
-            className="border-line-strong bg-raised text-ink mt-1 w-full rounded-sm border px-2 py-1.5 font-mono text-sm"
-          />
-        </label>
+        {/* A UTR is copied off a bank statement and compared digit by digit. */}
+        <Input
+          label="Bank UTR"
+          value={utr}
+          onChange={(event) => setUtr(event.target.value)}
+          placeholder="HDFCR52025082512345678"
+          className="ident"
+        />
         <div className="mt-2.5 flex gap-2">
-          <button
+          <Button
             type="button"
             disabled={pending || utr.trim().length < 6}
             onClick={() =>
@@ -67,18 +70,20 @@ export function SettlementActions({
                 'Payout recorded and the seller notified',
               )
             }
-            className="bg-ink text-canvas disabled:bg-line-strong rounded-sm px-3 py-1.5 text-xs font-medium disabled:cursor-not-allowed"
+            size="sm"
+            loading={pending}
           >
-            {pending ? 'Saving…' : 'Confirm payout'}
-          </button>
-          <button
+            Confirm payout
+          </Button>
+          <Button
             type="button"
             onClick={() => setMode(null)}
             disabled={pending}
-            className="text-muted hover:text-ink px-2 py-1.5 text-xs"
+            size="sm"
+            variant="ghost"
           >
             Cancel
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -87,21 +92,16 @@ export function SettlementActions({
   if (mode === 'hold') {
     return (
       <div className="border-line bg-sunken mt-3 rounded-md border p-3">
-        <label className="block">
-          <span className="text-faint text-2xs uppercase tracking-[0.12em]">
-            Why is this on hold?
-          </span>
-          <textarea
-            value={reason}
-            onChange={(event) => setReason(event.target.value)}
-            rows={2}
-            maxLength={300}
-            placeholder="The seller reads this, so be specific."
-            className="border-line-strong bg-raised text-ink mt-1 w-full rounded-sm border px-2 py-1.5 text-sm"
-          />
-        </label>
+        <Textarea
+          label="Why is this on hold?"
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+          rows={2}
+          maxLength={300}
+          placeholder="The seller reads this, so be specific."
+        />
         <div className="mt-2.5 flex gap-2">
-          <button
+          <Button
             type="button"
             disabled={pending || reason.trim().length < 8}
             onClick={() =>
@@ -110,18 +110,21 @@ export function SettlementActions({
                 'Payout held',
               )
             }
-            className="bg-warning-700 disabled:bg-line-strong rounded-sm px-3 py-1.5 text-xs font-medium text-white disabled:cursor-not-allowed"
+            size="sm"
+            variant="secondary"
+            loading={pending}
           >
-            {pending ? 'Saving…' : 'Hold payout'}
-          </button>
-          <button
+            Hold payout
+          </Button>
+          <Button
             type="button"
             onClick={() => setMode(null)}
             disabled={pending}
-            className="text-muted hover:text-ink px-2 py-1.5 text-xs"
+            size="sm"
+            variant="ghost"
           >
             Cancel
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -130,22 +133,23 @@ export function SettlementActions({
   return (
     <div className="mt-3 flex flex-wrap gap-2">
       {payable ? (
-        <button
+        <Button
           type="button"
           onClick={() => setMode('pay')}
-          className="bg-ink text-canvas rounded-sm px-3 py-1.5 text-xs font-medium"
+          size="sm"
         >
           Record payout
-        </button>
+        </Button>
       ) : null}
       {holdable ? (
-        <button
+        <Button
           type="button"
           onClick={() => setMode('hold')}
-          className="border-line-strong text-muted hover:border-ink hover:text-ink rounded-sm border px-3 py-1.5 text-xs transition-colors"
+          variant="secondary"
+          size="sm"
         >
           Hold
-        </button>
+        </Button>
       ) : null}
     </div>
   );

@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import { PageHeader } from '@/components/console/page-header';
+import { Card } from '@/components/ui/card';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
@@ -39,24 +41,19 @@ async function ShipmentDetail({ params }: { params: Promise<{ id: string }> }) {
 
   return (
     <>
-      <nav className="text-2xs mb-3">
-        <Link href="/seller/shipments" className="text-muted hover:text-ink">
-          ← All shipments
-        </Link>
-      </nav>
-
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="font-display text-ink tabular text-xl">{shipment.shipmentNumber}</h1>
-          <p className="text-muted mt-1 text-sm">
+      <PageHeader
+        back={{ href: '/seller/shipments', label: 'All shipments' }}
+        title={<span className="tabular">{shipment.shipmentNumber}</span>}
+        description={
+          <>
             Order{' '}
             <Link href="/seller/orders" className="text-ink underline-offset-2 hover:underline">
               {shipment.orderNumber}
             </Link>
             {shipment.manifestId ? ' · manifested' : ''}
-          </p>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="min-w-0">
@@ -93,7 +90,7 @@ async function ShipmentDetail({ params }: { params: Promise<{ id: string }> }) {
         </div>
 
         <aside className="space-y-4">
-          <section className="border-line bg-raised rounded-lg border p-5">
+          <Card as="section">
             <h2 className="text-faint text-2xs uppercase tracking-[0.12em]">Deliver to</h2>
             <address className="text-ink mt-2 text-sm not-italic leading-relaxed">
               <span className="font-medium">{shipment.deliveryAddress.fullName}</span>
@@ -110,10 +107,10 @@ async function ShipmentDetail({ params }: { params: Promise<{ id: string }> }) {
               <br />
               <span className="tabular">{shipment.deliveryAddress.pincode}</span>
             </address>
-          </section>
+          </Card>
 
           {pickup ? (
-            <section className="border-line bg-raised rounded-lg border p-5">
+            <Card as="section">
               <h2 className="text-faint text-2xs uppercase tracking-[0.12em]">Pick up from</h2>
               <address className="text-ink mt-2 text-sm not-italic leading-relaxed">
                 <span className="font-medium">{pickup.name}</span>
@@ -122,10 +119,10 @@ async function ShipmentDetail({ params }: { params: Promise<{ id: string }> }) {
                 <br />
                 <span className="tabular">{pickup.pincode}</span>
               </address>
-            </section>
+            </Card>
           ) : null}
 
-          <section className="border-line bg-raised rounded-lg border p-5">
+          <Card as="section">
             <h2 className="text-faint text-2xs uppercase tracking-[0.12em]">Parcel</h2>
             <dl className="mt-2 space-y-1.5 text-sm">
               <Row label="Weight" value={`${(shipment.weightGrams / 1000).toFixed(2)} kg`} />
@@ -141,7 +138,7 @@ async function ShipmentDetail({ params }: { params: Promise<{ id: string }> }) {
                 <Row label="Delivery attempts" value={String(shipment.deliveryAttempts)} />
               ) : null}
             </dl>
-          </section>
+          </Card>
         </aside>
       </div>
     </>

@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import { PageHeader } from '@/components/console/page-header';
+import { Card } from '@/components/ui/card';
 import { Suspense } from 'react';
 
 import { RevenueChart } from '@/components/console/revenue-chart';
@@ -12,8 +14,10 @@ export const metadata: Metadata = { title: 'Analytics' };
 export default function SellerAnalyticsPage() {
   return (
     <>
-      <h1 className="font-display text-ink text-xl">Analytics</h1>
-      <p className="text-muted mt-1 text-sm">How your store is trading over the last 90 days.</p>
+      <PageHeader
+        title="Analytics"
+        description="How your store is trading over the last 90 days."
+      />
 
       <Suspense fallback={<div className="skeleton mt-6 h-96 rounded-lg" aria-hidden />}>
         <Analytics />
@@ -51,15 +55,15 @@ async function Analytics() {
         />
       </div>
 
-      <section className="border-line bg-raised rounded-lg border p-5">
+      <Card as="section">
         <div className="flex items-baseline justify-between gap-4">
           <h2 className="text-ink text-md font-semibold">Revenue over time</h2>
           <p className="text-faint text-xs">Daily, last 90 days</p>
         </div>
         <RevenueChart data={data.trend} className="mt-4 h-72" />
-      </section>
+      </Card>
 
-      <section className="border-line bg-raised rounded-lg border">
+      <Card as="section" pad="none">
         <div className="border-line border-b px-5 py-3.5">
           <h2 className="text-ink text-md font-semibold">Top styles by revenue</h2>
         </div>
@@ -80,7 +84,7 @@ async function Analytics() {
             ))}
           </ol>
         )}
-      </section>
+      </Card>
     </div>
   );
 }

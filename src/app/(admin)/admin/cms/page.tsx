@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
+import { PageHeader } from '@/components/console/page-header';
 import { SectionToggle } from '@/components/console/admin-actions';
 import { Badge } from '@/components/ui/badge';
 import { requirePermission } from '@/server/auth/session';
@@ -20,10 +21,10 @@ export const metadata: Metadata = { title: 'Homepage' };
 export default function AdminCmsPage() {
   return (
     <>
-      <h1 className="font-display text-ink text-xl">Homepage</h1>
-      <p className="text-muted mt-1 text-sm">
-        The sections the storefront renders, in order. This list is the homepage.
-      </p>
+      <PageHeader
+        title="Homepage"
+        description="The sections the storefront renders, in order. This list is the homepage."
+      />
 
       <Suspense fallback={<div className="skeleton mt-6 h-96 rounded-lg" aria-hidden />}>
         <Sections />

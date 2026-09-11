@@ -1,4 +1,6 @@
 import { AlertTriangle, ArrowRight, PackageX } from 'lucide-react';
+import { PageHeader } from '@/components/console/page-header';
+import { Card } from '@/components/ui/card';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Suspense } from 'react';
@@ -7,6 +9,7 @@ import { RevenueChart } from '@/components/console/revenue-chart';
 import { StatCard } from '@/components/console/stat-card';
 import { requireSeller } from '@/server/auth/session';
 import { formatMoneyCompact, formatMoney, formatCompactNumber } from '@/lib/format';
+import { getLiveStats } from '@/server/services/live';
 import { getSellerDashboard } from '@/server/services/seller';
 
 export const metadata: Metadata = { title: 'Dashboard' };
@@ -14,8 +17,10 @@ export const metadata: Metadata = { title: 'Dashboard' };
 export default function SellerDashboardPage() {
   return (
     <>
-      <h1 className="font-display text-ink text-xl">Dashboard</h1>
-      <p className="text-muted mt-1 text-sm">Your last 30 days, against the 30 before it.</p>
+      <PageHeader
+        title="Dashboard"
+        description="Your last 30 days, against the 30 before it."
+      />
 
       <Suspense fallback={<DashboardSkeleton />}>
         <Dashboard />
@@ -26,7 +31,19 @@ export default function SellerDashboardPage() {
 
 async function Dashboard() {
   const user = await requireSeller();
-  const data = await getSellerDashboard(user.sellerId);
+
+  /*
+   * Fetched together, because they are independent.
+   *
+   * The live figures come from their own collections and share nothing with the
+   * order dashboard, so awaiting them in sequence would add a round trip to the
+   * slowest screen in the console for no reason.
+   */
+  const [data, live] = await Promise.all([
+    getSellerDashboard(user.sellerId),
+    getLiveStats(user.sellerId),
+  ]);
+
   if (!data) return null;
 
   return (
@@ -79,17 +96,28 @@ async function Dashboard() {
       ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {/*
+          The sparkline reads the trend the dashboard already computes.
+
+          `data.trend` is thirty daily buckets, oldest first — the same series
+          the revenue chart below plots. Passing it here costs no extra query
+          and turns a bare number into a shape: "₹4.2L, up 12%" says the period
+          was good, and the line says whether it was steady or one enormous
+          Tuesday.
+        */}
         <StatCard
           label="Revenue"
           value={formatMoneyCompact(data.revenue.current)}
           delta={data.revenue.delta}
           hint="last 30 days"
+          series={data.trend.map((day) => day.revenue)}
         />
         <StatCard
           label="Orders"
           value={formatCompactNumber(data.orders.current)}
           delta={data.orders.delta}
           hint={`${data.units} units`}
+          series={data.trend.map((day) => day.orders)}
         />
         <StatCard
           label="Average order"
@@ -104,18 +132,56 @@ async function Dashboard() {
         />
       </div>
 
-      <section className="border-line bg-raised rounded-lg border p-5">
+      {/*
+        Live commerce, and only once there is something to say.
+        
+        A shop that has never taken a live call sees nothing here rather than a
+        row of zeroes — four empty tiles on the main dashboard would read as a
+        broken feature rather than an unused one, and they would push the
+        revenue chart below the fold to say it.
+      */}
+      {live.sessions > 0 || live.missed > 0 ? (
+        <section>
+          <h2 className="eyebrow mb-3">Live commerce · last 30 days</h2>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <StatCard label="Calls taken" value={String(live.sessions)} hint="answered" />
+            <StatCard label="Sold on a call" value={String(live.purchased)} hint="orders" />
+            <StatCard
+              /*
+               * Null when there were no calls, rather than 0%.
+               *
+               * "0%" reads as a failure to convert; having taken no calls is
+               * not that, and the tile says so by showing a dash.
+               */
+              label="Live conversion"
+              value={live.conversionRate === null ? '—' : `${live.conversionRate}%`}
+              hint="of calls taken"
+            />
+            <StatCard
+              label="Missed calls"
+              value={String(live.missed)}
+              goodDirection="down"
+              hint="rang out unanswered"
+            />
+          </div>
+        </section>
+      ) : null}
+
+      <Card as="section">
         <div className="flex items-baseline justify-between gap-4">
           <h2 className="text-ink text-md font-semibold">Revenue</h2>
           <p className="text-faint text-xs">Daily, last 30 days</p>
         </div>
         <RevenueChart data={data.trend} className="mt-4" />
-      </section>
+      </Card>
 
-      <section className="border-line bg-raised rounded-lg border">
+      <Card as="section" pad="none">
         <div className="border-line flex items-center justify-between border-b px-5 py-3.5">
           <h2 className="text-ink text-md font-semibold">Best sellers</h2>
-          <Link href="/seller/analytics" className="text-muted hover:text-ink text-xs">
+          <Link
+            href="/seller/analytics"
+            className="text-muted hover:text-ink inline-flex min-h-11 items-center text-xs lg:min-h-0"
+          >
             All analytics
           </Link>
         </div>
@@ -138,7 +204,7 @@ async function Dashboard() {
             ))}
           </ol>
         )}
-      </section>
+      </Card>
     </div>
   );
 }

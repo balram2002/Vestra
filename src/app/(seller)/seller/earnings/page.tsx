@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import { PageHeader } from '@/components/console/page-header';
+import { Card } from '@/components/ui/card';
 import { Suspense } from 'react';
 
 import { DataTable, TableEmpty, type Column } from '@/components/console/data-table';
@@ -20,11 +22,10 @@ export const metadata: Metadata = { title: 'Earnings' };
 export default function SellerEarningsPage() {
   return (
     <>
-      <h1 className="font-display text-ink text-xl">Earnings</h1>
-      <p className="text-muted mt-1 text-sm">
-        Money clears {FINANCE.settlementHoldDays} days after delivery, once the return window is
-        safely past.
-      </p>
+      <PageHeader
+        title="Earnings"
+        description={<>Money clears {FINANCE.settlementHoldDays} days after delivery, once the return window is safely past.</>}
+      />
 
       <Suspense fallback={<div className="skeleton mt-6 h-96 rounded-lg" aria-hidden />}>
         <Earnings />
@@ -99,7 +100,7 @@ async function Earnings() {
       </div>
 
       {/* The arithmetic, written out. */}
-      <section className="border-line bg-raised rounded-lg border p-5">
+      <Card as="section">
         <h2 className="text-ink text-md font-semibold">How your payout is calculated</h2>
 
         <dl className="mt-4 max-w-md space-y-2.5 text-sm">
@@ -123,7 +124,7 @@ async function Earnings() {
           TCS at {FINANCE.tcsPercent}% and TDS at {FINANCE.tdsPercent}% are deducted at settlement
           and reported against your PAN.
         </p>
-      </section>
+      </Card>
 
       <section>
         <h2 className="text-ink mb-2 text-md font-semibold">By month</h2>

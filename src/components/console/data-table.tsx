@@ -14,8 +14,12 @@ import { cn } from '@/lib/cn';
  *    and a column of money can be scanned vertically;
  *  - every table declares its own empty state, because "no rows" and "no rows
  *    matching your filter" need different words and different exits;
- *  - the header is sticky, so scrolling row 200 still tells you what column
- *    three is.
+ *  - the header is STICKY, so scrolling row 200 still tells you what column
+ *    three is. It sticks to the scroll container, not the viewport, which is
+ *    what makes it work inside the horizontally scrolling wrapper — a
+ *    viewport-sticky header would detach the moment the table scrolled
+ *    sideways. This was documented here for a phase before it was actually
+ *    implemented; it is real now.
  */
 
 export interface Column<T> {
@@ -46,27 +50,32 @@ export function DataTable<T>({
 }) {
   if (rows.length === 0) {
     return (
-      <div className="border-line rounded-lg border border-dashed p-10 text-center">{empty}</div>
+      <div className="border-line rounded-xl border border-dashed p-10 text-center">{empty}</div>
     );
   }
 
   return (
-    <div className={cn('border-line overflow-hidden rounded-lg border', className)}>
-      {/* The wrapper scrolls, not the page: a wide table must never make the
-          whole document scroll sideways. */}
-      <div className="overflow-x-auto">
+    <div className={cn('border-line bg-raised overflow-hidden rounded-xl border', className)}>
+      {/*
+        The wrapper scrolls, not the page: a wide table must never make the
+        whole document scroll sideways. `max-h` plus `overflow-y` is what gives
+        the sticky header something to stick to — `position: sticky` resolves
+        against the nearest scrolling ancestor, so without a vertical scroll
+        container here the header would have nothing to hold onto.
+      */}
+      <div className="max-h-[70dvh] overflow-auto">
         <table className="w-full min-w-[40rem] border-collapse text-sm">
           {caption ? <caption className="sr-only">{caption}</caption> : null}
 
           <thead>
-            <tr className="border-line bg-sunken border-b">
+            <tr className="border-line bg-sunken sticky top-0 z-10 border-b">
               {columns.map((column) => (
                 <th
                   key={column.key}
                   scope="col"
                   style={column.width ? { width: column.width } : undefined}
                   className={cn(
-                    'text-faint px-3 py-2.5 text-2xs font-medium uppercase tracking-[0.1em]',
+                    'text-faint bg-sunken px-3 py-2.5 text-2xs font-semibold uppercase tracking-[0.1em]',
                     column.numeric ? 'text-right' : 'text-left',
                     column.secondary && 'hidden sm:table-cell',
                   )}
@@ -81,7 +90,8 @@ export function DataTable<T>({
             {rows.map((row) => (
               <tr
                 key={rowKey(row)}
-                className="border-line hover:bg-sunken/60 border-b transition-colors last:border-b-0"
+                // `relative` so a `.row-link` inside has something to fill.
+                className="border-line hover:bg-sunken/70 relative border-b transition-colors last:border-b-0"
               >
                 {columns.map((column) => (
                   <td

@@ -1,5 +1,6 @@
 'use client';
 
+import { useReducedMotion } from 'framer-motion';
 import { useId } from 'react';
 import {
   Area,
@@ -31,6 +32,12 @@ import { formatDateShort, formatMoney, formatMoneyCompact } from '@/lib/format';
  *    The data should be the darkest thing in the frame.
  *  - Colour comes from the design tokens rather than a hex, so the chart tracks
  *    the theme instead of being repainted for dark mode.
+ *  - The area DRAWS IN once, over 480ms, and never again. A console is worked
+ *    in all day and a chart that replays its entrance on every navigation is a
+ *    half-second of waiting between a seller and their numbers. One short draw
+ *    on mount reads as the data arriving; anything longer reads as latency.
+ *    Under `prefers-reduced-motion` it is switched off outright rather than
+ *    shortened — a chart is data, and it is complete the instant it is painted.
  */
 
 export interface RevenuePoint {
@@ -47,13 +54,14 @@ export function RevenueChart({
   className?: string;
 }) {
   const gradientId = useId();
+  const reduced = useReducedMotion() ?? false;
   const hasRevenue = data.some((point) => point.revenue > 0);
 
   if (!hasRevenue) {
     return (
       <div
         className={cn(
-          'border-line text-muted flex h-56 items-center justify-center rounded-md border border-dashed text-sm',
+          'border-line text-muted flex h-56 items-center justify-center rounded-xl border border-dashed text-sm',
           className,
         )}
       >
@@ -68,14 +76,14 @@ export function RevenueChart({
         <AreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -12 }}>
           <defs>
             <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--color-mulberry-500)" stopOpacity={0.22} />
-              <stop offset="100%" stopColor="var(--color-mulberry-500)" stopOpacity={0.02} />
+              <stop offset="0%" stopColor="var(--color-chart-1)" stopOpacity={0.22} />
+              <stop offset="100%" stopColor="var(--color-chart-1)" stopOpacity={0.02} />
             </linearGradient>
           </defs>
 
           <CartesianGrid
             vertical={false}
-            stroke="var(--color-bone-200)"
+            stroke="var(--chart-grid)"
             strokeDasharray="2 4"
           />
 
@@ -85,7 +93,7 @@ export function RevenueChart({
             axisLine={false}
             // Roughly six labels regardless of range, so they never collide.
             interval={Math.max(0, Math.floor(data.length / 6) - 1)}
-            tick={{ fontSize: 11, fill: 'var(--color-bone-500)' }}
+            tick={{ fontSize: 11, fill: 'var(--chart-axis)' }}
             tickFormatter={(value: string) => formatDateShort(value)}
           />
 
@@ -93,19 +101,19 @@ export function RevenueChart({
             tickLine={false}
             axisLine={false}
             width={64}
-            tick={{ fontSize: 11, fill: 'var(--color-bone-500)' }}
+            tick={{ fontSize: 11, fill: 'var(--chart-axis)' }}
             tickFormatter={(value: number) => formatMoneyCompact(value)}
           />
 
           <Tooltip
-            cursor={{ stroke: 'var(--color-bone-400)', strokeWidth: 1, strokeDasharray: '3 3' }}
+            cursor={{ stroke: 'var(--chart-axis)', strokeWidth: 1, strokeDasharray: '3 3' }}
             content={<RevenueTooltip />}
           />
 
           <Area
             type="monotone"
             dataKey="revenue"
-            stroke="var(--color-mulberry-600)"
+            stroke="var(--color-chart-1)"
             strokeWidth={2}
             fill={`url(#${gradientId})`}
             // Dots on 30 points is clutter; the active dot on hover is enough.
@@ -113,10 +121,12 @@ export function RevenueChart({
             activeDot={{
               r: 4,
               strokeWidth: 2,
-              stroke: 'var(--color-bone-0)',
-              fill: 'var(--color-mulberry-600)',
+              stroke: 'var(--surface-raised)',
+              fill: 'var(--color-chart-1)',
             }}
-            isAnimationActive={false}
+            isAnimationActive={!reduced}
+            animationDuration={480}
+            animationEasing="ease-out"
           />
         </AreaChart>
       </ResponsiveContainer>

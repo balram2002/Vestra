@@ -1,6 +1,7 @@
 'use client';
 
 import { Star, Trash2 } from 'lucide-react';
+import { Card } from '@/components/ui/card';
 import Image from 'next/image';
 import { useTransition } from 'react';
 import { toast } from 'sonner';
@@ -46,7 +47,7 @@ export function MediaManager({ productId, media }: { productId: string; media: M
   };
 
   return (
-    <section className="border-line bg-raised rounded-lg border p-5">
+    <Card as="section">
       <header className="mb-4">
         <h2 className="text-ink text-md font-semibold">Photography</h2>
         <p className="text-muted mt-0.5 text-sm">
@@ -127,6 +128,6 @@ export function MediaManager({ productId, media }: { productId: string; media: M
         }}
       />
 
-    </section>
+    </Card>
   );
 }

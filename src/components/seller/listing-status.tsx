@@ -1,6 +1,7 @@
 'use client';
 
 import { AlertTriangle, Copy, Eye, EyeOff, Send } from 'lucide-react';
+import { Card } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
@@ -58,7 +59,7 @@ export function ListingStatus({
   };
 
   return (
-    <section className="border-line bg-raised rounded-lg border p-5">
+    <Card as="section">
       <header className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-ink text-md font-semibold">{meta.label}</h2>
@@ -178,6 +179,6 @@ export function ListingStatus({
           </button>
         ) : null}
       </div>
-    </section>
+    </Card>
   );
 }

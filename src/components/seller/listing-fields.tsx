@@ -1,6 +1,7 @@
 'use client';
 
 import { X } from 'lucide-react';
+import { Card } from '@/components/ui/card';
 import { useId, useState } from 'react';
 
 /**
@@ -22,13 +23,13 @@ export function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="border-line bg-raised rounded-lg border p-5">
+    <Card as="section">
       <header className="mb-4">
         <h2 className="text-ink text-md font-semibold">{title}</h2>
         {description ? <p className="text-muted mt-0.5 text-sm">{description}</p> : null}
       </header>
       <div className="space-y-4">{children}</div>
-    </section>
+    </Card>
   );
 }
 

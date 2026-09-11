@@ -1,6 +1,7 @@
 'use client';
 
 import { Check, FileUp, Send, X } from 'lucide-react';
+import { Card } from '@/components/ui/card';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 
@@ -64,7 +65,7 @@ export function KycDocuments({
   };
 
   return (
-    <section className="border-line bg-raised rounded-lg border p-5">
+    <Card as="section">
       <header className="mb-4">
         <h2 className="text-ink text-md font-semibold">Verification documents</h2>
         <p className="text-muted mt-0.5 text-sm">
@@ -133,7 +134,7 @@ export function KycDocuments({
           </button>
         </div>
       ) : null}
-    </section>
+    </Card>
   );
 }
 
@@ -162,7 +163,7 @@ function DocumentRow({
             aria-hidden
             className={
               document
-                ? 'bg-success-500 grid size-5 shrink-0 place-items-center rounded-full text-white'
+                ? 'bg-success-fill grid size-5 shrink-0 place-items-center rounded-full text-white'
                 : 'border-line-strong grid size-5 shrink-0 place-items-center rounded-full border'
             }
           >

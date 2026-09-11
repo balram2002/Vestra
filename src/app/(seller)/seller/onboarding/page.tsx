@@ -1,4 +1,7 @@
 import { CheckCircle2, Clock } from 'lucide-react';
+import { PageHeader } from '@/components/console/page-header';
+import { Card } from '@/components/ui/card';
+import { Alert } from '@/components/ui/alert';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
@@ -45,16 +48,16 @@ async function Onboarding() {
 
   return (
     <>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="font-display text-ink text-xl">{store.displayName}</h1>
-          <p className="text-muted mt-1 text-sm">
+      <PageHeader
+        title={store.displayName}
+        description={
+          <>
             Applied {formatDate(store.joinedAt)} · store code{' '}
             <span className="tabular">{store.code}</span>
-          </p>
-        </div>
-        <StatusBadge meta={SELLER_STATUS_META[store.status]} size="lg" />
-      </div>
+          </>
+        }
+        actions={<StatusBadge meta={SELLER_STATUS_META[store.status]} size="lg" />}
+      />
 
       <div className="mt-6 max-w-2xl space-y-6">
         {inReview ? (
@@ -71,15 +74,10 @@ async function Onboarding() {
         ) : null}
 
         {store.status === 'SUSPENDED' || store.status === 'ON_HOLD' ? (
-          <div className="border-warning-100 bg-warning-50 rounded-lg border p-4">
-            <p className="text-warning-700 text-sm font-semibold">
-              {SELLER_STATUS_META[store.status].label}
-            </p>
-            <p className="text-warning-700/80 mt-0.5 text-sm">
-              {store.kyc.rejectionReason ??
+          <Alert tone="warning" title={SELLER_STATUS_META[store.status].label}>
+            {store.kyc.rejectionReason ??
                 'Your store is paused. Contact support and we will talk it through.'}
-            </p>
-          </div>
+          </Alert>
         ) : null}
 
         <KycDocuments
@@ -89,7 +87,7 @@ async function Onboarding() {
         />
 
         {/* What we already hold, so an applicant can check it before we do. */}
-        <section className="border-line bg-raised rounded-lg border p-5">
+        <Card as="section">
           <h2 className="text-ink text-md font-semibold">What you told us</h2>
           <dl className="mt-3 space-y-1.5 text-sm">
             <Row label="Registered name" value={store.legalName} />
@@ -109,7 +107,7 @@ async function Onboarding() {
             </Link>{' '}
             and we will correct it before review.
           </p>
-        </section>
+        </Card>
 
         <section className="border-line rounded-lg border border-dashed p-5">
           <div className="flex items-start gap-3">

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Suspense } from 'react';
 
+import { PageHeader } from '@/components/console/page-header';
 import { ConsoleTabs } from '@/components/console/console-tabs';
 import { DataTable, TableEmpty, type Column } from '@/components/console/data-table';
 import { Pager } from '@/components/console/pager';
@@ -31,8 +32,10 @@ export default function AdminOrdersPage({
 }) {
   return (
     <>
-      <h1 className="font-display text-ink text-xl">Orders</h1>
-      <p className="text-muted mt-1 text-sm">Every order across the platform.</p>
+      <PageHeader
+        title="Orders"
+        description="Every order across the platform."
+      />
 
       <Suspense fallback={<div className="skeleton mt-6 h-96 rounded-lg" aria-hidden />}>
         <OrderTable searchParams={searchParams} />
@@ -60,7 +63,7 @@ async function OrderTable({
         <div className="min-w-0">
           <Link
             href={`/admin/orders/${order.id}`}
-            className="text-ink tabular block text-xs font-semibold hover:underline"
+            className="row-link text-ink tabular block text-xs font-semibold hover:underline"
           >
             {order.orderNumber}
           </Link>

@@ -1,13 +1,16 @@
-import Link from 'next/link';
-
-import { cn } from '@/lib/cn';
+import { Tabs, type TabItem } from '@/components/ui/tabs';
 
 /**
  * Filter tabs for a console list.
  *
- * Links, not buttons: the filter belongs in the URL so a view can be
- * bookmarked, shared with a colleague, and linked to from a dashboard queue
- * card. Client state here would make every one of those impossible.
+ * Now a thin adapter over `ui/tabs`, which owns the look, the touch minimum and
+ * the `aria-current` semantics. This kept its own copy of all three until Phase
+ * 24, which is how its tabs ended up 31px tall on a phone while the storefront's
+ * were not.
+ *
+ * The URL shape stays here because it is the part that differs: a console list
+ * filters on one query parameter and resets to page one implicitly by dropping
+ * every other parameter.
  */
 export function ConsoleTabs({
   basePath,
@@ -18,25 +21,13 @@ export function ConsoleTabs({
   basePath: string;
   param: string;
   current: string;
-  tabs: Array<{ value: string; label: string }>;
+  tabs: TabItem[];
 }) {
   return (
-    <nav className="scrollbar-none -mx-1 flex gap-1 overflow-x-auto px-1 pb-1" aria-label="Filter">
-      {tabs.map((tab) => (
-        <Link
-          key={tab.value}
-          href={`${basePath}?${param}=${tab.value}`}
-          aria-current={tab.value === current ? 'page' : undefined}
-          className={cn(
-            'shrink-0 rounded-md px-3 py-1.5 text-xs transition-colors',
-            tab.value === current
-              ? 'bg-ink text-canvas font-medium'
-              : 'text-muted hover:bg-sunken hover:text-ink',
-          )}
-        >
-          {tab.label}
-        </Link>
-      ))}
-    </nav>
+    <Tabs
+      items={tabs}
+      current={current}
+      href={(value) => `${basePath}?${param}=${value}`}
+    />
   );
 }

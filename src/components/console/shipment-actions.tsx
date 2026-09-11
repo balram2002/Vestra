@@ -1,6 +1,7 @@
 'use client';
 
 import { Printer, Receipt, RefreshCw, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 
@@ -87,26 +88,28 @@ export function ShipmentActions({
         ) : null}
 
         {trackable ? (
-          <button
+          <Button
             type="button"
             onClick={sync}
-            disabled={pending}
-            className="border-line-strong text-ink hover:border-ink disabled:text-faint inline-flex items-center gap-1.5 rounded-md border px-3 py-2 text-xs font-medium transition-colors disabled:cursor-wait"
+            loading={pending}
+            variant="secondary"
+            size="sm"
           >
             <RefreshCw className="size-3.5" aria-hidden />
-            {pending ? 'Checking…' : 'Refresh tracking'}
-          </button>
+            Refresh tracking
+          </Button>
         ) : null}
 
         {cancellable && !confirming ? (
-          <button
+          <Button
             type="button"
             onClick={() => setConfirming(true)}
-            className="text-danger-600 hover:bg-danger-50 inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors"
+            variant="danger"
+            size="sm"
           >
             <X className="size-3.5" aria-hidden />
             Cancel parcel
-          </button>
+          </Button>
         ) : null}
       </div>
 
@@ -131,21 +134,24 @@ export function ShipmentActions({
             The items go back into the queue and can be packed into a new parcel.
           </p>
           <div className="mt-3 flex gap-2">
-            <button
+            <Button
               type="button"
               onClick={cancel}
-              disabled={pending || reason.trim().length < 3}
-              className="bg-danger-600 disabled:bg-line-strong rounded-md px-3 py-2 text-xs font-medium text-white disabled:cursor-not-allowed"
+              loading={pending}
+              disabled={reason.trim().length < 3}
+              variant="danger"
+              size="sm"
             >
-              {pending ? 'Cancelling…' : 'Cancel parcel'}
-            </button>
-            <button
+              Cancel parcel
+            </Button>
+            <Button
               type="button"
               onClick={() => setConfirming(false)}
-              className="text-muted hover:text-ink rounded-md px-3 py-2 text-xs"
+              variant="ghost"
+              size="sm"
             >
               Keep it
-            </button>
+            </Button>
           </div>
         </div>
       ) : null}

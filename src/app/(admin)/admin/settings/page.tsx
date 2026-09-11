@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import { PageHeader } from '@/components/console/page-header';
+import { Card } from '@/components/ui/card';
 import { Suspense } from 'react';
 
 import { DataTable, TableEmpty, type Column } from '@/components/console/data-table';
@@ -30,10 +32,10 @@ export const metadata: Metadata = { title: 'Settings' };
 export default function AdminSettingsPage() {
   return (
     <>
-      <h1 className="font-display text-ink text-xl">Settings</h1>
-      <p className="text-muted mt-1 text-sm">
-        Platform-wide thresholds and what each role may do.
-      </p>
+      <PageHeader
+        title="Settings"
+        description="Platform-wide thresholds and what each role may do."
+      />
 
       <Suspense fallback={<div className="skeleton mt-6 h-96 rounded-lg" aria-hidden />}>
         <Settings />
@@ -135,12 +137,12 @@ async function Settings() {
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="border-line bg-raised rounded-lg border">
+    <Card as="section" pad="none">
       <header className="border-line border-b px-5 py-3.5">
         <h2 className="text-ink text-md font-semibold">{title}</h2>
       </header>
       <dl className="divide-line divide-y">{children}</dl>
-    </section>
+    </Card>
   );
 }
 

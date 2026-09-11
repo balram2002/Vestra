@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
+import { PageHeader } from '@/components/console/page-header';
+import { Card } from '@/components/ui/card';
 import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 
@@ -80,23 +81,18 @@ async function OrderDetail({ params }: { params: Promise<{ orderNumber: string }
 
   return (
     <>
-      <nav className="text-2xs mb-3">
-        <Link href="/admin/orders" className="text-muted hover:text-ink">
-          ← All orders
-        </Link>
-      </nav>
-
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="font-display text-ink tabular text-xl">{order.orderNumber}</h1>
-          <p className="text-muted mt-1 text-sm">
+      <PageHeader
+        back={{ href: '/admin/orders', label: 'All orders' }}
+        title={<span className="tabular">{order.orderNumber}</span>}
+        description={
+          <>
             Placed {formatDateTime(order.placedAt)} · {items.length} items ·{' '}
             <span className="tabular">{formatMoney(order.pricing.payable)}</span>
             {order.userId ? '' : ' · guest order'}
-          </p>
-        </div>
-        <StatusBadge meta={FULFILLMENT_STATUS_META[order.status]} size="lg" />
-      </div>
+          </>
+        }
+        actions={<StatusBadge meta={FULFILLMENT_STATUS_META[order.status]} size="lg" />}
+      />
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="min-w-0 space-y-6">
@@ -106,7 +102,7 @@ async function OrderDetail({ params }: { params: Promise<{ orderNumber: string }
             const parcels = shipments.filter((s) => s.sellerOrderId === sellerOrder.id);
 
             return (
-              <section key={sellerOrder.id} className="border-line bg-raised rounded-lg border">
+              <Card as="section" key={sellerOrder.id} pad="none">
                 <header className="border-line flex flex-wrap items-center justify-between gap-2 border-b px-5 py-3">
                   <div>
                     <p className="text-faint text-2xs uppercase tracking-[0.12em]">
@@ -142,12 +138,12 @@ async function OrderDetail({ params }: { params: Promise<{ orderNumber: string }
                     <ShipmentTracker shipment={shipment} />
                   </div>
                 ))}
-              </section>
+              </Card>
             );
           })}
 
           {/* ------------------------------------------------ refunds */}
-          <section className="border-line bg-raised rounded-lg border p-5">
+          <Card as="section">
             <h2 className="text-ink text-md font-semibold">Refunds</h2>
 
             {refunds.length === 0 ? (
@@ -179,12 +175,12 @@ async function OrderDetail({ params }: { params: Promise<{ orderNumber: string }
                 <ManualRefund orderId={order.id} refundable={refundable} />
               </div>
             ) : null}
-          </section>
+          </Card>
         </div>
 
         {/* ---------------------------------------------------- sidebar */}
         <aside className="space-y-4">
-          <section className="border-line bg-raised rounded-lg border p-5">
+          <Card as="section">
             <h2 className="text-faint text-2xs uppercase tracking-[0.12em]">Customer</h2>
             <p className="text-ink mt-2 text-sm font-medium">{order.shippingAddress.fullName}</p>
             <p className="text-muted text-sm">{formatPhone(order.shippingAddress.phone)}</p>
@@ -198,9 +194,9 @@ async function OrderDetail({ params }: { params: Promise<{ orderNumber: string }
               {order.shippingAddress.city}, {order.shippingAddress.state}{' '}
               <span className="tabular">{order.shippingAddress.pincode}</span>
             </address>
-          </section>
+          </Card>
 
-          <section className="border-line bg-raised rounded-lg border p-5">
+          <Card as="section">
             <h2 className="text-faint text-2xs uppercase tracking-[0.12em]">Payment</h2>
             <div className="mt-2 flex items-center justify-between gap-2">
               <span className="text-ink text-sm">{PAYMENT_METHOD_LABEL[order.paymentMethod]}</span>
@@ -247,7 +243,7 @@ async function OrderDetail({ params }: { params: Promise<{ orderNumber: string }
                 <Row label="Refunded" value={`− ${formatMoney(refunded)}`} />
               ) : null}
             </dl>
-          </section>
+          </Card>
         </aside>
       </div>
     </>

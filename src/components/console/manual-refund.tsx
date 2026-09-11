@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
 import { formatMoney } from '@/lib/format';
@@ -49,13 +50,14 @@ export function ManualRefund({
 
   if (!open) {
     return (
-      <button
+      <Button
         type="button"
         onClick={() => setOpen(true)}
-        className="text-danger-600 hover:text-danger-700 text-xs font-medium underline-offset-2 hover:underline"
+        variant="ghost"
+        size="sm"
       >
         Refund this order
-      </button>
+      </Button>
     );
   }
 
@@ -92,22 +94,25 @@ export function ManualRefund({
       </div>
 
       <div className="mt-3 flex gap-2">
-        <button
+        <Button
           type="button"
           onClick={submit}
-          disabled={pending || reason.trim().length < 4 || amount <= 0}
-          className="bg-danger-600 disabled:bg-line-strong rounded-sm px-3 py-1.5 text-xs font-medium text-white disabled:cursor-not-allowed"
+          loading={pending}
+          disabled={reason.trim().length < 4 || amount <= 0}
+          variant="danger"
+          size="sm"
         >
-          {pending ? 'Refunding…' : `Refund ${formatMoney(Math.round(amount * 100))}`}
-        </button>
-        <button
+          {`Refund ${formatMoney(Math.round(amount * 100))}`}
+        </Button>
+        <Button
           type="button"
           onClick={() => setOpen(false)}
           disabled={pending}
-          className="text-muted hover:text-ink px-2 py-1.5 text-xs"
+          variant="ghost"
+          size="sm"
         >
           Cancel
-        </button>
+        </Button>
       </div>
     </div>
   );

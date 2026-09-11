@@ -1,4 +1,7 @@
 import type { Metadata } from 'next';
+
+import { PageHeader } from '@/components/console/page-header';
+import { Tabs } from '@/components/ui/tabs';
 import Link from 'next/link';
 import { Suspense } from 'react';
 
@@ -40,10 +43,10 @@ export default function SellerShipmentsPage({
 }) {
   return (
     <>
-      <h1 className="font-display text-ink text-xl">Shipments</h1>
-      <p className="text-muted mt-1 text-sm">
-        Generate labels, hand parcels to the courier and close a manifest for the run.
-      </p>
+      <PageHeader
+        title="Shipments"
+        description="Generate labels, hand parcels to the courier and close a manifest for the run."
+      />
 
       <Suspense fallback={<div className="skeleton mt-6 h-96 rounded-lg" aria-hidden />}>
         <ShipmentQueue searchParams={searchParams} />
@@ -78,7 +81,7 @@ async function ShipmentQueue({
         <div className="min-w-0">
           <Link
             href={`/seller/shipments/${row.id}`}
-            className="text-ink tabular hover:text-accent text-xs font-semibold underline-offset-2 hover:underline"
+            className="row-link text-ink tabular hover:text-accent text-xs font-semibold underline-offset-2 hover:underline"
           >
             {row.shipmentNumber}
           </Link>
@@ -146,25 +149,12 @@ async function ShipmentQueue({
 
   return (
     <div className="mt-6">
-      <nav
-        className="scrollbar-none -mx-1 flex gap-1 overflow-x-auto px-1 pb-1"
-        aria-label="Filter shipments"
-      >
-        {TABS.map((tab) => (
-          <Link
-            key={tab.value}
-            href={`/seller/shipments?status=${tab.value}`}
-            aria-current={tab.value === status ? 'page' : undefined}
-            className={
-              tab.value === status
-                ? 'bg-ink text-canvas shrink-0 rounded-md px-3 py-1.5 text-xs font-medium'
-                : 'text-muted hover:bg-sunken hover:text-ink shrink-0 rounded-md px-3 py-1.5 text-xs transition-colors'
-            }
-          >
-            {tab.label}
-          </Link>
-        ))}
-      </nav>
+      <Tabs
+        label="Filter shipments"
+        items={[...TABS]}
+        current={status}
+        href={(value) => `/seller/shipments?status=${value}`}
+      />
 
       {manifestable.length > 0 ? (
         <ManifestBar

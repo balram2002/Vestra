@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
 import type { FulfillmentStatus } from '@/domain/enums';
@@ -57,71 +59,70 @@ export function ExchangeDecision({
       <div className="border-line mt-4 border-t pt-4">
         {rejecting ? (
           <div>
-            <label className="block">
-              <span className="text-faint text-2xs uppercase tracking-[0.12em]">
-                Why are you declining this?
-              </span>
-              <textarea
+            <Textarea
+          label="Why are you declining this?"
                 value={reason}
                 onChange={(event) => setReason(event.target.value)}
                 rows={2}
                 maxLength={400}
                 placeholder="The customer sees this, so be specific."
-                className="border-line-strong bg-canvas text-ink placeholder:text-faint mt-1.5 w-full rounded-sm border px-2 py-1.5 text-sm"
-              />
-            </label>
+        />
 
             <p className="text-faint mt-1.5 text-2xs">
               Declining releases the {toSize} you are holding for this customer.
             </p>
 
             <div className="mt-2.5 flex gap-2">
-              <button
+              <Button
                 type="button"
-                disabled={pending || reason.trim().length < 8}
+                loading={pending}
+                disabled={reason.trim().length < 8}
                 onClick={() =>
                   run(
                     () => decideExchange({ exchangeId, decision: 'REJECT', reason: reason.trim() }),
                     'Exchange declined',
                   )
                 }
-                className="bg-danger-600 disabled:bg-line-strong rounded-sm px-3 py-1.5 text-xs font-medium text-white disabled:cursor-not-allowed"
+                variant="danger"
+                size="sm"
               >
-                {pending ? 'Working…' : 'Confirm decline'}
-              </button>
-              <button
+                Confirm decline
+              </Button>
+              <Button
                 type="button"
                 onClick={() => setRejecting(false)}
                 disabled={pending}
-                className="text-muted hover:text-ink px-2 py-1.5 text-xs"
+                variant="ghost"
+                size="sm"
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         ) : (
           <div className="flex flex-wrap gap-2">
-            <button
+            <Button
               type="button"
-              disabled={pending}
+              loading={pending}
               onClick={() =>
                 run(
                   () => decideExchange({ exchangeId, decision: 'APPROVE' }),
                   'Approved. A courier will collect the item.',
                 )
               }
-              className="bg-ink text-canvas rounded-sm px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+              size="sm"
             >
-              {pending ? 'Working…' : 'Approve exchange'}
-            </button>
-            <button
+              Approve exchange
+            </Button>
+            <Button
               type="button"
-              disabled={pending}
+              loading={pending}
               onClick={() => setRejecting(true)}
-              className="border-line-strong text-muted hover:border-ink hover:text-ink rounded-sm border px-3 py-1.5 text-xs transition-colors"
+              variant="secondary"
+              size="sm"
             >
               Decline
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -135,23 +136,24 @@ export function ExchangeDecision({
       </p>
 
       <div className="mt-2.5 flex flex-wrap gap-2">
-        <button
+        <Button
           type="button"
-          disabled={pending}
+          loading={pending}
           onClick={() =>
             run(
               () => submitExchangeQualityCheck({ exchangeId, result: 'PASSED' }),
               `Passed. ${toSize} is on its way to the customer.`,
             )
           }
-          className="bg-success-600 rounded-sm px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+          variant="ghost"
+          size="sm"
         >
-          {pending ? 'Working…' : `Passed — dispatch ${toSize}`}
-        </button>
+          {`Passed — dispatch ${toSize}`}
+        </Button>
 
-        <button
+        <Button
           type="button"
-          disabled={pending}
+          loading={pending}
           onClick={() =>
             run(
               () =>
@@ -163,10 +165,11 @@ export function ExchangeDecision({
               'Marked as failed. The unit is written off and the replacement released.',
             )
           }
-          className="border-danger-300 text-danger-700 hover:bg-danger-50 rounded-sm border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
+          variant="danger"
+          size="sm"
         >
           Failed
-        </button>
+        </Button>
       </div>
 
       <p className="text-faint mt-2 text-2xs">

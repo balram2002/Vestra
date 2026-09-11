@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Suspense } from 'react';
 
+import { PageHeader } from '@/components/console/page-header';
 import { SellerStatusActions } from '@/components/console/admin-actions';
 import { ConsoleTabs } from '@/components/console/console-tabs';
 import { DataTable, TableEmpty, type Column } from '@/components/console/data-table';
@@ -30,10 +31,10 @@ export default function AdminSellersPage({
 }) {
   return (
     <>
-      <h1 className="font-display text-ink text-xl">Sellers</h1>
-      <p className="text-muted mt-1 text-sm">
-        Every store on the platform, ranked by lifetime trade.
-      </p>
+      <PageHeader
+        title="Sellers"
+        description="Every store on the platform, ranked by lifetime trade."
+      />
 
       <Suspense fallback={<div className="skeleton mt-6 h-96 rounded-lg" aria-hidden />}>
         <SellerTable searchParams={searchParams} />
@@ -61,7 +62,7 @@ async function SellerTable({
         <div className="min-w-0">
           <Link
             href={`/store/${seller.slug}`}
-            className="text-ink block truncate text-xs font-medium hover:underline"
+            className="row-link text-ink block truncate text-xs font-medium hover:underline"
           >
             {seller.displayName}
           </Link>
