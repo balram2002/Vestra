@@ -1,5 +1,7 @@
+import { UserCircle } from 'lucide-react';
 import Link from 'next/link';
 
+import { StatusPage } from '@/components/layout/status-page';
 import { Button } from '@/components/ui/button';
 
 /**
@@ -10,20 +12,20 @@ import { Button } from '@/components/ui/button';
  */
 export default function Unauthorized() {
   return (
-    <div className="gutter shell-max flex min-h-[60dvh] flex-col items-center justify-center py-16 text-center">
-      <h1 className="font-display text-ink text-2xl">Sign in to continue</h1>
-      <p className="text-muted mt-2 max-w-md text-sm">
-        This page is part of your account. Sign in and we will bring you straight back here.
-      </p>
-
-      <div className="mt-7 flex flex-wrap justify-center gap-2">
-        <Button asChild>
-          <Link href="/login">Sign in</Link>
-        </Button>
-        <Button asChild variant="secondary">
-          <Link href="/register">Create an account</Link>
-        </Button>
-      </div>
-    </div>
+    <StatusPage
+      icon={UserCircle}
+      title="Sign in to continue"
+      body="This page is part of your account. Sign in and we will bring you straight back here."
+      actions={
+        <>
+          <Button asChild>
+            <Link href="/login">Sign in</Link>
+          </Button>
+          <Button asChild variant="secondary">
+            <Link href="/register">Create an account</Link>
+          </Button>
+        </>
+      }
+    />
   );
 }

@@ -37,7 +37,10 @@ export function Breadcrumbs({
                 </span>
               ) : (
                 <>
-                  <Link href={item.href} className="hover:text-accent-ink transition-colors">
+                  <Link
+                  href={item.href}
+                  className="hover:text-accent-ink inline-flex min-h-11 min-w-11 items-center justify-center transition-colors lg:min-h-0 lg:min-w-0"
+                >
                     {item.label}
                   </Link>
                   <ChevronRight className="size-3 shrink-0" aria-hidden />

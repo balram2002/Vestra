@@ -3,28 +3,57 @@ import Link from 'next/link';
 
 import type { ProductBadgeKind, ProductSummary } from '@/domain/types';
 import { cn } from '@/lib/cn';
-import { formatMoney } from '@/lib/format';
 
+import { PriceBlock } from './price-block';
 import { RatingStars } from './rating-stars';
 
 /**
  * Product card.
  *
- * The most-repeated component in the shop, so it is a Server Component with no
- * client JavaScript at all: a 48-card grid that hydrates is a measurable INP
- * cost for a surface whose only job is to link somewhere. Interactive
- * affordances arrive as `action` children — separate client islands — so the
- * card itself stays static.
+ * The most-repeated component in the shop, so it is a Server Component with NO
+ * CLIENT JAVASCRIPT AT ALL: a 48-card grid that hydrates is a measurable INP
+ * cost for a surface whose only job is to link somewhere. Every hover effect
+ * below is therefore pure CSS, and interactive affordances arrive as `action`
+ * children — separate client islands — so the card itself stays static.
  *
- * Design decisions worth keeping:
+ * That constraint is the interesting part of the design. A card cannot know
+ * whether it is hovered in JavaScript, so the entire reveal — the second
+ * photograph, the size rail, the lifted shadow — is built out of `group-hover`,
+ * `transform` and `opacity`, all of which composite. The result runs at 60fps
+ * on a grid of fifty on a phone from 2019.
  *
- *  - ONE badge, never a stack. Two or three competing flags on a tile is how a
- *    grid starts to look like a discount bin, and none of them get read.
- *  - The price line carries the discount, so the image does not have to.
- *  - Fixed 3:4 image well, so the grid reserves its final height before any
- *    image loads and CLS stays at zero.
- *  - `sizes` is declared per breakpoint, so a phone downloads a phone-sized
+ * ---------------------------------------------------------------------------
+ * THE DECISIONS, IN THE ORDER THEY MATTER
+ * ---------------------------------------------------------------------------
+ *
+ *  - **ONE badge, never a stack.** Two or three competing flags on a tile is
+ *    how a grid starts to look like a discount bin, and none of them get read.
+ *    `BADGE_PRIORITY` ranks them by how much each actually changes a decision:
+ *    "only 2 left" beats "bestseller" beats "new".
+ *
+ *  - **A fixed 4:5 image well**, so the grid reserves its final height before
+ *    any image loads and CLS stays at zero. 4:5 rather than 3:4 because
+ *    garments are taller than they are wide and the extra height is the
+ *    difference between a shot that crops at the knee and one that does not.
+ *    `sizes` is declared per breakpoint, so a phone downloads a phone-sized
  *    image rather than the 900px one.
+ *
+ *  - **The price line carries the discount**, so the image does not have to. A
+ *    "50% OFF" flash over the photograph is the single fastest way to make
+ *    premium stock look cheap.
+ *
+ *  - **A hairline ring inside the image well.** Fashion photography is shot on
+ *    white; without the ring a white-on-white product has no edge and the whole
+ *    grid dissolves into the page.
+ *
+ *  - **Sold out desaturates rather than hides.** An out-of-stock product still
+ *    answers "do they carry this", and hiding it makes a category look thinner
+ *    than it is. It simply must never look available.
+ *
+ *  - **The size rail appears on hover and is never the only way to see sizes.**
+ *    It is `aria-hidden` decoration that saves a pointer user one click; the
+ *    PDP is the source of truth, and touch — which has no hover — loses
+ *    nothing.
  */
 
 /** Ranked by how much each actually influences a decision. */
@@ -40,14 +69,17 @@ const BADGE_PRIORITY: ProductBadgeKind[] = [
 ];
 
 const BADGE_STYLE: Record<ProductBadgeKind, string> = {
-  LOW_STOCK: 'bg-ember-600 text-white',
+  // The only two that get the urgency colour.
+  LOW_STOCK: 'bg-danger-fill text-white',
+  DEAL: 'bg-danger-fill text-white',
   BESTSELLER: 'bg-ink text-canvas',
-  NEW: 'bg-canvas text-ink',
   TRENDING: 'bg-ink text-canvas',
-  BACK_IN_STOCK: 'bg-success-600 text-white',
-  PREMIUM: 'bg-brass-600 text-white',
-  DEAL: 'bg-ember-600 text-white',
-  SPONSORED: 'bg-canvas/85 text-muted',
+  // Frosted rather than solid: "new" is the quietest thing worth saying.
+  NEW: 'bg-raised/90 text-ink backdrop-blur-md',
+  BACK_IN_STOCK: 'bg-success-fill text-white',
+  PREMIUM: 'bg-premium-fill text-white',
+  // Disclosure, not promotion — it must not compete with a real badge.
+  SPONSORED: 'bg-raised/80 text-muted backdrop-blur-md',
 };
 
 export interface ProductCardProps {
@@ -59,19 +91,72 @@ export interface ProductCardProps {
   priority?: boolean;
   /** Interactive island, e.g. the wishlist heart. */
   action?: React.ReactNode;
+  /**
+   * Sizes to reveal on hover.
+   *
+   * Decoration for a pointer, and `aria-hidden` for that reason — see the
+   * header note. Capped at six by the renderer: a seven-size rail wraps and
+   * pushes the card's own height around on hover, which is the one thing this
+   * effect must never do.
+   */
+  sizes?: string[];
   className?: string;
 }
 
-export function ProductCard({ product, priority = false, action, className }: ProductCardProps) {
+export function ProductCard({
+  product,
+  priority = false,
+  action,
+  sizes: sizeOptions,
+  className,
+}: ProductCardProps) {
   const soldOut = product.stockLevel === 'OUT_OF_STOCK';
 
-  const badge = BADGE_PRIORITY.map((kind) =>
-    product.badges.find((b) => b.kind === kind),
-  ).find(Boolean);
+  const badge = BADGE_PRIORITY.map((kind) => product.badges.find((b) => b.kind === kind)).find(
+    Boolean,
+  );
+
+  const imageSizes =
+    '(max-width: 40rem) 46vw, (max-width: 64rem) 31vw, (max-width: 96rem) 23vw, 300px';
+
+  const sizeRail = soldOut ? [] : (sizeOptions ?? []).slice(0, 6);
 
   return (
     <article className={cn('group relative flex flex-col', className)}>
-      <div className="bg-sunken relative aspect-3/4 overflow-hidden rounded-lg">
+      <div
+        className={cn(
+          'bg-sunken relative aspect-4/5 overflow-hidden rounded-xl',
+          /*
+           * The well itself lifts, not the whole card: the type below stays
+           * pinned to the grid baseline while the photograph rises, which reads
+           * as the image coming forward rather than the card wobbling.
+           *
+           * This is the one place in the codebase that transitions `box-shadow`
+           * directly instead of using `.lift`, and both halves of that are
+           * deliberate. The utility cross-fades a pseudo-element carrying the
+           * shadow — but this well sets `overflow-hidden` to clip the
+           * photograph, which would clip that pseudo-element's shadow away
+           * entirely. Escaping it would mean a wrapper element on the
+           * most-repeated component in the shop.
+           *
+           * And the cost it avoids does not apply here: `.lift` earns its keep
+           * when many elements animate at once, whereas exactly one card is
+           * hovered at a time, so this is a single element repainting a shadow.
+           * The lift travels on `transform` regardless, which is the expensive
+           * half.
+           */
+          'transition-[transform,box-shadow] duration-(--duration-slow) ease-(--ease-out)',
+          !soldOut && 'motion-safe:group-hover:-translate-y-1 group-hover:shadow-lg',
+        )}
+      >
+        {/*
+          The image is wrapped in its own `aria-hidden` link.
+
+          Two links to the same place in one card would be announced twice and
+          tabbed through twice. The title's link below is the real one — it
+          carries the accessible name and stretches over the whole card — and
+          this one exists only so a pointer click on the photograph works.
+        */}
         <Link href={`/product/${product.slug}`} tabIndex={-1} aria-hidden className="block h-full">
           <Image
             src={product.primaryImage}
@@ -79,16 +164,17 @@ export function ProductCard({ product, priority = false, action, className }: Pr
             fill
             priority={priority}
             loading={priority ? undefined : 'lazy'}
-            sizes="(max-width: 40rem) 50vw, (max-width: 64rem) 33vw, (max-width: 96rem) 25vw, 300px"
+            sizes={imageSizes}
             className={cn(
-              'object-cover transition-[opacity,transform] duration-500 ease-out-quint',
-              // A gentle push-in on hover reads as depth; the second shot then
-              // cross-fades over it, so no request is made on hover.
-              'motion-safe:group-hover:scale-[1.03]',
-              product.hoverImage ? 'group-hover:opacity-0' : '',
-              soldOut ? 'opacity-55 saturate-[0.6]' : '',
+              'object-cover transition-[opacity,transform] duration-(--duration-hero) ease-(--ease-out)',
+              // A gentle push-in reads as depth; the second shot then
+              // cross-fades over it, so hovering makes no new request.
+              'motion-safe:group-hover:scale-[1.06]',
+              product.hoverImage && 'group-hover:opacity-0',
+              soldOut && 'opacity-50 saturate-[0.35]',
             )}
           />
+
           {product.hoverImage ? (
             <Image
               src={product.hoverImage}
@@ -96,16 +182,33 @@ export function ProductCard({ product, priority = false, action, className }: Pr
               aria-hidden
               fill
               loading="lazy"
-              sizes="(max-width: 40rem) 50vw, (max-width: 64rem) 33vw, (max-width: 96rem) 25vw, 300px"
-              className="pointer-events-none object-cover opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+              sizes={imageSizes}
+              className={cn(
+                'pointer-events-none object-cover opacity-0',
+                'transition-[opacity,transform] duration-(--duration-hero) ease-(--ease-out)',
+                'group-hover:opacity-100 motion-safe:group-hover:scale-[1.03]',
+                soldOut && 'saturate-[0.35]',
+              )}
             />
           ) : null}
         </Link>
 
+        {/*
+          The edge, for product photography shot on white.
+
+          `ring-inset` rather than a border: a border would sit outside the
+          rounded corner and paint a visible notch where the two radii disagree.
+        */}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-inset ring-black/[0.07]"
+        />
+
         {badge ? (
           <span
             className={cn(
-              'pointer-events-none absolute left-2.5 top-2.5 rounded-full px-2.5 py-1 text-2xs font-medium tracking-wide',
+              'pointer-events-none absolute left-2.5 top-2.5 rounded-full px-2.5 py-1',
+              'text-2xs font-semibold uppercase tracking-[0.06em] shadow-xs',
               BADGE_STYLE[badge.kind],
             )}
           >
@@ -114,62 +217,123 @@ export function ProductCard({ product, priority = false, action, className }: Pr
         ) : null}
 
         {soldOut ? (
-          <div className="bg-canvas/90 absolute inset-x-0 bottom-0 py-2 text-center backdrop-blur-sm">
-            <span className="text-ink text-xs font-medium tracking-wide">Sold out</span>
+          <div className="absolute inset-0 grid place-items-center">
+            <span className="bg-raised/92 text-ink rounded-full px-4 py-2 text-xs font-semibold tracking-wide backdrop-blur-sm">
+              Sold out
+            </span>
           </div>
         ) : null}
 
         {action ? <div className="absolute right-2.5 top-2.5">{action}</div> : null}
-      </div>
-
-      <div className="flex flex-1 flex-col gap-1 pt-3">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-faint truncate text-2xs font-medium uppercase tracking-[0.12em]">
-            {product.brandName}
-          </p>
-          <RatingStars rating={product.rating} count={product.ratingCount} />
-        </div>
 
         {/*
-          The whole card is clickable via this stretched link, which keeps the
-          accessible name on the product title rather than on a bare wrapper.
+          The size rail.
+
+          Slides up from beneath the image's lower edge on hover. It is
+          translated 100% down at rest rather than hidden, so the browser has
+          already laid it out and the reveal is one compositor-only transform
+          with nothing to measure.
+
+          `hover-only` (see global.css) forces it visible where there is no
+          hover at all, but the rail is additionally gated on `md` — on a phone
+          it would sit permanently over the bottom of every photograph in the
+          grid.
         */}
-        <h3 className="text-ink clamp-2 text-sm leading-snug">
-          <Link href={`/product/${product.slug}`} className="after:absolute after:inset-0">
+        {sizeRail.length > 0 ? (
+          <div
+            aria-hidden
+            className={cn(
+              'pointer-events-none absolute inset-x-0 bottom-0 hidden p-2.5 md:block',
+              'translate-y-full opacity-0',
+              'transition-[transform,opacity] duration-(--duration-slow) ease-(--ease-out)',
+              'group-hover:translate-y-0 group-hover:opacity-100',
+            )}
+          >
+            <div className="glass flex items-center justify-center gap-1 rounded-lg px-2 py-1.5 shadow-sm">
+              {sizeRail.map((size) => (
+                <span
+                  key={size}
+                  className="text-muted min-w-6 rounded px-1 text-center text-2xs font-medium"
+                >
+                  {size}
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="flex flex-1 flex-col gap-1.5 pt-3.5">
+        <p className="text-faint truncate text-2xs font-semibold uppercase tracking-[0.13em]">
+          {product.brandName}
+        </p>
+
+        {/*
+          The stretched link.
+
+          The whole card is clickable through this, which keeps the accessible
+          name on the product title rather than on a bare wrapper. Exactly ONE
+          element per card may carry it, or the card gets two overlapping
+          full-size targets and the later one silently wins.
+        */}
+        <h3 className="text-ink clamp-2 text-sm font-medium leading-snug">
+          <Link
+            href={`/product/${product.slug}`}
+            className={cn(
+              'after:absolute after:inset-0 focus-visible:underline',
+              // The title is the one element that responds to hovering the
+              // card, which keeps the connection between the photograph and its
+              // name legible in a dense grid.
+              'transition-colors duration-(--duration-base) group-hover:text-accent-ink',
+            )}
+          >
             {product.title}
           </Link>
         </h3>
 
-        <div className="tabular mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-          <span className="text-ink text-md font-semibold">
-            {formatMoney(product.sellingPrice)}
-          </span>
-          {product.discountPercent > 0 ? (
-            <>
-              <span className="text-faint text-xs line-through">{formatMoney(product.mrp)}</span>
-              <span className="text-ember-600 text-xs font-medium">
-                {product.discountPercent}% off
-              </span>
-            </>
+        <PriceBlock
+          sellingPrice={product.sellingPrice}
+          mrp={product.mrp}
+          discountPercent={product.discountPercent}
+          size="md"
+          className="mt-0.5"
+        />
+
+        <div className="mt-auto flex items-center justify-between gap-2 pt-2">
+          <RatingStars rating={product.rating} count={product.ratingCount} />
+
+          {product.colorOptions.length > 1 ? (
+            <span className="flex items-center gap-1" aria-hidden>
+              {product.colorOptions.slice(0, 4).map((color) => (
+                <span
+                  key={color.value}
+                  title={color.label}
+                  className={cn(
+                    'size-3 rounded-full ring-1 ring-inset ring-black/20',
+                    'transition-transform duration-(--duration-base) ease-(--ease-spring)',
+                    'motion-safe:group-hover:scale-115',
+                  )}
+                  style={{ backgroundColor: color.hex }}
+                />
+              ))}
+              {product.colorOptions.length > 4 ? (
+                <span className="text-faint ml-0.5 text-2xs">
+                  +{product.colorOptions.length - 4}
+                </span>
+              ) : null}
+            </span>
           ) : null}
         </div>
 
+        {/*
+          Colour count, for assistive tech.
+
+          The swatch row above is `aria-hidden` because a list of unlabelled
+          colour chips announces as nothing useful; this says the one fact they
+          actually convey.
+        */}
         {product.colorOptions.length > 1 ? (
-          <div className="mt-1.5 flex items-center gap-1">
-            {product.colorOptions.slice(0, 4).map((color) => (
-              <span
-                key={color.value}
-                title={color.label}
-                className="border-line-strong size-3 rounded-full border"
-                style={{ backgroundColor: color.hex }}
-              />
-            ))}
-            {product.colorOptions.length > 4 ? (
-              <span className="text-faint ml-0.5 text-2xs">
-                +{product.colorOptions.length - 4}
-              </span>
-            ) : null}
-          </div>
+          <span className="sr-only">Available in {product.colorOptions.length} colours</span>
         ) : null}
       </div>
     </article>

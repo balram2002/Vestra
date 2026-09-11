@@ -8,9 +8,9 @@ import { getSessionUser } from '@/server/auth/session';
 import { applicableCategories, getApplication } from '@/server/services/onboarding';
 
 export const metadata: Metadata = {
-  title: 'Apply to sell on Vestra',
+  title: 'Apply to sell on VestraWAB',
   description:
-    'Open a store on Vestra. Tell us about your business, upload your documents, and start listing once you are verified.',
+    'Open a store on VestraWAB. Tell us about your business, upload your documents, and start listing once you are verified.',
 };
 
 export default function ApplyPage() {
@@ -18,7 +18,7 @@ export default function ApplyPage() {
     <div className="gutter shell-max py-8">
       <nav className="text-2xs mb-3">
         <Link href="/sell-with-us" className="text-muted hover:text-ink">
-          &larr; Selling on Vestra
+          &larr; Selling on VestraWAB
         </Link>
       </nav>
 

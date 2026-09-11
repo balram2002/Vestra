@@ -3,6 +3,8 @@
 import { LogOut } from 'lucide-react';
 import { useTransition } from 'react';
 
+import { Button } from '@/components/ui/button';
+
 import { signOut } from '@/server/actions/auth';
 
 /**
@@ -16,14 +18,16 @@ export function SignOutButton() {
   const [pending, startTransition] = useTransition();
 
   return (
-    <button
+    <Button
       type="button"
       disabled={pending}
       onClick={() => startTransition(async () => { await signOut(); })}
-      className="border-line-strong text-muted hover:border-ink hover:text-ink inline-flex shrink-0 items-center gap-2 rounded-md border px-3 py-1.5 text-sm transition-colors disabled:opacity-60"
+      variant="secondary"
+      size="sm"
+      className="shrink-0"
     >
       <LogOut className="size-4" aria-hidden />
       {pending ? 'Signing out…' : 'Sign out'}
-    </button>
+    </Button>
   );
 }

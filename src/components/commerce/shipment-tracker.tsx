@@ -1,4 +1,5 @@
 import { Check, CircleAlert, Truck } from 'lucide-react';
+import { Card } from '@/components/ui/card';
 
 import { SHIPMENT_STATUS_META, type ShipmentStatus } from '@/domain/enums';
 import type { Shipment } from '@/domain/types';
@@ -34,7 +35,7 @@ export function ShipmentTracker({
   const delivered = current === 'DELIVERED';
 
   return (
-    <section className="border-line bg-raised rounded-lg border">
+    <Card as="section" pad="none">
       {showHeader ? (
         <header className="border-line flex flex-wrap items-start justify-between gap-3 border-b p-5">
           <div className="min-w-0">
@@ -135,7 +136,7 @@ export function ShipmentTracker({
           })}
         </ol>
       )}
-    </section>
+    </Card>
   );
 }
 

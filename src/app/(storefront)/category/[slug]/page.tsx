@@ -3,11 +3,7 @@ import { notFound, permanentRedirect } from 'next/navigation';
 import { Suspense } from 'react';
 
 import { Breadcrumbs } from '@/components/commerce/breadcrumbs';
-import { FilterDrawer } from '@/components/commerce/filter-drawer';
-import { FilterRail } from '@/components/commerce/filter-rail';
-import { ListingToolbar, SortChips } from '@/components/commerce/listing-toolbar';
-import { Pagination } from '@/components/commerce/pagination';
-import { ProductGrid } from '@/components/commerce/product-grid';
+import { ListingView } from '@/components/commerce/listing-view';
 import { ProductGridSkeleton } from '@/components/skeletons/product-card-skeleton';
 import { absoluteUrl } from '@/config/site';
 import { isIndexableListing, parseProductQuery, type RawSearchParams } from '@/lib/product-query';
@@ -131,7 +127,7 @@ export default async function CategoryPage({ params, searchParams }: PageProps) 
         who came to shop is already looking.
       */}
       <header className="mt-2 sm:mt-3">
-        <h1 className="font-display text-ink text-xl sm:text-3xl">{category.name}</h1>
+        <h1 className="headline text-ink text-2xl sm:text-4xl">{category.name}</h1>
         {category.description ? (
           <p className="text-muted mt-1 line-clamp-2 max-w-2xl text-sm sm:mt-1.5 sm:line-clamp-none">
             {category.description}
@@ -183,76 +179,17 @@ async function CategoryListing({
       />
 
       {/*
-        The rail is built once and rendered twice: docked on desktop, and inside
-        the drawer on mobile. Re-implementing it for small screens would
-        guarantee the two sets of filters drift apart.
+        The entire listing arrangement — sticky mobile bar, docked rail, applied
+        chips, toolbar, grid, pagination — lives in `ListingView` and is shared
+        with search, brand and store. Four copies of this layout was four
+        chances for the filter drawer to go missing from one of them.
       */}
-      <div className="bg-canvas/95 gutter sticky top-[var(--header-height)] z-30 -mx-4 mt-3 flex items-center gap-2 border-b border-line py-2 backdrop-blur-md sm:-mx-6 lg:hidden">
-        <FilterDrawer appliedCount={result.appliedFilterCount}>
-          <FilterRail
-            facets={result.facets}
-            priceFacet={result.priceFacet}
-            params={raw}
-            basePath={basePath}
-            appliedCount={result.appliedFilterCount}
-          />
-        </FilterDrawer>
-
-        {/*
-          The chips scroll and the count does not.
-          
-          A fade on the trailing edge is what says "there is more sort to the
-          right"; without it the last chip is simply sliced in half against the
-          count and reads as a rendering fault.
-        */}
-        <div className="relative min-w-0 flex-1">
-          <SortChips activeSort={query.sort ?? 'popularity'} params={raw} basePath={basePath} />
-          <div
-            aria-hidden
-            className="from-canvas pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l to-transparent"
-          />
-        </div>
-
-        <p className="text-faint tabular border-line shrink-0 border-l pl-2.5 text-2xs" role="status">
-          {result.total} items
-        </p>
-      </div>
-
-      <div className="mt-4 flex gap-8 lg:mt-5">
-        <div className="hidden w-60 shrink-0 lg:block">
-          <FilterRail
-            facets={result.facets}
-            priceFacet={result.priceFacet}
-            params={raw}
-            basePath={basePath}
-            appliedCount={result.appliedFilterCount}
-          />
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <ListingToolbar
-            className="hidden lg:flex"
-            total={result.total}
-            activeSort={query.sort ?? 'popularity'}
-            params={raw}
-            basePath={basePath}
-          />
-
-          <div className="mt-5">
-            <ProductGrid
-              products={result.items}
-              emptyAction={{ href: basePath, label: 'Clear all filters' }}
-            />
-          </div>
-
-          <Pagination
-            page={result.page}
-            pageCount={result.pageCount}
-            params={raw}
-            basePath={basePath}
-          />
-        </div>
-      </div>
+      <ListingView
+        result={result}
+        params={raw}
+        basePath={basePath}
+        sort={query.sort ?? 'popularity'}
+      />
     </>
   );
 }

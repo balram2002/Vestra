@@ -82,13 +82,19 @@ function RouteProgressInner() {
     <>
       <div
         aria-hidden
-        className="pointer-events-none fixed inset-x-0 top-0 z-[100] h-0.5 overflow-hidden"
+        className="pointer-events-none fixed inset-x-0 top-0 z-[100] h-[3px] overflow-hidden"
       >
+        {/*
+          The leading glow is a `box-shadow` on a bar that only ever TRANSLATES,
+          so the shadow is rasterised once and carried along rather than being
+          repainted per frame — which is what makes an animated glow expensive
+          everywhere else it is attempted.
+        */}
         <div
-          className="bg-accent h-full w-full origin-left"
+          className="bg-accent h-full w-full origin-left shadow-[0_0_10px_2px_var(--accent-glow)]"
           style={
             state === 'loading'
-              ? { animation: 'route-progress 8s cubic-bezier(0.22, 1, 0.36, 1) forwards' }
+              ? { animation: 'mrd-progress 8s cubic-bezier(0.22, 1, 0.36, 1) forwards' }
               : { transform: 'translateX(0)', transition: 'transform 220ms ease-out' }
           }
         />

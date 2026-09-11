@@ -72,7 +72,7 @@ export function OrderStatusTimeline({
                   className={cn(
                     'flex size-6 items-center justify-center rounded-full border-2 transition-colors',
                     reached
-                      ? 'border-success-500 bg-success-500 text-white'
+                      ? 'border-success-fill bg-success-fill text-white'
                       : 'border-line bg-canvas',
                     isCurrent && 'ring-success-500/25 ring-4',
                   )}
@@ -129,7 +129,7 @@ function EventList({ events, status }: { events: OrderEvent[]; status: Fulfillme
           meta.tone === 'neutral' && 'border-line bg-sunken text-muted',
           meta.tone === 'info' && 'border-info-100 bg-info-50 text-info-700',
           meta.tone === 'accent' && 'border-accent-line bg-accent-soft text-accent-ink',
-          meta.tone === 'brass' && 'border-brass-200 bg-brass-50 text-brass-700',
+          meta.tone === 'premium' && 'border-sand-200 bg-sand-50 text-sand-700',
         )}
       >
         <p className="font-semibold">{meta.label}</p>

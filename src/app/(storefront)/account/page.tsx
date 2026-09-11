@@ -107,7 +107,7 @@ async function Overview() {
             {allOrders > orders.length ? (
               <Link
                 href="/orders"
-                className="text-ink group text-sm font-medium hover:underline underline-offset-4"
+                className="text-ink group text-sm font-medium hover:underline underline-offset-4 inline-flex min-h-11 items-center lg:min-h-0"
               >
                 <span className="inline-flex items-center gap-1.5">
                   All {allOrders} orders
@@ -202,9 +202,9 @@ async function Overview() {
           />
 
           {user.creditBalance > 0 ? (
-            <div className="border-brass-200 bg-brass-50 rounded-lg border p-4">
-              <p className="text-brass-700 text-2xs font-medium uppercase tracking-[0.12em]">
-                Vestra credit
+            <div className="border-sand-200 bg-sand-50 rounded-lg border p-4">
+              <p className="text-sand-700 text-2xs font-medium uppercase tracking-[0.12em]">
+                VestraWAB credit
               </p>
               <p className="text-ink tabular mt-1 text-xl font-semibold">
                 {formatMoney(user.creditBalance)}

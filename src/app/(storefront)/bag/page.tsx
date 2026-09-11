@@ -164,7 +164,7 @@ async function BagContents() {
 
             {cart.pricing.creditApplied > 0 ? (
               <Row
-                label="Vestra Credit"
+                label="VestraWAB Credit"
                 value={`− ${formatMoney(cart.pricing.creditApplied)}`}
                 tone="success"
               />

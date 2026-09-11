@@ -8,9 +8,9 @@ import { formatCompactNumber } from '@/lib/format';
 import { listSellers } from '@/server/services/catalog';
 
 export const metadata: Metadata = {
-  title: 'Sellers on Vestra',
+  title: 'Sellers on VestraWAB',
   description:
-    'Every store on Vestra is GST-registered and KYC-verified before its first listing goes live. Browse the independent labels and workshops selling direct.',
+    'Every store on VestraWAB is GST-registered and KYC-verified before its first listing goes live. Browse the independent labels and workshops selling direct.',
   alternates: { canonical: absoluteUrl('/stores') },
 };
 
@@ -28,7 +28,7 @@ export default async function StoresPage() {
       <Breadcrumbs items={[{ href: '/', label: 'Home' }, { href: '/stores', label: 'Sellers' }]} />
 
       <header className="mt-3">
-        <h1 className="font-display text-ink text-2xl sm:text-3xl">Sellers on Vestra</h1>
+        <h1 className="font-display text-ink text-2xl sm:text-3xl">Sellers on VestraWAB</h1>
         <p className="text-muted mt-2 max-w-2xl text-sm">
           Independent labels, workshops and family businesses selling direct. Every one is
           GST-registered and KYC-verified before their first listing goes live.

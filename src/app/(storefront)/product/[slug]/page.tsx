@@ -157,7 +157,7 @@ export default async function ProductPage({ params }: PageProps) {
                     </span>
                   </a>
                 ) : null}
-                {brand?.isPremium ? <Badge tone="brass" size="sm">Premium</Badge> : null}
+                {brand?.isPremium ? <Badge tone="premium" size="sm">Premium</Badge> : null}
               </div>
             </div>
           }
@@ -229,7 +229,7 @@ export default async function ProductPage({ params }: PageProps) {
 
         <div>
           <h2 className="font-display text-ink text-lg">Specifications</h2>
-          <dl className="border-line mt-3 divide-y divide-[--border-subtle] border-y text-sm">
+          <dl className="border-line mt-3 divide-y divide-(--border-subtle) border-y text-sm">
             {product.specifications.map((spec) => (
               <div key={spec.label} className="grid grid-cols-3 gap-3 py-2.5">
                 <dt className="text-muted col-span-1">{spec.label}</dt>

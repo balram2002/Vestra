@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
@@ -43,12 +44,9 @@ export default async function SellWithUsPage() {
               About fifteen minutes, if you have your GSTIN and bank details to hand.
             </p>
           </div>
-          <Link
-            href="/sell-with-us/apply"
-            className="bg-ink text-canvas shrink-0 rounded-md px-5 py-2.5 text-sm font-medium"
-          >
-            Start your application
-          </Link>
+          <Button asChild size="lg" className="shrink-0">
+            <Link href="/sell-with-us/apply">Start your application</Link>
+          </Button>
         </div>
       </div>
     </>

@@ -9,7 +9,7 @@ import { getCategoryTree } from '@/server/services/catalog';
 export const metadata: Metadata = {
   title: 'Shop by category',
   description:
-    'Every department on Vestra — womenswear, menswear, kids, beauty, footwear, accessories and home.',
+    'Every department on VestraWAB — womenswear, menswear, kids, beauty, footwear, accessories and home.',
   alternates: { canonical: absoluteUrl('/categories') },
 };
 
@@ -72,7 +72,7 @@ async function Departments() {
               </h2>
               <Link
                 href={`/category/${department.slug}`}
-                className="text-accent-ink shrink-0 text-xs font-medium hover:underline underline-offset-4"
+                className="text-accent-ink inline-flex min-h-11 min-w-11 shrink-0 items-center justify-end text-xs font-medium underline-offset-4 hover:underline lg:min-h-0 lg:min-w-0"
               >
                 All {department.name.toLowerCase()}
               </Link>
@@ -91,7 +91,7 @@ async function Departments() {
                   <li key={child.id}>
                     <Link
                       href={`/category/${child.slug}`}
-                      className="text-muted hover:text-ink block py-2 text-sm transition-colors"
+                      className="text-muted hover:text-ink flex min-h-11 items-center text-sm transition-colors lg:min-h-0 lg:py-2"
                     >
                       {child.name}
                     </Link>

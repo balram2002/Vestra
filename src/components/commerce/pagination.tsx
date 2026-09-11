@@ -77,9 +77,11 @@ function PageLink({
   children: React.ReactNode;
 } & Omit<React.ComponentProps<typeof Link>, 'href' | 'children'>) {
   const className = cn(
-    'tabular flex h-9 min-w-9 items-center justify-center rounded-md px-2.5 text-sm transition-colors',
+    'tabular flex size-11 min-w-11 items-center justify-center rounded-md px-2.5 text-sm',
+    'transition-colors duration-(--duration-base) ease-(--ease-out)',
+    'lg:size-9 lg:min-w-9',
     active
-      ? 'bg-accent text-on-inverse font-semibold'
+      ? 'bg-accent text-on-accent font-semibold'
       : 'text-muted hover:bg-sunken hover:text-ink',
     disabled && 'text-faint pointer-events-none opacity-40',
   );

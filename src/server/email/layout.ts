@@ -135,6 +135,9 @@ export function renderHtml(content: EmailContent): string {
               <p style="margin:0 0 6px;color:${PALETTE.faint};font-size:12px;line-height:1.5;">
                 ${escape(siteConfig.legalName)} · ${escape(siteConfig.supportEmail)}
               </p>
+              <p style="margin:0 0 6px;color:${PALETTE.faint};font-size:12px;line-height:1.5;">
+                ${escape(siteConfig.attribution)}
+              </p>
               <p style="margin:0;color:${PALETTE.faint};font-size:12px;line-height:1.5;">
                 <a href="${absoluteUrl('/account/notifications')}" style="color:${PALETTE.faint};">Manage which emails you get</a>
               </p>
@@ -171,6 +174,7 @@ export function renderText(content: EmailContent): string {
   if (content.footnote) lines.push(content.footnote, '');
 
   lines.push('—', `${siteConfig.legalName} · ${siteConfig.supportEmail}`);
+  lines.push(siteConfig.attribution);
   lines.push(`Manage which emails you get: ${absoluteUrl('/account/notifications')}`);
 
   return lines.join('\n');

@@ -2,11 +2,8 @@ import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
 import { Suspense } from 'react';
 
+import { ListingView } from '@/components/commerce/listing-view';
 import { Breadcrumbs } from '@/components/commerce/breadcrumbs';
-import { FilterRail } from '@/components/commerce/filter-rail';
-import { ListingToolbar } from '@/components/commerce/listing-toolbar';
-import { Pagination } from '@/components/commerce/pagination';
-import { ProductGrid } from '@/components/commerce/product-grid';
 import { JsonLd } from '@/components/seo/json-ld';
 import { ProductGridSkeleton } from '@/components/skeletons/product-card-skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -154,32 +151,12 @@ async function StoreListing({
   const basePath = `/store/${slug}`;
 
   return (
-    <div className="mt-6 flex gap-8">
-      <div className="hidden w-60 shrink-0 lg:block">
-        <FilterRail
-          facets={result.facets}
-          priceFacet={result.priceFacet}
-          params={raw}
-          basePath={basePath}
-          appliedCount={result.appliedFilterCount}
-        />
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <ListingToolbar
-          total={result.total}
-          activeSort={query.sort ?? 'popularity'}
-          params={raw}
-          basePath={basePath}
-        />
-        <div className="mt-5">
-          <ProductGrid
-            products={result.items}
-            emptyAction={{ href: basePath, label: 'Clear all filters' }}
-          />
-        </div>
-        <Pagination page={result.page} pageCount={result.pageCount} params={raw} basePath={basePath} />
-      </div>
-    </div>
+    <ListingView
+      result={result}
+      params={raw}
+      basePath={basePath}
+      sort={query.sort ?? 'popularity'}
+      className="mt-6"
+    />
   );
 }

@@ -30,18 +30,18 @@ const PAGES: PageSeed[] = [
     slug: 'legal/terms',
     title: 'Terms of use',
     metaDescription:
-      'The terms under which Vestra operates as a marketplace, and what buyers and sellers each agree to.',
+      'The terms under which VestraWAB operates as a marketplace, and what buyers and sellers each agree to.',
     body: md`
-## What Vestra is
+## What VestraWAB is
 
-Vestra is a marketplace. We do not manufacture or own the products listed here.
+VestraWAB is a marketplace. We do not manufacture or own the products listed here.
 Each item is sold by an independent seller who is identified on the product page
 and on your invoice. Your contract of sale is with that seller; our contract with
 you covers the platform, payment handling and dispute resolution.
 
 ## Your account
 
-You must be 18 or older to buy on Vestra. Keep your password to yourself — you
+You must be 18 or older to buy on VestraWAB. Keep your password to yourself — you
 are responsible for orders placed from your account. Tell us immediately if you
 think someone else has access to it.
 
@@ -75,7 +75,7 @@ jurisdiction.
     slug: 'legal/privacy',
     title: 'Privacy policy',
     metaDescription:
-      'What personal data Vestra collects, why, how long it is kept, and how to get it deleted.',
+      'What personal data VestraWAB collects, why, how long it is kept, and how to get it deleted.',
     body: md`
 ## What we collect
 
@@ -95,7 +95,7 @@ sellers beyond what is needed to deliver your order and handle returns.
 
 Your name, delivery address and phone number are shared with the seller
 fulfilling your order and with the courier carrying it. Payment details go to
-the payment provider. Nothing else leaves Vestra except where the law requires.
+the payment provider. Nothing else leaves VestraWAB except where the law requires.
 
 ## Marketing
 
@@ -118,7 +118,7 @@ respond within 30 days.
   {
     slug: 'legal/returns-policy',
     title: 'Return policy',
-    metaDescription: `Vestra's return and exchange policy: ${RETURNS.defaultWindowDays}-day window, free reverse pickup where we are at fault.`,
+    metaDescription: `VestraWAB's return and exchange policy: ${RETURNS.defaultWindowDays}-day window, free reverse pickup where we are at fault.`,
     body: md`
 ## The window
 
@@ -168,7 +168,7 @@ automatically becomes a refund and we tell you as soon as that happens.
     body: md`
 ## Step 1 — Support
 
-Raise a ticket from your orders page or write to help@vestra.example. Most
+Raise a ticket from your orders page or write to help@vestrawab.example. Most
 issues are resolved within two working days.
 
 ## Step 2 — Escalation
@@ -181,10 +181,10 @@ to be escalated. A senior agent will review it within three working days.
 As required under the Consumer Protection (E-Commerce) Rules, 2020:
 
 **Grievance Officer**
-Vestra Commerce Private Limited
+VestraWAB Commerce Private Limited
 Prestige Atrium, 4th Floor, 12 Residency Road
 Bengaluru, Karnataka 560025
-grievance@vestra.example
+grievance@vestrawab.example
 
 The officer acknowledges every complaint within 48 hours and resolves it within
 one month.
@@ -194,7 +194,7 @@ one month.
     slug: 'help/shipping',
     title: 'Shipping and delivery',
     metaDescription:
-      'Delivery timelines, charges, free-delivery threshold and how tracking works on Vestra.',
+      'Delivery timelines, charges, free-delivery threshold and how tracking works on VestraWAB.',
     body: md`
 ## Timelines
 
@@ -234,7 +234,7 @@ the seller and you are refunded in full, minus nothing.
   {
     slug: 'help/returns',
     title: 'How to return or exchange',
-    metaDescription: 'Step-by-step: how to raise a return or exchange on Vestra and what happens next.',
+    metaDescription: 'Step-by-step: how to raise a return or exchange on VestraWAB and what happens next.',
     body: md`
 ## Raising a return
 
@@ -270,7 +270,7 @@ you know.
   {
     slug: 'help/refunds',
     title: 'Refunds',
-    metaDescription: 'When Vestra refunds, how long it takes, and where the money goes.',
+    metaDescription: 'When VestraWAB refunds, how long it takes, and where the money goes.',
     body: md`
 ## When a refund is issued
 
@@ -303,11 +303,11 @@ from the rest.
   {
     slug: 'help/contact',
     title: 'Contact us',
-    metaDescription: 'How to reach Vestra support, and what to have ready so it is resolved fast.',
+    metaDescription: 'How to reach VestraWAB support, and what to have ready so it is resolved fast.',
     body: md`
 ## Support
 
-**help@vestra.example** · **+91 80 4718 0000**
+**help@vestrawab.example** · **+91 80 4718 0000**
 Monday to Saturday, 9am to 9pm IST
 
 ## Faster resolution
@@ -332,7 +332,7 @@ stock — usually needs one working day.
   {
     slug: 'help/size-guide',
     title: 'Size guide',
-    metaDescription: 'How Vestra sizing works, and how to measure yourself so it fits first time.',
+    metaDescription: 'How VestraWAB sizing works, and how to measure yourself so it fits first time.',
     body: md`
 ## Read the product, not the label
 
@@ -362,13 +362,13 @@ Returns are free on unworn items with tags intact.
   },
   {
     slug: 'about',
-    title: 'About Vestra',
+    title: 'About VestraWAB',
     metaDescription:
-      'Vestra is a marketplace for independent Indian fashion labels selling direct, with verified sellers and honest product information.',
+      'VestraWAB is a marketplace for independent Indian fashion labels selling direct, with verified sellers and honest product information.',
     body: md`
 ## What we are building
 
-Vestra is a marketplace for fashion, beauty and home, built around a simple
+VestraWAB is a marketplace for fashion, beauty and home, built around a simple
 position: the people who make things should be able to sell them without a
 three-times markup, and shoppers should be able to see who they are buying from.
 
@@ -393,9 +393,9 @@ Patiala and Kanpur.
   },
   {
     slug: 'sell-with-us',
-    title: 'Sell on Vestra',
+    title: 'Sell on VestraWAB',
     metaDescription:
-      'What it takes to sell on Vestra: commission, settlement terms, onboarding and the tools you get.',
+      'What it takes to sell on VestraWAB: commission, settlement terms, onboarding and the tools you get.',
     body: md`
 ## Who we onboard
 
@@ -439,7 +439,7 @@ export function generateCmsPages(updatedByUserId: string, now: Date): CmsPage[] 
     slug: page.slug,
     title: page.title,
     body: page.body,
-    metaTitle: `${page.title} | Vestra`,
+    metaTitle: `${page.title} | VestraWAB`,
     metaDescription: page.metaDescription,
     isPublished: true,
     updatedAt: at,

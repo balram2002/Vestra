@@ -78,7 +78,7 @@ export function LoginForm({ next }: { next?: string }) {
         <div className="mt-1.5 text-right">
           <Link
             href="/forgot-password"
-            className="text-muted hover:text-accent-ink text-2xs underline-offset-2 hover:underline"
+            className="text-muted hover:text-accent-ink inline-flex min-h-11 items-center text-2xs underline-offset-2 hover:underline lg:min-h-0"
           >
             Forgot your password?
           </Link>

@@ -6,24 +6,35 @@
  */
 
 export const siteConfig = {
-  name: 'Vestra',
-  legalName: 'Vestra Commerce Private Limited',
+  name: 'VestraWAB',
+  legalName: 'VestraWAB Commerce Private Limited',
+  /**
+   * The parent brand, and the line that names it.
+   *
+   * Kept as its own field rather than baked into `tagline`, because the two are
+   * used in different places: the tagline sells the shop and belongs in a
+   * `<title>`, while the attribution establishes who is behind it and belongs in
+   * a footer, an auth screen and the foot of every email. Splitting them means
+   * neither has to be trimmed to fit the other.
+   */
+  parent: 'planWAB',
+  attribution: 'A product by planWAB',
   tagline: 'Marketplace for modern wardrobes',
   description:
-    'Vestra is a multi-vendor marketplace for fashion, beauty and lifestyle. Shop verified sellers, transparent pricing, easy returns and fast delivery across India.',
+    'VestraWAB is a multi-vendor marketplace for fashion, beauty and lifestyle. Shop verified sellers, transparent pricing, easy returns and fast delivery across India.',
   locale: 'en_IN',
   language: 'en-IN',
   country: 'IN',
   currency: 'INR',
-  supportEmail: 'help@vestra.example',
+  supportEmail: 'help@vestrawab.example',
   supportPhone: '+91 80 4718 0000',
   supportHours: 'Mon to Sat, 9am to 9pm IST',
   social: {
-    instagram: 'https://instagram.com/vestra',
-    x: 'https://x.com/vestra',
-    facebook: 'https://facebook.com/vestra',
-    youtube: 'https://youtube.com/@vestra',
-    linkedin: 'https://linkedin.com/company/vestra',
+    instagram: 'https://instagram.com/vestrawab',
+    x: 'https://x.com/vestrawab',
+    facebook: 'https://facebook.com/vestrawab',
+    youtube: 'https://youtube.com/@vestrawab',
+    linkedin: 'https://linkedin.com/company/vestrawab',
   },
   address: {
     line1: 'Prestige Atrium, 4th Floor',
@@ -55,7 +66,7 @@ export function absoluteUrl(path = '/'): string {
    *
    * Media lives on a remote host, so `absoluteUrl(media.url)` is a natural
    * thing to write — and without this it produced
-   * `https://vestra.example/https://images.example/photo.jpg`, which every
+   * `https://vestrawab.example/https://images.example/photo.jpg`, which every
    * social crawler fetched as a 404. Making the function idempotent fixes it
    * for every caller rather than at the one call site where it was noticed.
    */
@@ -131,7 +142,7 @@ export const routes = {
   help: () => '/help',
   helpArticle: (slug: string) => `/help/${slug}`,
   page: (slug: string) => `/pages/${slug}`,
-  sellOnVestra: () => '/sell',
+  sellWithUs: () => '/sell-with-us',
 
   seller: {
     dashboard: () => '/seller',

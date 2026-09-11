@@ -1,9 +1,9 @@
 import { Suspense } from 'react';
 
-import { SiteFooter } from '@/components/layout/site-footer';
-import { SiteHeader } from '@/components/layout/site-header';
-import { RouteProgress } from '@/components/layout/route-progress';
 import { BottomNav, BottomNavBar } from '@/components/layout/bottom-nav';
+import { RouteProgress } from '@/components/layout/route-progress';
+import { SiteFooter } from '@/components/layout/site-footer';
+import { SiteHeader, SiteHeaderFallback } from '@/components/layout/site-header';
 import { currentOwner } from '@/server/auth/session';
 import { getBagCount } from '@/server/services/cart';
 import { getWishlistCount } from '@/server/services/wishlist';
@@ -26,13 +26,13 @@ export default function StorefrontLayout({ children }: { children: React.ReactNo
 
       <a
         href="#main"
-        className="bg-accent text-on-inverse sr-only z-[70] rounded-md px-4 py-2 text-sm font-medium focus:not-sr-only focus:absolute focus:left-4 focus:top-4"
+        className="bg-accent text-on-accent sr-only z-[70] rounded-full px-5 py-2.5 text-sm font-medium shadow-lg focus:not-sr-only focus:absolute focus:left-4 focus:top-4"
       >
         Skip to content
       </a>
 
       {/* The header reads the taxonomy, so it streams rather than blocking the page. */}
-      <Suspense fallback={<div className="bg-raised border-line h-[6.25rem] border-b" />}>
+      <Suspense fallback={<SiteHeaderFallback />}>
         <SiteHeader />
       </Suspense>
 
@@ -40,9 +40,10 @@ export default function StorefrontLayout({ children }: { children: React.ReactNo
         The bottom bar is fixed, so the page needs room underneath it or it
         covers the last element of every screen. Paying for that here — once,
         next to where the bar is mounted — keeps it from becoming something
-        every page has to remember.
+        every page has to remember. The value is the bar's own token, so the two
+        cannot drift.
       */}
-      <main id="main" className="flex-1 pb-14 lg:pb-0">
+      <main id="main" className="flex-1 pb-(--spacing-bottom-nav) lg:pb-0">
         {children}
       </main>
 
@@ -50,8 +51,10 @@ export default function StorefrontLayout({ children }: { children: React.ReactNo
         <SiteFooter />
       </Suspense>
 
-      {/* The fallback is the same bar with nothing highlighted, so it is
-          usable from the first paint and never shifts when the counts land. */}
+      {/*
+        The fallback is the same bar with nothing highlighted, so it is usable
+        from the first paint and never shifts when the counts land.
+      */}
       <Suspense fallback={<BottomNavBar pathname={null} />}>
         <BottomNavWithCounts />
       </Suspense>

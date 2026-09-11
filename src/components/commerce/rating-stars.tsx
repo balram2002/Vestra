@@ -6,13 +6,35 @@ import { formatCompactNumber, formatRating } from '@/lib/format';
 /**
  * Rating.
  *
- * Rendered as a single figure plus a filled star rather than five glyphs: at
- * card size five stars are illegible, and a shopper scanning a grid reads
- * "4.3" far faster than they count pips. The five-star bar is reserved for the
- * PDP review summary, where there is room for it to mean something.
+ * Rendered as ONE filled star plus the figure, rather than five glyphs: at card
+ * size five stars are illegible, and a shopper scanning a grid reads "4.3" far
+ * faster than they count pips. The five-star bar is reserved for the PDP review
+ * summary, where there is room for it to mean something.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THIS IS NOT A GREEN PILL
+ * ---------------------------------------------------------------------------
+ * The obvious treatment — a filled green badge with the number reversed out —
+ * is what most Indian marketplaces ship, and it has two problems here.
+ *
+ * The first is contrast: white on a green light enough to read as "good" never
+ * clears 4.5:1 at the 11px a card renders it at, so the badge either fails WCAG
+ * or stops looking positive. That is a real constraint, not a preference.
+ *
+ * The second is louder. A grid of forty cards each carrying a saturated green
+ * chip puts forty pieces of colour in front of the merchandise, and the
+ * photography is what is being sold. Colour on this page belongs to the
+ * product, the sale flash and the primary action — in that order — and a rating
+ * is none of the three.
+ *
+ * So the star carries the hue (`sand`, the premium accent, at badge scale which
+ * is the only scale it is allowed) and the number is set in ink. It reads as
+ * quality without spending any of the page's attention budget, and it passes on
+ * contrast because ink on canvas always does.
  *
  * A product with no reviews renders NOTHING, not "0.0" — a zero reads as a bad
- * score rather than an absent one.
+ * score rather than an absent one, and that is a meaningful difference to a
+ * seller who has just listed.
  */
 export function RatingStars({
   rating,
@@ -34,30 +56,40 @@ export function RatingStars({
 }) {
   if (count === 0) return null;
 
-  // Below 3.5 the badge stops being a recommendation, so it drops the green.
   /*
-   * The 600 steps, not 500. White on warning-500 measures 4.23:1 and on
-   * brass-500 3.72:1 — both fail WCAG AA at the 12px this badge renders at.
-   * The 600 steps clear 4.5:1 and are visually indistinguishable at this size.
+   * Below 3.5 the star loses its fill.
+   *
+   * A hollow star is the honest shape for a rating that is not a
+   * recommendation, and it survives greyscale and colour blindness in a way
+   * that swapping a green chip for an amber one does not — the difference is in
+   * the FORM, not only in the hue.
    */
-  const tone = rating >= 3.5 ? 'bg-success-600 text-white' : 'bg-warning-600 text-white';
+  const good = rating >= 3.5;
 
   return (
-    <span className={cn('inline-flex items-center gap-1.5', className)}>
+    <span className={cn('inline-flex items-baseline gap-1.5', className)}>
       <span
         className={cn(
-          'tabular inline-flex items-center gap-0.5 rounded-xs font-medium',
-          tone,
-          size === 'sm' ? 'px-1 py-px text-2xs' : 'px-1.5 py-0.5 text-xs',
+          'tabular text-ink inline-flex items-center gap-1 font-semibold',
+          size === 'sm' ? 'text-2xs' : 'text-xs',
         )}
       >
+        <Star
+          className={cn(
+            'translate-y-px',
+            size === 'sm' ? 'size-3' : 'size-3.5',
+            good ? 'text-sand-500' : 'text-faint',
+          )}
+          fill={good ? 'currentColor' : 'none'}
+          strokeWidth={good ? 0 : 1.75}
+          aria-hidden
+        />
         {formatRating(rating)}
-        <Star className={size === 'sm' ? 'size-2.5' : 'size-3'} fill="currentColor" strokeWidth={0} />
       </span>
 
       {showCount && count !== null ? (
         <span className={cn('text-faint tabular', size === 'sm' ? 'text-2xs' : 'text-xs')}>
-          {formatCompactNumber(count)}
+          ({formatCompactNumber(count)})
         </span>
       ) : null}
     </span>

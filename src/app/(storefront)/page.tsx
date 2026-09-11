@@ -3,8 +3,9 @@ import { Suspense } from 'react';
 import {
   BannerGrid,
   BrandStrip,
-  CategoryStrip,
+  CategoryRail,
   HeroCarousel,
+  HeroSkeleton,
   ProductRail,
   SellerSpotlight,
   ValueProps,
@@ -23,24 +24,45 @@ import { getProductRail } from '@/server/services/listing';
  * no hardcoded arrangement here — reordering the page or swapping a rail's
  * source is a CMS edit, not a deploy.
  *
- * Each product rail is its own `<Suspense>` boundary. That is deliberate: the
- * hero and category strip are cheap and appear immediately, while a rail that
- * needs a sort over the whole catalogue streams in behind its own skeleton
- * instead of holding up the fold.
+ * Each section is its own `<Suspense>` boundary, and that is what makes the
+ * page feel fast rather than merely be fast: the hero is one query and appears
+ * immediately, while a rail that needs a sort over the whole catalogue streams
+ * in behind a skeleton of its exact final height instead of holding up the
+ * fold.
  */
 export default async function HomePage() {
   const sections = await getHomeSections();
 
+  /*
+   * Which rail gets `priority`.
+   *
+   * Exactly one — the first product rail on the page — and it is computed here
+   * rather than guessed inside the rail, because only the page knows what came
+   * before it. A `priority` image is a preload hint; marking every rail's first
+   * two cards would preload ten images and preload nothing usefully.
+   */
+  const firstRailId = sections.find((section) => section.kind === 'PRODUCT_RAIL')?.id;
+
   return (
-    <div className="pb-4">
+    <div className="pb-8">
       {sections.map((section) => (
-        <SectionRenderer key={section.id} section={section} />
+        <SectionRenderer
+          key={section.id}
+          section={section}
+          priority={section.id === firstRailId}
+        />
       ))}
     </div>
   );
 }
 
-function SectionRenderer({ section }: { section: HomeSection }) {
+function SectionRenderer({
+  section,
+  priority,
+}: {
+  section: HomeSection;
+  priority: boolean;
+}) {
   switch (section.kind) {
     case 'HERO_CAROUSEL':
       return (
@@ -59,7 +81,7 @@ function SectionRenderer({ section }: { section: HomeSection }) {
     case 'PRODUCT_RAIL':
       return (
         <Suspense fallback={<RailFallback section={section} />}>
-          <RailSection section={section} />
+          <RailSection section={section} priority={priority} />
         </Suspense>
       );
 
@@ -94,7 +116,7 @@ function SectionRenderer({ section }: { section: HomeSection }) {
   }
 }
 
-/* --------------------------------------------------------- data wrappers */
+/* ----------------------------------------------------------- data wrappers */
 
 async function HeroSection() {
   const banners = await getBanners('HOME_HERO');
@@ -105,18 +127,27 @@ async function CategorySection({ section }: { section: HomeSection }) {
   const all = await getCategoryTree();
   // Shelf level: departments are too coarse to browse from, leaves too many.
   const shelves = all.filter((c) => c.depth === 1).slice(0, section.config.limit ?? 12);
-  return <CategoryStrip section={section} categories={shelves} />;
+  return <CategoryRail section={section} categories={shelves} />;
 }
 
-async function RailSection({ section }: { section: HomeSection }) {
+async function RailSection({
+  section,
+  priority,
+}: {
+  section: HomeSection;
+  priority: boolean;
+}) {
   const source = section.config.source ?? 'BESTSELLERS';
   const supported =
-    source === 'NEW_ARRIVALS' || source === 'BESTSELLERS' || source === 'TRENDING' || source === 'DEALS'
+    source === 'NEW_ARRIVALS' ||
+    source === 'BESTSELLERS' ||
+    source === 'TRENDING' ||
+    source === 'DEALS'
       ? source
       : 'BESTSELLERS';
 
   const products = await getProductRail(supported, section.config.limit ?? CATALOG.railSize);
-  return <ProductRail section={section} products={products} />;
+  return <ProductRail section={section} products={products} priority={priority} />;
 }
 
 async function GridSection() {
@@ -130,32 +161,26 @@ async function BrandSection({ section }: { section: HomeSection }) {
 }
 
 async function SellerSection({ section }: { section: HomeSection }) {
-  const sellers = await listSellers(section.config.limit ?? 4);
-  return <SellerSpotlight section={section} sellers={sellers.slice(0, section.config.limit ?? 4)} />;
+  const limit = section.config.limit ?? 4;
+  const sellers = await listSellers(limit);
+  return <SellerSpotlight section={section} sellers={sellers.slice(0, limit)} />;
 }
 
-/* ------------------------------------------------------------- fallbacks */
+/* ---------------------------------------------------------------- fallbacks */
 
-function HeroSkeleton() {
-  return (
-    <section className="gutter shell-max pt-4" aria-hidden>
-      <div className="grid gap-3 lg:grid-cols-3">
-        <div className="skeleton aspect-[16/10] rounded-lg lg:col-span-2 lg:aspect-[16/9]" />
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-          <div className="skeleton aspect-[16/9] rounded-lg lg:aspect-[16/7]" />
-          <div className="skeleton aspect-[16/9] rounded-lg lg:aspect-[16/7]" />
-        </div>
-      </div>
-    </section>
-  );
-}
-
+/**
+ * A rail's placeholder.
+ *
+ * Carries the real heading, because the heading is data the page already has —
+ * showing it immediately and streaming only the products underneath is the
+ * difference between "the page is loading" and "this rail is loading".
+ */
 function RailFallback({ section }: { section: HomeSection }) {
   return (
-    <section className="gutter shell-max py-8">
-      <div className="mb-4">
-        <h2 className="font-display text-ink text-xl sm:text-2xl">{section.title}</h2>
-        {section.subtitle ? <p className="text-muted mt-0.5 text-sm">{section.subtitle}</p> : null}
+    <section className="gutter shell-max py-12 sm:py-16">
+      <div className="mb-5 sm:mb-7">
+        <h2 className="headline text-ink text-2xl sm:text-3xl">{section.title}</h2>
+        {section.subtitle ? <p className="text-muted mt-2 text-sm">{section.subtitle}</p> : null}
       </div>
       <ProductRailSkeleton />
     </section>

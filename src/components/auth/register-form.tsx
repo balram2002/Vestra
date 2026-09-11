@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useState, useTransition } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/choice';
 import { Input } from '@/components/ui/input';
 import { ACCOUNTS } from '@/config/business';
 import { register } from '@/server/actions/auth';
@@ -107,16 +108,10 @@ export function RegisterForm() {
         placeholder="9876543210"
       />
 
-      <label className="flex items-start gap-2 text-xs">
-        <input
-          type="checkbox"
-          name="marketingOptIn"
-          className="border-line-strong accent-[--accent-solid] mt-0.5 size-4 rounded-xs"
-        />
-        <span className="text-muted">
-          Email me about new arrivals and sales. You can turn this off at any time.
-        </span>
-      </label>
+      <Checkbox
+        name="marketingOptIn"
+        label="Email me about new arrivals and sales. You can turn this off at any time."
+      />
 
       <Button type="submit" size="cta" loading={pending}>
         Create account

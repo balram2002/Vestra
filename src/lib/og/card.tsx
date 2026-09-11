@@ -16,25 +16,32 @@ import { siteConfig } from '@/config/site';
  * a colour is written twice. `OG_PALETTE` exists so it is written twice in
  * exactly one file rather than once per card.
  *
- * Typeface is Satori's bundled sans rather than the brand's Fraunces. Loading
- * the real face would mean either a network fetch at render time or a binary
- * committed to the repository, and neither is worth it for an image whose job
- * is to be legible at thumbnail size in a feed. The identity is carried by
+ * Typeface is Satori's bundled sans rather than the brand's Instrument Serif.
+ * Loading the real face would mean either a network fetch at render time or a
+ * binary committed to the repository, and neither is worth it for an image whose
+ * job is to be legible at thumbnail size in a feed. The identity is carried by
  * colour, scale and layout, all of which survive the substitution.
  */
 
 export const OG_SIZE = { width: 1200, height: 630 } as const;
 export const OG_CONTENT_TYPE = 'image/png';
 
-/** Mirrors `src/styles/tokens.css`. Satori cannot read CSS custom properties. */
+/**
+ * Mirrors `src/styles/tokens.css`. Satori cannot read CSS custom properties.
+ *
+ * These are the LIGHT theme values, deliberately: a social card has no viewer
+ * theme to follow. It is composited into someone else's feed, which may be dark
+ * or light, so it commits to one look and carries its own ground rather than
+ * borrowing whatever is behind it.
+ */
 const OG_PALETTE = {
-  canvas: '#faf8f5',
-  ink: '#1a1815',
-  muted: '#5e5950',
-  faint: '#6f6a60',
-  line: '#e8e4dd',
-  accent: '#6d2650',
-  accentBright: '#ae4173',
+  canvas: '#f8f8f6',
+  ink: '#1b1a18',
+  muted: '#56544d',
+  faint: '#6b6960',
+  line: '#e4e3de',
+  accent: '#4835a1',
+  accentBright: '#5744c1',
 } as const;
 
 export interface OgCardOptions {
@@ -98,11 +105,12 @@ export function ogCard(options: OgCardOptions): ImageResponse {
               backgroundColor: OG_PALETTE.accent,
               borderRadius: 10,
               color: OG_PALETTE.canvas,
-              fontSize: 26,
+              fontSize: 24,
               fontWeight: 700,
+              letterSpacing: '-0.02em',
             }}
           >
-            V
+            VW
           </div>
           <div
             style={{
@@ -169,7 +177,12 @@ export function ogCard(options: OgCardOptions): ImageResponse {
             paddingTop: 24,
           }}
         >
-          <div style={{ fontSize: 22, color: OG_PALETTE.faint }}>{siteConfig.tagline}</div>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <div style={{ fontSize: 22, color: OG_PALETTE.faint }}>{siteConfig.tagline}</div>
+            <div style={{ fontSize: 18, color: OG_PALETTE.faint, marginTop: 4 }}>
+              {siteConfig.attribution}
+            </div>
+          </div>
           {options.footnote ? (
             <div style={{ fontSize: 22, fontWeight: 600, color: OG_PALETTE.ink }}>
               {clamp(options.footnote, 40)}

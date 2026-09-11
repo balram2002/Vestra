@@ -2,12 +2,8 @@ import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
 import { Suspense } from 'react';
 
+import { ListingView } from '@/components/commerce/listing-view';
 import { Breadcrumbs } from '@/components/commerce/breadcrumbs';
-import { FilterDrawer } from '@/components/commerce/filter-drawer';
-import { FilterRail } from '@/components/commerce/filter-rail';
-import { ListingToolbar } from '@/components/commerce/listing-toolbar';
-import { Pagination } from '@/components/commerce/pagination';
-import { ProductGrid } from '@/components/commerce/product-grid';
 import { JsonLd } from '@/components/seo/json-ld';
 import { ProductGridSkeleton } from '@/components/skeletons/product-card-skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -78,7 +74,7 @@ export default async function BrandPage({ params, searchParams }: PageProps) {
       <header className="mt-3">
         <div className="flex items-center gap-3">
           <h1 className="font-display text-ink text-2xl sm:text-3xl">{brand.name}</h1>
-          {brand.isPremium ? <Badge tone="brass">Premium</Badge> : null}
+          {brand.isPremium ? <Badge tone="premium">Premium</Badge> : null}
         </div>
         <p className="text-muted mt-2 max-w-2xl text-pretty text-sm">{brand.description}</p>
         <p className="text-faint mt-2 text-xs">
@@ -105,47 +101,23 @@ async function BrandListing({
   const result = await listProducts(query);
   const basePath = `/brand/${slug}`;
 
-  const rail = (
-    <FilterRail
-      facets={result.facets.filter((f) => f.key !== 'brand')}
-      priceFacet={result.priceFacet}
-      params={raw}
-      basePath={basePath}
-      appliedCount={result.appliedFilterCount}
-    />
-  );
+  /*
+   * The brand facet is dropped, not hidden.
+   *
+   * Every product on this page is already this brand, so a brand filter would
+   * be a list of one option that changes nothing — and on a page reached from
+   * a brand link it reads as a bug. Filtering the facet out of the result is
+   * cleaner than teaching the rail about context it should not know.
+   */
+  const scoped = { ...result, facets: result.facets.filter((f) => f.key !== 'brand') };
 
   return (
-    <>
-      {/* Same rail, docked on desktop and in a drawer below lg. */}
-      <div className="mt-6 lg:hidden">
-        <FilterDrawer appliedCount={result.appliedFilterCount}>{rail}</FilterDrawer>
-      </div>
-
-      <div className="mt-4 flex gap-8 lg:mt-6">
-        <div className="hidden w-60 shrink-0 lg:block">{rail}</div>
-
-        <div className="min-w-0 flex-1">
-          <ListingToolbar
-            total={result.total}
-            activeSort={query.sort ?? 'popularity'}
-            params={raw}
-            basePath={basePath}
-          />
-          <div className="mt-5">
-            <ProductGrid
-              products={result.items}
-              emptyAction={{ href: basePath, label: 'Clear all filters' }}
-            />
-          </div>
-          <Pagination
-            page={result.page}
-            pageCount={result.pageCount}
-            params={raw}
-            basePath={basePath}
-          />
-        </div>
-      </div>
-    </>
+    <ListingView
+      result={scoped}
+      params={raw}
+      basePath={basePath}
+      sort={query.sort ?? 'popularity'}
+      className="mt-6"
+    />
   );
 }

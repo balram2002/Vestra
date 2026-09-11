@@ -15,7 +15,7 @@ import { absoluteUrl, siteUrl } from './site';
 const original = process.env.NEXT_PUBLIC_SITE_URL;
 
 beforeEach(() => {
-  process.env.NEXT_PUBLIC_SITE_URL = 'https://vestra.example';
+  process.env.NEXT_PUBLIC_SITE_URL = 'https://vestrawab.example';
 });
 
 afterEach(() => {
@@ -25,39 +25,39 @@ afterEach(() => {
 
 describe('siteUrl', () => {
   it('strips a trailing slash so callers can concatenate safely', () => {
-    process.env.NEXT_PUBLIC_SITE_URL = 'https://vestra.example/';
-    expect(siteUrl()).toBe('https://vestra.example');
+    process.env.NEXT_PUBLIC_SITE_URL = 'https://vestrawab.example/';
+    expect(siteUrl()).toBe('https://vestrawab.example');
   });
 
   it('strips several trailing slashes', () => {
-    process.env.NEXT_PUBLIC_SITE_URL = 'https://vestra.example///';
-    expect(siteUrl()).toBe('https://vestra.example');
+    process.env.NEXT_PUBLIC_SITE_URL = 'https://vestrawab.example///';
+    expect(siteUrl()).toBe('https://vestrawab.example');
   });
 });
 
 describe('absoluteUrl', () => {
   it('makes a rooted path absolute', () => {
-    expect(absoluteUrl('/product/kurta')).toBe('https://vestra.example/product/kurta');
+    expect(absoluteUrl('/product/kurta')).toBe('https://vestrawab.example/product/kurta');
   });
 
   it('tolerates a path that forgot its leading slash', () => {
-    expect(absoluteUrl('product/kurta')).toBe('https://vestra.example/product/kurta');
+    expect(absoluteUrl('product/kurta')).toBe('https://vestrawab.example/product/kurta');
   });
 
   it('defaults to the site root', () => {
-    expect(absoluteUrl()).toBe('https://vestra.example/');
+    expect(absoluteUrl()).toBe('https://vestrawab.example/');
   });
 
   it('keeps the query string intact', () => {
     expect(absoluteUrl('/search?q=kurta&sort=new')).toBe(
-      'https://vestra.example/search?q=kurta&sort=new',
+      'https://vestrawab.example/search?q=kurta&sort=new',
     );
   });
 
   /*
    * The regression. Remote media passed straight through this on the way into
    * `og:image` and into Product JSON-LD, and came out as
-   * `https://vestra.example/https://images.example/photo.jpg` — which every
+   * `https://vestrawab.example/https://images.example/photo.jpg` — which every
    * crawler fetched as a 404.
    */
   it('returns an already-absolute URL untouched', () => {
@@ -73,7 +73,7 @@ describe('absoluteUrl', () => {
   it('leaves other schemes alone rather than mangling them', () => {
     expect(absoluteUrl('http://cdn.example/a.png')).toBe('http://cdn.example/a.png');
     expect(absoluteUrl('data:image/png;base64,AAAA')).toBe('data:image/png;base64,AAAA');
-    expect(absoluteUrl('mailto:help@vestra.example')).toBe('mailto:help@vestra.example');
+    expect(absoluteUrl('mailto:help@vestrawab.example')).toBe('mailto:help@vestrawab.example');
   });
 
   /*

@@ -13,7 +13,17 @@ export const metadata: Metadata = {
  * group is the documented way out.
  *
  * Everything here is designed for paper first and screen second.
+ *
+ * **It does not follow the theme, and that is the point.** An invoice and a
+ * shipping label are documents, not UI: they are ink on paper whichever way the
+ * viewer has their screen set. The ground used to be `bg-canvas`, which flips
+ * to near-black in dark mode, while everything drawn on it is fixed light-mode
+ * neutrals — so a seller who prefers a dark console opened an invoice and got
+ * dark grey text on a near-black page. Committing to white here is both the
+ * correct document design and the fix.
  */
 export default function PrintLayout({ children }: { children: React.ReactNode }) {
-  return <div className="bg-canvas min-h-full">{children}</div>;
+  return (
+    <div className="min-h-full bg-white text-neutral-900 [color-scheme:light]">{children}</div>
+  );
 }

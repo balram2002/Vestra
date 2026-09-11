@@ -2,6 +2,8 @@
 
 import { MailWarning } from 'lucide-react';
 import { useState, useTransition } from 'react';
+
+import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
 import { resendVerificationEmail } from '@/server/actions/auth';
@@ -42,14 +44,16 @@ export function VerifyEmailNotice({ email }: { email: string }) {
           it also proves the account is yours if you ever need to recover it.
         </p>
       </div>
-      <button
+      <Button
         type="button"
         onClick={resend}
         disabled={pending || sent}
-        className="border-warning-700/30 text-warning-700 hover:bg-warning-100 shrink-0 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+        variant="secondary"
+        size="sm"
+        className="shrink-0"
       >
         {pending ? 'Sending…' : sent ? 'Sent' : 'Send me the link'}
-      </button>
+      </Button>
     </div>
   );
 }

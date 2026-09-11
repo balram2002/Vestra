@@ -9,7 +9,7 @@ import { listBrands } from '@/server/services/catalog';
 export const metadata: Metadata = {
   title: 'Brands',
   description:
-    'Every label stocked on Vestra, from block-print cotton workshops to Goodyear-welted shoemakers.',
+    'Every label stocked on VestraWAB, from block-print cotton workshops to Goodyear-welted shoemakers.',
   alternates: { canonical: absoluteUrl('/brands') },
 };
 
@@ -50,16 +50,23 @@ export default async function BrandsPage() {
             <ul className="mt-3 grid gap-x-6 gap-y-2 sm:grid-cols-2 lg:grid-cols-4">
               {entries.map((brand) => (
                 <li key={brand.id}>
+                  {/*
+                    The name, the Premium mark and the count all sat inside the
+                    link with nothing between them, so the accessible name came
+                    out as "Ash & OakPremium40". Stating it explicitly is the
+                    only way to get a name a person could be told to look for.
+                  */}
                   <Link
                     href={`/brand/${brand.slug}`}
-                    className="group flex items-center justify-between gap-2 py-1"
+                    aria-label={`${brand.name}${brand.isPremium ? ', premium brand' : ''}, ${brand.productCount} products`}
+                    className="group flex min-h-11 items-center justify-between gap-2 lg:min-h-0 lg:py-1"
                   >
                     <span className="text-ink group-hover:text-accent-ink text-sm transition-colors">
                       {brand.name}
                     </span>
-                    <span className="flex items-center gap-1.5">
+                    <span className="flex items-center gap-1.5" aria-hidden>
                       {brand.isPremium ? (
-                        <Badge tone="brass" size="sm">
+                        <Badge tone="premium" size="sm">
                           Premium
                         </Badge>
                       ) : null}
