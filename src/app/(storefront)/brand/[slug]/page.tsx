@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
 import { Suspense } from 'react';
 
+import { atLeastOne, PLACEHOLDER_SLUG } from '@/lib/static-params';
 import { ListingView } from '@/components/commerce/listing-view';
 import { Breadcrumbs } from '@/components/commerce/breadcrumbs';
 import { JsonLd } from '@/components/seo/json-ld';
@@ -27,8 +28,9 @@ interface PageProps {
 }
 
 export async function generateStaticParams() {
-  const brands = await listBrands(100);
-  return brands.map((brand) => ({ slug: brand.slug }));
+  return atLeastOne(async () => (await listBrands(100)).map((brand) => ({ slug: brand.slug })), {
+    slug: PLACEHOLDER_SLUG,
+  });
 }
 
 export async function generateMetadata({ params, searchParams }: PageProps): Promise<Metadata> {

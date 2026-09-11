@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
 import { Suspense } from 'react';
 
+import { atLeastOne, PLACEHOLDER_SLUG } from '@/lib/static-params';
 import { Breadcrumbs } from '@/components/commerce/breadcrumbs';
 import { ProductCard } from '@/components/commerce/product-card';
 import { RatingStars } from '@/components/commerce/rating-stars';
@@ -45,8 +46,9 @@ interface PageProps {
  * costing the pages people actually visit.
  */
 export async function generateStaticParams() {
-  const slugs = await getTopProductSlugs(120);
-  return slugs.map((slug) => ({ slug }));
+  return atLeastOne(async () => (await getTopProductSlugs(120)).map((slug) => ({ slug })), {
+    slug: PLACEHOLDER_SLUG,
+  });
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {

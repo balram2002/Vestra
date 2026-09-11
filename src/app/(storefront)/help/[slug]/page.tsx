@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
+import { atLeastOne, PLACEHOLDER_SLUG } from '@/lib/static-params';
 import { CmsPageView } from '@/components/cms/cms-page-view';
 import { absoluteUrl } from '@/config/site';
 import { getCmsPage, listCmsPages } from '@/server/services/content';
@@ -10,8 +11,10 @@ interface PageProps {
 }
 
 export async function generateStaticParams() {
-  const pages = await listCmsPages('help');
-  return pages.map((page) => ({ slug: page.slug.replace('help/', '') }));
+  return atLeastOne(
+    async () => (await listCmsPages('help')).map((page) => ({ slug: page.slug.replace('help/', '') })),
+    { slug: PLACEHOLDER_SLUG },
+  );
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {

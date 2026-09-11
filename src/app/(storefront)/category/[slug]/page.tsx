@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
 import { Suspense } from 'react';
 
+import { atLeastOne, PLACEHOLDER_SLUG } from '@/lib/static-params';
 import { Breadcrumbs } from '@/components/commerce/breadcrumbs';
 import { ListingView } from '@/components/commerce/listing-view';
 import { ProductGridSkeleton } from '@/components/skeletons/product-card-skeleton';
@@ -42,8 +43,10 @@ interface PageProps {
  * cannot be prerendered at all.
  */
 export async function generateStaticParams() {
-  const categories = await getCategoryTree();
-  return categories.map((category) => ({ slug: category.slug }));
+  return atLeastOne(
+    async () => (await getCategoryTree()).map((category) => ({ slug: category.slug })),
+    { slug: PLACEHOLDER_SLUG },
+  );
 }
 
 export async function generateMetadata({ params, searchParams }: PageProps): Promise<Metadata> {

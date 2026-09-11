@@ -86,6 +86,13 @@ export function checkEnv(env: Record<string, string | undefined> = process.env):
     'for live shipping (set ESHOPBOX_MODE=simulation to simulate on purpose)',
   );
 
+  // Vercel's disk is read-only and not shared between instances, so uploads
+  // have nowhere to go without ImageKit.
+  const imageKit = ['NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT', 'NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY', 'IMAGEKIT_PRIVATE_KEY'];
+  if (env.VERCEL === '1' && imageKit.some((key) => !env[key])) {
+    (strict ? errors : warnings).push('ImageKit is required on Vercel: uploads cannot be stored on its read-only disk');
+  }
+
   if (strict) {
     if (/dev-only|change-me/i.test(e.AUTH_SECRET)) {
       errors.push('AUTH_SECRET is still the development placeholder');

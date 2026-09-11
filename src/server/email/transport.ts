@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { mkdir, writeFile } from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 
 import type { Transporter } from 'nodemailer';
@@ -54,7 +55,12 @@ function consoleTransport(): EmailTransport {
       );
 
       try {
-        const dir = path.join(process.cwd(), email.outbox);
+        // Vercel's disk is read-only apart from the temporary directory, and the
+        // project directory must not be traced into every server function, so
+        // the path is scoped under tmp there and opted out of tracing elsewhere.
+        const dir = process.env.VERCEL
+          ? path.join(os.tmpdir(), 'vestrawab-outbox')
+          : path.join(/*turbopackIgnore: true*/ process.cwd(), email.outbox);
         await mkdir(dir, { recursive: true });
         const stamp = new Date().toISOString().replace(/[:.]/g, '-');
         const slug = message.subject.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 60);

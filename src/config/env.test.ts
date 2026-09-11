@@ -73,4 +73,15 @@ describe('checkEnv', () => {
     const report = checkEnv({ ...complete, APP_ENV: 'production', MONGODB_URI: 'postgres://nope' });
     expect(report.errors[0]).toMatch(/MONGODB_URI/);
   });
+
+  it('requires ImageKit on Vercel outside development', () => {
+    const imageKit = {
+      NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT: 'https://ik.imagekit.io/shop',
+      NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY: 'public',
+      IMAGEKIT_PRIVATE_KEY: 'private',
+    };
+    const without = checkEnv({ ...complete, APP_ENV: 'production', VERCEL: '1' });
+    expect(without.errors.join(' ')).toMatch(/ImageKit is required on Vercel/);
+    expect(checkEnv({ ...complete, ...imageKit, APP_ENV: 'production', VERCEL: '1' }).errors).toEqual([]);
+  });
 });

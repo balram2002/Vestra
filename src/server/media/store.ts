@@ -27,7 +27,7 @@ export type { MediaStore, StoredMedia, UploadResult } from './types';
 
 /* ------------------------------------------------------------ disk driver */
 
-const UPLOAD_DIR = path.join(process.cwd(), process.env.DATA_DIR || '.data', 'uploads');
+const UPLOAD_DIR = path.join(/*turbopackIgnore: true*/ process.cwd(), process.env.DATA_DIR || '.data', 'uploads');
 
 export function diskMediaStore(): MediaStore {
   return {
@@ -36,6 +36,12 @@ export function diskMediaStore(): MediaStore {
     async put(file, { scope }) {
       const inspected = await inspect(file);
       if (!inspected.ok) return inspected;
+
+      // Vercel's disk is read-only and not shared between instances: a file
+      // written here would vanish, so refuse clearly instead of failing on mkdir.
+      if (process.env.VERCEL) {
+        return { ok: false, error: 'Uploads need ImageKit on this host. Set the three ImageKit variables.' };
+      }
 
       // Content-addressed, so re-uploading the same photo does not duplicate it.
       const digest = createHash('sha256').update(inspected.bytes).digest('hex').slice(0, 20);

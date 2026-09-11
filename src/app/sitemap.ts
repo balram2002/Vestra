@@ -21,8 +21,22 @@ import { collections, toEntities } from '@/server/db/collections';
 const PER_SITEMAP = 20_000;
 
 export async function generateSitemaps() {
-  const products = await collections.products();
-  const live = await products.countDocuments({ status: 'PUBLISHED' });
+  /*
+   * Runs while the build collects page data, before anything renders. A
+   * database that cannot be reached here used to fail the whole deployment
+   * with "Failed to collect page data for /sitemap/[__metadata_id__]".
+   * Segment 0 always exists and needs no count, so it is the safe answer.
+   */
+  let live = 0;
+  try {
+    const products = await collections.products();
+    live = await products.countDocuments({ status: 'PUBLISHED' });
+  } catch (error) {
+    console.warn(
+      '[vestrawab:build] sitemap could not count products; publishing the core sitemap only:',
+      error instanceof Error ? error.message : error,
+    );
+  }
 
   // Segment 0 always exists and carries the static and taxonomy URLs, so a
   // shop with no products still publishes a valid sitemap.
