@@ -84,7 +84,7 @@ export function createSessionSlot<T>(name: string): StorageSlot<T> {
   };
 }
 
-/** Remove every Vestra key. Used by "reset demo data" and by sign-out-everywhere. */
+/** Remove every VestraWAB key. Used by "reset demo data" and by sign-out-everywhere. */
 export function clearAllStorage(): void {
   try {
     const doomed: string[] = [];

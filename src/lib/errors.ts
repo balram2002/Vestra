@@ -128,7 +128,7 @@ export function errorCodeOf(value: unknown): ErrorCode {
  * it says what happened AND what to do next.
  */
 const MESSAGES: Partial<Record<ErrorCode, string>> = {
-  NETWORK_ERROR: 'We could not reach Vestra. Check your connection and try again.',
+  NETWORK_ERROR: 'We could not reach VestraWAB. Check your connection and try again.',
   TIMEOUT: 'That took longer than expected. Please try again.',
   UNAUTHENTICATED: 'Please sign in to continue.',
   FORBIDDEN: 'You do not have permission to do this.',

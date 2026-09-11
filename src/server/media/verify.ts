@@ -65,7 +65,7 @@ export async function verifyUploaded(url: string): Promise<VerifyResult> {
 
       return finish(new Uint8Array(await response.arrayBuffer()));
     } catch (error) {
-      console.error('[vestra:media] verification threw', error);
+      console.error('[vestrawab:media] verification threw', error);
       return { ok: false, error: 'We could not verify that upload.' };
     }
   }

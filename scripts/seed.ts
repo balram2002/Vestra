@@ -18,7 +18,7 @@ function log(message: string): void {
 }
 
 async function main(): Promise<void> {
-  process.stdout.write('\nVestra — seeding MongoDB\n\n');
+  process.stdout.write('\nVestraWAB — seeding MongoDB\n\n');
 
   const health = await pingDb();
   if (!health.ok) {

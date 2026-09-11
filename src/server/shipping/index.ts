@@ -29,7 +29,7 @@ export function shipping(): ShippingProvider {
     if (!warned) {
       warned = true;
       console.warn(
-        '[vestra:shipping] Eshopbox credentials are not configured ' +
+        '[vestrawab:shipping] Eshopbox credentials are not configured ' +
           '(ESHOPBOX_CLIENT_ID / _CLIENT_SECRET / _REFRESH_TOKEN / _WORKSPACE). ' +
           'Running the simulated courier instead.',
       );

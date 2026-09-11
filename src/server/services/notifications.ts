@@ -56,7 +56,7 @@ function loggingAdapter(channel: NotificationChannel): ChannelAdapter {
     async send({ user, title }) {
       // A stub that says so. Silently returning ok would make an unconfigured
       // provider indistinguishable from a working one.
-      console.info(`[vestra:notify] ${channel} -> ${user.email}: ${title} (adapter not configured)`);
+      console.info(`[vestrawab:notify] ${channel} -> ${user.email}: ${title} (adapter not configured)`);
       return { ok: true };
     },
   };
@@ -183,7 +183,7 @@ export async function notify(input: NotifyInput): Promise<Notification | null> {
       if (result.ok) delivered.push(channel);
     } catch (error) {
       // Never rethrow: a failed send must not fail the order that caused it.
-      console.error(`[vestra:notify] ${channel} failed`, error);
+      console.error(`[vestrawab:notify] ${channel} failed`, error);
     }
   }
 
@@ -212,7 +212,7 @@ export async function notify(input: NotifyInput): Promise<Notification | null> {
 /** Fire-and-forget. For call sites where the notification is a side effect. */
 export function notifyQuietly(input: NotifyInput): void {
   void notify(input).catch((error) => {
-    console.error('[vestra:notify] failed', error);
+    console.error('[vestrawab:notify] failed', error);
   });
 }
 

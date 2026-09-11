@@ -3,7 +3,7 @@ import 'server-only';
 import type { ShipmentStatus } from '@/domain/enums';
 
 /**
- * Eshopbox status vocabulary -> Vestra shipment states.
+ * Eshopbox status vocabulary -> VestraWAB shipment states.
  *
  * The courier's vocabulary is theirs and will change without asking us. Keeping
  * the translation in one table means a new status string is a one-line edit

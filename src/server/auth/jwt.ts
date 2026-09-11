@@ -40,7 +40,7 @@ function secret(): Uint8Array {
   const value = process.env.AUTH_SECRET;
   if (!value || value.length < 16) {
     throw new Error(
-      '[vestra:auth] AUTH_SECRET is missing or too short. Set it in .env.local (32+ random characters).',
+      '[vestrawab:auth] AUTH_SECRET is missing or too short. Set it in .env.local (32+ random characters).',
     );
   }
   return new TextEncoder().encode(value);

@@ -182,7 +182,7 @@ export async function createShipmentForSellerOrder(
     // still recorded so it appears in the queue and can be retried; only the
     // provider link is missing.
     if (!(error instanceof ShippingProviderError)) throw error;
-    console.error('[vestra:shipping] createShipment failed', error);
+    console.error('[vestrawab:shipping] createShipment failed', error);
   }
 
   const shipment: Shipment = {
@@ -594,7 +594,7 @@ export async function createReturnPickup(
     awb = created.awb;
   } catch (error) {
     if (!(error instanceof ShippingProviderError)) throw error;
-    console.error('[vestra:shipping] reverse pickup failed', error);
+    console.error('[vestrawab:shipping] reverse pickup failed', error);
   }
 
   const shipment: Shipment = {
@@ -962,7 +962,7 @@ export async function syncTracking(shipmentId: string): Promise<{ applied: numbe
   try {
     snapshot = await shipping().track(shipment.awb);
   } catch (error) {
-    console.error('[vestra:shipping] tracking poll failed', error);
+    console.error('[vestrawab:shipping] tracking poll failed', error);
     return { applied: 0 };
   }
   if (!snapshot) return { applied: 0 };

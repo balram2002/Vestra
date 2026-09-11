@@ -47,7 +47,7 @@ export function sellerOrderNumber(orderNo: string, index: number): string {
   return `${orderNo}-S${index + 1}`;
 }
 
-/** Shipment reference issued by Vestra (distinct from the courier AWB). */
+/** Shipment reference issued by VestraWAB (distinct from the courier AWB). */
 export function shipmentNumber(date = new Date()): string {
   return `SHP-${yymm(date)}-${token(7)}`;
 }

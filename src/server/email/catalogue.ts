@@ -76,7 +76,7 @@ export const EMAIL_WORTHY: Record<NotificationCategory, boolean> = {
  *
  * The title is written for a notification row, where the surrounding UI says
  * what kind of thing it is. An inbox has no surrounding UI, so the subject has
- * to stand alone — but prefixing every subject with "[Vestra]" wastes the
+ * to stand alone — but prefixing every subject with "[VestraWAB]" wastes the
  * first and most-read characters, and the sender name already says who it is.
  */
 export function subjectFor(category: NotificationCategory, title: string): string {
@@ -119,5 +119,5 @@ export function buttonLabelFor(category: NotificationCategory): string {
     FINANCE: 'View the payout',
     SYSTEM: 'Read and reply',
   };
-  return labels[category] ?? 'Open Vestra';
+  return labels[category] ?? 'Open VestraWAB';
 }

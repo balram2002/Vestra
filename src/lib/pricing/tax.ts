@@ -30,7 +30,7 @@ export function splitGst(taxAmount: number, isInterState: boolean): Pick<TaxLine
 
 /**
  * Compute the tax component of a tax-inclusive taxable value.
- * Vestra quotes GST-inclusive prices (Indian retail convention), so tax is
+ * VestraWAB quotes GST-inclusive prices (Indian retail convention), so tax is
  * extracted from the amount charged rather than added to it.
  */
 export function taxForLine(

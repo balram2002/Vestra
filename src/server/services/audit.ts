@@ -56,7 +56,7 @@ export async function record(input: AuditInput): Promise<void> {
     const logs = await collections.auditLogs();
     await logs.insertOne({ ...entry, _id: entry.id });
   } catch (error) {
-    console.error('[vestra:audit] FAILED TO RECORD', entry.action, entry.entityId, error);
+    console.error('[vestrawab:audit] FAILED TO RECORD', entry.action, entry.entityId, error);
   }
 }
 

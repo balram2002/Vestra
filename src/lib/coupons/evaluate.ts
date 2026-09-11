@@ -94,7 +94,7 @@ export function evaluateCoupon(coupon: Coupon, context: CouponContext): CouponEv
   /* -- audience --------------------------------------------------------- */
 
   if (coupon.audience === 'NEW_CUSTOMER' && !context.isNewCustomer) {
-    return deny('This offer is only for first-time Vestra shoppers.');
+    return deny('This offer is only for first-time VestraWAB shoppers.');
   }
   if (coupon.audience === 'EXISTING_CUSTOMER' && context.isNewCustomer) {
     return deny('This offer is only for returning shoppers.');
@@ -248,7 +248,7 @@ function readablePaymentMethod(method: PaymentMethod): string {
     NETBANKING: 'net banking',
     WALLET: 'wallets',
     COD: 'cash on delivery',
-    VESTRA_CREDIT: 'Vestra Credit',
+    VESTRA_CREDIT: 'VestraWAB Credit',
   };
   return labels[method];
 }

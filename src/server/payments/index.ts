@@ -20,17 +20,17 @@ export function gateway(): PaymentGateway {
   switch (configured) {
     case 'razorpay':
       if (!process.env.RAZORPAY_KEY_SECRET) {
-        console.warn('[vestra:payments] PAYMENT_PROVIDER=razorpay but no key secret; using mock.');
+        console.warn('[vestrawab:payments] PAYMENT_PROVIDER=razorpay but no key secret; using mock.');
         return mockGateway();
       }
-      throw new Error('[vestra:payments] The Razorpay adapter is not implemented yet.');
+      throw new Error('[vestrawab:payments] The Razorpay adapter is not implemented yet.');
 
     case 'stripe':
       if (!process.env.STRIPE_SECRET_KEY) {
-        console.warn('[vestra:payments] PAYMENT_PROVIDER=stripe but no secret key; using mock.');
+        console.warn('[vestrawab:payments] PAYMENT_PROVIDER=stripe but no secret key; using mock.');
         return mockGateway();
       }
-      throw new Error('[vestra:payments] The Stripe adapter is not implemented yet.');
+      throw new Error('[vestrawab:payments] The Stripe adapter is not implemented yet.');
 
     default:
       return mockGateway();

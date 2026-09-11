@@ -5,7 +5,7 @@ import type { ShipmentStatus } from '@/domain/enums';
 /**
  * Courier contract.
  *
- * Eshopbox is the provider Vestra ships with, but nothing above this file knows
+ * Eshopbox is the provider VestraWAB ships with, but nothing above this file knows
  * that. The service layer speaks in shipments, AWBs and pickups; the adapter
  * translates. Adding a second courier for a region Eshopbox does not cover is
  * then a new implementation of this interface, not a change to fulfilment.

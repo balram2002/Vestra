@@ -21,7 +21,7 @@ export const email = {
    * instead, which nodemailer negotiates on its own.
    */
   secure: process.env.SMTP_SECURE === 'true' || Number(process.env.SMTP_PORT) === 465,
-  from: process.env.EMAIL_FROM ?? 'Vestra <no-reply@vestra.example>',
+  from: process.env.EMAIL_FROM ?? 'VestraWAB <no-reply@vestrawab.example>',
   replyTo: process.env.EMAIL_REPLY_TO ?? '',
   /** Where the console transport writes rendered mail during development. */
   outbox: process.env.EMAIL_OUTBOX ?? '.data/outbox',

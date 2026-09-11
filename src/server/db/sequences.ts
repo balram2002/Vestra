@@ -30,7 +30,7 @@ export async function nextSequence(key: string): Promise<number> {
   );
 
   if (!result) {
-    throw new Error(`[vestra:db] sequence "${key}" could not be advanced`);
+    throw new Error(`[vestrawab:db] sequence "${key}" could not be advanced`);
   }
   return result.value;
 }
@@ -50,7 +50,7 @@ export async function nextSequenceBlock(key: string, count: number): Promise<num
   );
 
   if (!result) {
-    throw new Error(`[vestra:db] sequence "${key}" could not be advanced`);
+    throw new Error(`[vestrawab:db] sequence "${key}" could not be advanced`);
   }
 
   const end = result.value;

@@ -97,7 +97,7 @@ try {
       verification.html.slice(0, 0),
     );
     check('it says how long the link lasts', /24 hours/.test(verification.html));
-    check('it names the sender', /Vestra/.test(verification.html));
+    check('it names the sender', /VestraWAB/.test(verification.html));
 
     /*
      * The token must NOT be recoverable from the database — only its hash is

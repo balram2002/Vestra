@@ -189,7 +189,7 @@ describe('audience', () => {
       coupon({ audience: 'NEW_CUSTOMER' }),
       context({ isNewCustomer: false }),
     );
-    expect(result.reason).toBe('This offer is only for first-time Vestra shoppers.');
+    expect(result.reason).toBe('This offer is only for first-time VestraWAB shoppers.');
   });
 
   it('holds a win-back coupon back from a first-time shopper', () => {

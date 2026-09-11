@@ -50,7 +50,7 @@ function consoleTransport(): EmailTransport {
     name: 'console',
     async send(message) {
       console.info(
-        `[vestra:email] NOT DELIVERED (no SMTP configured) -> ${message.to}: ${message.subject}`,
+        `[vestrawab:email] NOT DELIVERED (no SMTP configured) -> ${message.to}: ${message.subject}`,
       );
 
       try {
@@ -62,7 +62,7 @@ function consoleTransport(): EmailTransport {
       } catch (error) {
         // Writing the outbox is a convenience; failing to is not worth an error
         // path in the caller.
-        console.error('[vestra:email] could not write the outbox', error);
+        console.error('[vestrawab:email] could not write the outbox', error);
       }
 
       return { ok: true };
@@ -114,7 +114,7 @@ function smtpTransport(): EmailTransport {
         });
         return { ok: true };
       } catch (error) {
-        console.error('[vestra:email] send failed', message.subject, error);
+        console.error('[vestrawab:email] send failed', message.subject, error);
         return {
           ok: false,
           error: error instanceof Error ? error.message : 'The mail server rejected that message.',

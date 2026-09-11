@@ -1,4 +1,4 @@
-# Vestra — working notes
+# VestraWAB — working notes
 
 Multi-vendor fashion marketplace. Storefront, seller console and admin console
 on one Next.js 16 App Router codebase.

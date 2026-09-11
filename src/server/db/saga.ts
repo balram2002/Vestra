@@ -91,7 +91,7 @@ async function journal(record: SagaRecord): Promise<void> {
   } catch (error) {
     // The journal is an observability aid. Losing it must never turn a
     // successful order into a failed one.
-    console.error('[vestra:saga] journal write failed', error);
+    console.error('[vestrawab:saga] journal write failed', error);
   }
 }
 
@@ -153,7 +153,7 @@ export async function runSaga<TContext extends object>(
           record.status = 'COMPENSATION_FAILED';
           record.orphanedSteps.push(completed.name);
           console.error(
-            `[vestra:saga] "${name}" could not compensate step "${completed.name}"`,
+            `[vestrawab:saga] "${name}" could not compensate step "${completed.name}"`,
             compensationError,
           );
         }

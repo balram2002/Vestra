@@ -12,3 +12,8 @@ next-env.d.ts
 coverage
 .DS_Store
 .vercel
+
+# Screenshot output from scripts/screenshot.mjs — review artefacts, never committed.
+.shots/
+
+.claude

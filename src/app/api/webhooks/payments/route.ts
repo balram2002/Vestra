@@ -142,7 +142,7 @@ export async function POST(request: Request) {
     // 4. Journal the failure, still return 200. Redelivery would not help — the
     // event is already recorded as seen — and ops needs to see this.
     outcome = `error:${error instanceof Error ? error.message : 'unknown'}`;
-    console.error('[vestra:webhook] processing failed', error);
+    console.error('[vestrawab:webhook] processing failed', error);
   }
 
   await events.updateOne({ _id: `${provider.name}:${event.eventId}` }, { $set: { outcome } });

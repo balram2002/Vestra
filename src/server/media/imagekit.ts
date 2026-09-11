@@ -84,7 +84,7 @@ export function imageKitMediaStore(): MediaStore {
 
         if (!response.ok) {
           const detail = await response.text().catch(() => '');
-          console.error('[vestra:imagekit] upload failed', response.status, detail.slice(0, 300));
+          console.error('[vestrawab:imagekit] upload failed', response.status, detail.slice(0, 300));
           return { ok: false, error: 'That upload could not be saved. Try again.' };
         }
 
@@ -103,7 +103,7 @@ export function imageKitMediaStore(): MediaStore {
           },
         };
       } catch (error) {
-        console.error('[vestra:imagekit] upload threw', error);
+        console.error('[vestrawab:imagekit] upload threw', error);
         return { ok: false, error: 'We could not reach the image service. Try again.' };
       }
     },
@@ -130,10 +130,10 @@ export function imageKitMediaStore(): MediaStore {
         });
         // 404 means it is already gone, which is the desired end state.
         if (!response.ok && response.status !== 404) {
-          console.error('[vestra:imagekit] delete failed', id, response.status);
+          console.error('[vestrawab:imagekit] delete failed', id, response.status);
         }
       } catch (error) {
-        console.error('[vestra:imagekit] delete threw', id, error);
+        console.error('[vestrawab:imagekit] delete threw', id, error);
       }
     },
   };

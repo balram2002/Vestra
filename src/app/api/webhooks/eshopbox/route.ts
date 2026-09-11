@@ -99,7 +99,7 @@ export async function POST(request: Request) {
     }
   } catch (error) {
     outcome = `error:${error instanceof Error ? error.message : 'unknown'}`;
-    console.error('[vestra:webhook:eshopbox] processing failed', error);
+    console.error('[vestrawab:webhook:eshopbox] processing failed', error);
   }
 
   await events.updateOne({ _id: key }, { $set: { outcome } });

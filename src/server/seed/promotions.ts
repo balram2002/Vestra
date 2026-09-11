@@ -139,7 +139,7 @@ export function generatePromotions(
       id: entityId('prm'),
       slug: 'atelier-launch',
       title: `${second.displayName} launch offer`,
-      subtitle: 'New store on Vestra',
+      subtitle: 'New store on VestraWAB',
       description: `Flat ₹300 off everything from ${second.displayName}.`,
       type: 'SELLER_OFFER',
       valueKind: 'AMOUNT' as const,

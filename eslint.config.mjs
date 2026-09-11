@@ -16,7 +16,7 @@ const config = [
   ...coreWebVitals,
   ...nextTypescript,
   {
-    ignores: ['.next/**', 'node_modules/**', 'next-env.d.ts', '.data/**'],
+    ignores: ['.next/**', 'node_modules/**', 'next-env.d.ts', '.data/**', '.claude/**', '.shots/**'],
   },
   {
     rules: {

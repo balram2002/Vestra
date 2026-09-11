@@ -27,7 +27,7 @@ import { describeStatus, mapProviderStatus } from './status';
 /**
  * Eshopbox adapter.
  *
- * Translates between Vestra's fulfilment vocabulary and Eshopbox's. Two
+ * Translates between VestraWAB's fulfilment vocabulary and Eshopbox's. Two
  * conversions matter and are easy to get silently wrong:
  *
  *  - MONEY. We hold integer paise; Eshopbox expects rupees as decimals. The

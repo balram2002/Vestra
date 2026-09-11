@@ -10,7 +10,7 @@
  * Every transition is declared here. Nothing in the UI may invent one.
  */
 
-export type Tone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent' | 'brass';
+export type Tone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent' | 'premium';
 
 export interface StatusMeta {
   label: string;
@@ -334,7 +334,7 @@ export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
   NETBANKING: 'Net banking',
   WALLET: 'Wallet',
   COD: 'Cash on delivery',
-  VESTRA_CREDIT: 'Vestra Credit',
+  VESTRA_CREDIT: 'VestraWAB Credit',
 };
 
 export const REFUND_STATUSES = [
@@ -438,7 +438,7 @@ export const SELLER_STATUS_META: Record<SellerStatus, StatusMeta> = {
   KYC_PENDING: { label: 'KYC pending', tone: 'warning', description: 'Documents are being verified.' },
   APPROVED: { label: 'Approved', tone: 'success', description: 'Approved, awaiting first listing.' },
   REJECTED: { label: 'Rejected', tone: 'danger', description: 'Application was rejected.' },
-  ACTIVE: { label: 'Active', tone: 'success', description: 'Selling on Vestra.' },
+  ACTIVE: { label: 'Active', tone: 'success', description: 'Selling on VestraWAB.' },
   ON_HOLD: { label: 'On hold', tone: 'warning', description: 'Temporarily paused by operations.' },
   SUSPENDED: { label: 'Suspended', tone: 'danger', description: 'Suspended for policy violation.' },
 };

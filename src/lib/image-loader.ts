@@ -59,7 +59,7 @@ export default function imageLoader({
  * to the one list that matters and checked by a test, so the two cannot drift
  * apart silently.
  */
-export const OPTIMISABLE_REMOTE_HOSTS = ['images.unsplash.com', 'cdn.vestra.example'];
+export const OPTIMISABLE_REMOTE_HOSTS = ['images.unsplash.com', 'cdn.vestrawab.example'];
 
 function isConfiguredRemoteHost(src: string): boolean {
   try {
