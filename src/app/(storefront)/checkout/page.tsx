@@ -1,12 +1,11 @@
-import { MapPin, Plus } from 'lucide-react';
+import { MapPin } from 'lucide-react';
+import { AddressFormDialog } from '@/components/account/address-form';
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
 
 import { CheckoutForm } from '@/components/checkout/checkout-form';
 import { CheckoutSteps } from '@/components/checkout/checkout-steps';
-import { Button } from '@/components/ui/button';
 import { SHIPPING } from '@/config/business';
 import { formatMoney } from '@/lib/format';
 import { currentOwner, getSessionUser } from '@/server/auth/session';
@@ -76,11 +75,11 @@ async function CheckoutFlow() {
       <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-14">
         <div>
           {/*
-            The "add an address first" detour applies only to a SIGNED-IN
-            shopper with an empty address book — they have somewhere to save it
-            to. A guest has no address book by definition, and sending them to
-            /account/addresses would bounce them into a sign-in wall from the
-            middle of a checkout.
+            A SIGNED-IN shopper with an empty address book adds one right here,
+            in a dialog, and the page re-renders with it selected. It used to
+            link to the address page, whose Add button was disabled, so a new
+            customer could not buy at all. A guest types the address into the
+            form instead, having no book to save it to.
           */}
           {user && addresses.length === 0 ? (
             <div className="border-line rounded-lg border border-dashed p-8 text-center">
@@ -89,12 +88,12 @@ async function CheckoutFlow() {
               <p className="text-muted mt-1 text-sm">
                 Add where you would like this delivered before you pay.
               </p>
-              <Button asChild variant="secondary" size="sm" className="mt-5">
-                <Link href="/account/addresses">
-                  <Plus className="size-4" />
-                  Add an address
-                </Link>
-              </Button>
+              <AddressFormDialog
+                label="Add an address"
+                className="mt-5"
+                defaultName={user.fullName}
+                defaultPhone={user.phone ?? ''}
+              />
             </div>
           ) : (
             <CheckoutForm

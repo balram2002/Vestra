@@ -1,10 +1,10 @@
-import { MapPin, Plus } from 'lucide-react';
+import { MapPin } from 'lucide-react';
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
+import { AddressCardActions, AddressFormDialog } from '@/components/account/address-form';
 import { Breadcrumbs } from '@/components/commerce/breadcrumbs';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { requireUser } from '@/server/auth/session';
 import { collections, toEntities } from '@/server/db/collections';
 
@@ -14,10 +14,12 @@ export const metadata: Metadata = {
 };
 
 /**
- * Saved addresses.
+ * The address book.
  *
- * Scoped to the session's user id, never to a request parameter, so one
- * customer cannot read another's addresses by changing a URL.
+ * Addresses are read with the user id IN the query, so a customer cannot read
+ * another's by changing a URL, and every change goes through actions that
+ * scope the same way. The default comes first, because it is the one checkout
+ * picks.
  */
 export default function AddressesPage() {
   return (
@@ -29,13 +31,7 @@ export default function AddressesPage() {
         ]}
       />
 
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-display text-ink text-2xl">Your addresses</h1>
-        <Button size="sm" variant="secondary" disabled>
-          <Plus className="size-4" />
-          Add address
-        </Button>
-      </div>
+      <h1 className="font-display text-ink mt-3 text-2xl">Your addresses</h1>
 
       <Suspense fallback={<AddressSkeleton />}>
         <AddressList />
@@ -49,26 +45,37 @@ async function AddressList() {
 
   const addressCol = await collections.addresses();
   const addresses = toEntities(
-    await addressCol.find({ userId: user.id }).sort({ isDefault: -1 }).toArray(),
+    await addressCol.find({ userId: user.id }).sort({ isDefault: -1, updatedAt: -1 }).toArray(),
   );
 
   return (
     <>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-muted text-sm">
+          {addresses.length === 0
+            ? 'Save one now and checkout takes a single tap.'
+            : `${addresses.length} of 10 saved`}
+        </p>
+        <AddressFormDialog defaultName={user.fullName} defaultPhone={user.phone ?? ''} />
+      </div>
 
       {addresses.length === 0 ? (
-        <div className="border-line mt-8 flex flex-col items-center rounded-lg border border-dashed px-6 py-16 text-center">
+        <div className="border-line mt-6 flex flex-col items-center rounded-xl border border-dashed px-6 py-16 text-center">
           <MapPin className="text-faint size-8" aria-hidden />
           <h2 className="text-ink mt-4 text-md font-semibold">No addresses saved</h2>
           <p className="text-muted mt-1.5 max-w-sm text-sm">
-            Add one here, or enter it during checkout and we will save it for next time.
+            Add one here, or during checkout, and it is ready for next time.
           </p>
         </div>
       ) : (
         <ul className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {addresses.map((address) => (
-            <li key={address.id} className="border-line rounded-lg border p-4">
+            <li
+              key={address.id}
+              className="border-line bg-raised flex flex-col rounded-xl border p-4"
+            >
               <div className="flex items-center gap-2">
-                <span className="text-faint text-2xs uppercase tracking-wider">
+                <span className="text-faint text-2xs font-semibold uppercase tracking-wider">
                   {address.label}
                 </span>
                 {address.isDefault ? (
@@ -83,10 +90,17 @@ async function AddressList() {
                 {address.line1}
                 {address.line2 ? `, ${address.line2}` : ''}
               </p>
+              {address.landmark ? (
+                <p className="text-muted text-sm">{address.landmark}</p>
+              ) : null}
               <p className="text-muted text-sm">
                 {address.city}, {address.state} {address.pincode}
               </p>
               <p className="text-faint mt-1.5 text-xs">{address.phone}</p>
+
+              <div className="mt-auto">
+                <AddressCardActions address={address} />
+              </div>
             </li>
           ))}
         </ul>
@@ -99,7 +113,7 @@ function AddressSkeleton() {
   return (
     <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-hidden>
       {Array.from({ length: 3 }, (_, i) => (
-        <div key={i} className="skeleton h-36 rounded-lg" />
+        <div key={i} className="skeleton h-44 rounded-xl" />
       ))}
     </div>
   );

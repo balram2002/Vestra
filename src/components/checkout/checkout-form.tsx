@@ -3,6 +3,7 @@
 import { AlertTriangle, Banknote, CreditCard, Landmark, Smartphone, Wallet } from 'lucide-react';
 import { useId, useState, useTransition } from 'react';
 
+import { AddressFormDialog } from '@/components/account/address-form';
 import { Button } from '@/components/ui/button';
 import { SHIPPING } from '@/config/business';
 import type { Address, PaymentMethod } from '@/domain/types';
@@ -257,6 +258,15 @@ export function CheckoutForm({
             </li>
           ))}
         </ul>
+
+        {isGuest ? null : (
+          <AddressFormDialog
+            label="Deliver somewhere else"
+            variant="ghost"
+            className="mt-2"
+            onSaved={(address) => setAddressId(address.id)}
+          />
+        )}
       </section>
 
       {/* ------------------------------------------------------- payment */}
