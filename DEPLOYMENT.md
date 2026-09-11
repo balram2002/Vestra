@@ -110,3 +110,22 @@ BASE_URL=https://staging.example.com npm run audit:console    # console layout
 
 The smoke suites write test data and clean up after themselves, but they
 assume the demo seed, so run them against staging, never production.
+
+## 7. Deploying on Vercel
+
+Vercel builds the site on its own machines and runs it as serverless functions. That changes four things compared with a server of your own.
+
+1. **The database must be reachable from Vercel, during the build and afterwards.** The build prerenders the catalogue, the help and legal pages and the sitemap from MongoDB. Use MongoDB Atlas (or any hosted MongoDB), and in **Atlas → Network Access → Add IP Address** choose **Allow access from anywhere (`0.0.0.0/0`)**: Vercel's build machines and functions use changing IP addresses. A database on your own computer can never be reached.
+2. **Set the environment variables in Vercel**, under **Project → Settings → Environment Variables**, for **Production and Preview**. Variables starting with `NEXT_PUBLIC_` are baked into the build, so they must be set before it runs; redeploy after changing any of them.
+3. **The disk is read-only.** Set the three ImageKit variables, or uploads have nowhere to go (production refuses to start without them on Vercel), and set SMTP so email is actually sent.
+4. **Node.js 24**: **Project → Settings → General → Node.js Version**, to match `.nvmrc`. 22 also works.
+
+Then:
+
+- **Import the GitHub repository** in Vercel. The Next.js preset is detected; leave the build command as `npm run build`.
+- **Put data in the database** once, from your computer. If your `.env.local` already points at the Atlas database Vercel uses, the data you see locally is the data Vercel builds from. `npm run seed` loads the demo catalogue (and wipes the database first).
+- **Create the first administrator** against the same database: `npm run admin:create -- --email you@company.com --name "Your Name"`.
+- **Webhooks** go to your Vercel domain: `https://<domain>/api/webhooks/payments` and `https://<domain>/api/webhooks/eshopbox`.
+- **Check** `https://<domain>/api/health` returns `"status":"ok"`.
+
+`npm run build` starts with a database check (`scripts/check-build.mjs`). If a deployment stops with **"Build stopped: MongoDB is not usable for this build"**, the message says which of the steps above is missing: the variable is not set, it points at `localhost`, or Atlas is refusing Vercel's address. Before this check, the same problem surfaced as `Failed to collect page data for /sitemap/[__metadata_id__]`.

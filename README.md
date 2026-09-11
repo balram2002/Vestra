@@ -783,7 +783,7 @@ Smoke tests and audits run against a started server (`BASE_URL`, default `http:/
 
 ## 🚢 Deploying
 
-Read **[DEPLOYMENT.md](DEPLOYMENT.md)**. In short: Node 24 behind a TLS proxy, MongoDB, `APP_ENV=production` with real provider keys, `npm run build`, `npm run start`, then `npm run admin:create` for the first administrator, and point the payment and courier webhooks at the site. `/api/health` tells your load balancer when a node is ready.
+Read **[DEPLOYMENT.md](DEPLOYMENT.md)**, and for Vercel its section [Deploying on Vercel](DEPLOYMENT.md#7-deploying-on-vercel): a hosted MongoDB open to Vercel's addresses, the environment variables set for Production and Preview, and ImageKit for uploads. In short: Node 24 behind a TLS proxy, MongoDB, `APP_ENV=production` with real provider keys, `npm run build`, `npm run start`, then `npm run admin:create` for the first administrator, and point the payment and courier webhooks at the site. `/api/health` tells your load balancer when a node is ready.
 
 ---
 
