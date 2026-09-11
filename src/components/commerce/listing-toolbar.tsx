@@ -49,7 +49,10 @@ export function SortChips({
         {sorts.map((sort) => {
           const active = sort === activeSort;
           return (
-            <li key={sort}>
+            // `shrink-0` on the ITEM: the global `min-width: 0` lets a flex
+            // item shrink below its text, and the chips then piled on top of
+            // each other on a phone instead of scrolling.
+            <li key={sort} className="shrink-0">
               <Link
                 href={withParam(params, 'sort', sort, basePath)}
                 aria-current={active ? 'true' : undefined}

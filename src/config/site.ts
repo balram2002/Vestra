@@ -108,113 +108,95 @@ export function absoluteUrl(path = '/'): string {
 /* -------------------------------------------------------------------------
  * Route builders.
  *
- * Public URLs are always slug-based. IDs stay internal. Centralising the
- * builders means a URL-shape change is one edit, and no component ever
- * hand-assembles a path.
+ * Public URLs are slug-based and IDs stay internal. Every builder points at a
+ * page that exists: `routes.test.ts` walks the app directory and fails when
+ * one does not, so a moved page cannot leave a builder linking to a 404, which
+ * is exactly what happened to half of these before the test.
  * ---------------------------------------------------------------------- */
 
 export const routes = {
   home: () => '/',
   search: (query?: string) => (query ? `/search?q=${encodeURIComponent(query)}` : '/search'),
-
-  category: (path: string | string[]) =>
-    `/category/${(Array.isArray(path) ? path : [path]).join('/')}`,
-
+  categories: () => '/categories',
+  category: (slug: string) => `/category/${slug}`,
   product: (slug: string) => `/product/${slug}`,
+  brands: () => '/brands',
   brand: (slug: string) => `/brand/${slug}`,
   /**
    * Public seller storefronts live under /store, not /seller. The seller
    * console owns /seller/*, and letting a seller slug share that namespace
    * would make a store called "orders" shadow a console route.
    */
+  stores: () => '/stores',
   store: (slug: string) => `/store/${slug}`,
-  campaign: (slug: string) => `/campaign/${slug}`,
+  reels: () => '/reels',
 
   bag: () => '/bag',
   wishlist: () => '/wishlist',
   checkout: () => '/checkout',
-  checkoutPayment: () => '/checkout/payment',
-  orderConfirmation: (orderNumber: string) => `/checkout/confirmation/${orderNumber}`,
+  checkoutPayment: (orderId: string) => `/checkout/payment/${orderId}`,
 
-  orders: () => '/account/orders',
-  order: (orderNumber: string) => `/account/orders/${orderNumber}`,
-  orderTracking: (orderNumber: string, shipmentNumber: string) =>
-    `/account/orders/${orderNumber}/track/${shipmentNumber}`,
-  orderReturn: (orderNumber: string) => `/account/orders/${orderNumber}/return`,
-  orderExchange: (orderNumber: string) => `/account/orders/${orderNumber}/exchange`,
-  orderCancel: (orderNumber: string) => `/account/orders/${orderNumber}/cancel`,
+  orders: () => '/orders',
+  order: (id: string) => `/orders/${id}`,
+  invoice: (id: string) => `/invoice/${id}`,
 
   account: () => '/account',
   accountProfile: () => '/account/profile',
   accountAddresses: () => '/account/addresses',
-  accountPayments: () => '/account/payments',
-  accountCoupons: () => '/account/coupons',
-  accountReviews: () => '/account/reviews',
-  accountReturns: () => '/account/returns',
   accountNotifications: () => '/account/notifications',
-  accountSecurity: () => '/account/security',
+  accountReturns: () => '/account/returns',
+  accountReviews: () => '/account/reviews',
   accountSupport: () => '/account/support',
-  accountTicket: (ticketNumber: string) => `/account/support/${ticketNumber}`,
 
-  signIn: (next?: string) => (next ? `/sign-in?next=${encodeURIComponent(next)}` : '/sign-in'),
-  signUp: (next?: string) => (next ? `/sign-up?next=${encodeURIComponent(next)}` : '/sign-up'),
+  signIn: (next?: string) => (next ? `/login?next=${encodeURIComponent(next)}` : '/login'),
+  signUp: (next?: string) => (next ? `/register?next=${encodeURIComponent(next)}` : '/register'),
   forgotPassword: () => '/forgot-password',
 
-  help: () => '/help',
   helpArticle: (slug: string) => `/help/${slug}`,
-  page: (slug: string) => `/pages/${slug}`,
+  legal: (slug: string) => `/legal/${slug}`,
+  about: () => '/about',
   sellWithUs: () => '/sell-with-us',
+  applyToSell: () => '/sell-with-us/apply',
 
   seller: {
     dashboard: () => '/seller',
+    onboarding: () => '/seller/onboarding',
     products: () => '/seller/products',
     product: (id: string) => `/seller/products/${id}`,
     newProduct: () => '/seller/products/new',
+    inventory: () => '/seller/inventory',
     orders: () => '/seller/orders',
-    sellerOrder: (id: string) => `/seller/orders/${id}`,
     shipments: () => '/seller/shipments',
     shipment: (id: string) => `/seller/shipments/${id}`,
-    inventory: () => '/seller/inventory',
     returns: () => '/seller/returns',
-    returnDetail: (id: string) => `/seller/returns/${id}`,
     earnings: () => '/seller/earnings',
     settlements: () => '/seller/settlements',
-    settlement: (id: string) => `/seller/settlements/${id}`,
     analytics: () => '/seller/analytics',
-    coupons: () => '/seller/coupons',
-    reviews: () => '/seller/reviews',
-    support: () => '/seller/support',
     settings: () => '/seller/settings',
-    onboarding: () => '/seller/onboarding',
   },
 
   admin: {
     dashboard: () => '/admin',
-    users: () => '/admin/users',
-    user: (id: string) => `/admin/users/${id}`,
-    sellers: () => '/admin/sellers',
-    sellerDetail: (id: string) => `/admin/sellers/${id}`,
-    products: () => '/admin/products',
-    productDetail: (id: string) => `/admin/products/${id}`,
-    categories: () => '/admin/categories',
-    brands: () => '/admin/brands',
-    orders: () => '/admin/orders',
-    orderDetail: (orderNumber: string) => `/admin/orders/${orderNumber}`,
-    payments: () => '/admin/payments',
-    refunds: () => '/admin/refunds',
-    returns: () => '/admin/returns',
-    shipments: () => '/admin/shipments',
-    coupons: () => '/admin/coupons',
-    promotions: () => '/admin/promotions',
-    reviews: () => '/admin/reviews',
-    settlements: () => '/admin/settlements',
     analytics: () => '/admin/analytics',
-    cms: () => '/admin/cms',
-    banners: () => '/admin/cms/banners',
-    navigation: () => '/admin/cms/navigation',
+    orders: () => '/admin/orders',
+    order: (orderNumber: string) => `/admin/orders/${orderNumber}`,
+    returns: () => '/admin/returns',
+    payments: () => '/admin/payments',
+    settlements: () => '/admin/settlements',
     support: () => '/admin/support',
     ticket: (id: string) => `/admin/support/${id}`,
-    roles: () => '/admin/roles',
+    products: () => '/admin/products',
+    reviews: () => '/admin/reviews',
+    categories: () => '/admin/categories',
+    brands: () => '/admin/brands',
+    sellers: () => '/admin/sellers',
+    seller: (id: string) => `/admin/sellers/${id}`,
+    users: () => '/admin/users',
+    coupons: () => '/admin/coupons',
+    promotions: () => '/admin/promotions',
+    homepage: () => '/admin/cms',
+    pages: () => '/admin/pages',
+    page: (id: string) => `/admin/pages/${id}`,
     auditLogs: () => '/admin/audit-logs',
     settings: () => '/admin/settings',
   },

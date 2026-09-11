@@ -26,6 +26,9 @@ function InputControl({
   ...props
 }: ComponentProps<'input'> & { leading?: React.ReactNode; trailing?: React.ReactNode }) {
   const field = useField();
+  // A text prefix such as "+91" is wider than an icon, so it gets its own
+  // width and more padding; an icon or a single symbol keeps the 16px slot.
+  const textPrefix = typeof leading === 'string' && leading.length > 1;
 
   const control = (
     <input
@@ -36,7 +39,7 @@ function InputControl({
         controlClasses,
         controlTone(field.invalid),
         'h-11',
-        leading && 'pl-9',
+        leading && (textPrefix ? 'pl-12' : 'pl-9'),
         trailing && 'pr-9',
         className,
       )}
@@ -50,7 +53,10 @@ function InputControl({
     <div className="relative">
       {leading ? (
         <span
-          className="text-faint pointer-events-none absolute left-3 top-1/2 grid size-4 -translate-y-1/2 place-items-center"
+          className={cn(
+            'text-faint pointer-events-none absolute left-3 top-1/2 -translate-y-1/2',
+            textPrefix ? 'tabular text-sm' : 'grid size-4 place-items-center',
+          )}
           aria-hidden
         >
           {leading}

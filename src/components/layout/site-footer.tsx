@@ -63,7 +63,7 @@ const PAYMENT_METHODS = [
 const GUARANTEES = [
   { label: 'Secure checkout', icon: ShieldCheck },
   { label: '14-day returns', icon: RotateCcw },
-  { label: 'GST-verified sellers', icon: BadgeCheck },
+  { label: 'Every seller reviewed', icon: BadgeCheck },
 ] as const;
 
 /**

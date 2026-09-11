@@ -103,11 +103,10 @@ async function Notifications() {
         <ul className="border-line mt-4 divide-y rounded-lg border">
           {NOTIFICATION_CATEGORIES.filter((category) => category !== 'SYSTEM').map((category) => {
             const preference = preferences[category];
-            const channels = [
-              preference?.email ? 'Email' : null,
-              preference?.sms ? 'SMS' : null,
-              preference?.push ? 'Push' : null,
-            ].filter(Boolean);
+            // Only the channels that actually deliver. SMS and push are not
+            // connected to a provider yet, and listing them would promise
+            // messages nobody sends.
+            const channels = [preference?.email ? 'Email' : null].filter(Boolean);
 
             return (
               <li key={category} className="flex items-center justify-between gap-3 px-4 py-2.5">

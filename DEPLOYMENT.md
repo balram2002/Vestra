@@ -38,7 +38,7 @@ Required for `APP_ENV=production`:
 | `PAYMENT_PROVIDER` | `razorpay` or `stripe`, with that provider's keys and webhook secret |
 | Eshopbox credentials | all five `ESHOPBOX_*` values, or set `ESHOPBOX_MODE=simulation` deliberately |
 | `LIVE_PROVIDER` | `zoom` with its three S2S OAuth values for real calls; `mock` is allowed but warned about |
-| ImageKit | optional. Without it, uploads go to local disk, which does not survive a multi-instance deploy |
+| ImageKit | optional. Without it, uploads go to local disk, which does not survive a multi-instance deploy. Set `NEXT_PUBLIC_IMAGEKIT_WEB_PROXY=true` only if the endpoint's web proxy is switched on in the ImageKit dashboard; off, remote images are served directly instead of 404ing |
 | Business details | recommended: `NEXT_PUBLIC_SUPPORT_EMAIL` and `NEXT_PUBLIC_GRIEVANCE_OFFICER` (an Indian marketplace must name one), and the rest of the block in `.env.example`. Unset ones are left out, never invented, and the startup check warns about those two |
 
 Every provider falls back to a simulation when its secrets are missing. That is
@@ -136,7 +136,7 @@ Then:
 - **Add your brands** in the admin console under **Catalogue → Brands**. A seller cannot submit a listing without one.
 - **Fill in the business details** in Vercel's environment variables: at least `NEXT_PUBLIC_SUPPORT_EMAIL` and `NEXT_PUBLIC_GRIEVANCE_OFFICER` (the whole block is in `.env.example`), plus `EMAIL_FROM` with an address your SMTP provider sends from. They are `NEXT_PUBLIC_`, so redeploy after setting them. Nothing is invented for an empty one: it is simply not shown.
 - **Read every page** under **Marketing → Pages**. The terms, privacy, returns and grievance policies are a starting point and they are your commitments, so edit them there. The contact details under the contact and grievance pages come from the variables above.
-- **Add homepage banners** under **Marketing → Homepage**: upload an image (needs ImageKit on Vercel) or paste an https link. Until there is one, the hero and the tile grid stay hidden.
+- **Make the homepage yours** under **Marketing → Homepage**. Until you add a hero slide, five default slides show; **Customise these slides** turns them into banners you can edit, reorder, hide or delete, or add your own (upload an image, which needs ImageKit on Vercel, or paste an https link). The tile grid stays hidden until it has a tile.
 - **Webhooks** go to your Vercel domain: `https://<domain>/api/webhooks/payments` and `https://<domain>/api/webhooks/eshopbox`.
 - **Check** `https://<domain>/api/health` returns `"status":"ok"`.
 

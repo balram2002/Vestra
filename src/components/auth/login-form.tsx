@@ -90,18 +90,21 @@ export function LoginForm({ next }: { next?: string }) {
       </Button>
 
       {/*
-        Demo credentials are shown on purpose: this build ships with a seeded
-        dataset and no way to receive a verification email.
+        Demo credentials, only where the demo dataset is loaded. A real shop's
+        sign-in page must not advertise accounts and a shared password, so
+        this stays off unless NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS=true.
       */}
-      <div className="border-line bg-sunken rounded-md border p-3">
-        <p className="text-ink text-2xs font-semibold uppercase tracking-wider">Demo accounts</p>
-        <ul className="text-muted mt-1.5 space-y-0.5 text-2xs">
-          <li>Customer — ananya.iyer@example.com</li>
-          <li>Seller — mora01@seller.vestra.test</li>
-          <li>Admin — admin@vestra.test</li>
-        </ul>
-        <p className="text-faint mt-1.5 text-2xs">Password for all: vestra123</p>
-      </div>
+      {process.env.NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS === 'true' ? (
+        <div className="border-line bg-sunken rounded-md border p-3">
+          <p className="text-ink text-2xs font-semibold uppercase tracking-wider">Demo accounts</p>
+          <ul className="text-muted mt-1.5 space-y-0.5 text-2xs">
+            <li>Customer — ananya.iyer@example.com</li>
+            <li>Seller — mora01@seller.vestra.test</li>
+            <li>Admin — admin@vestra.test</li>
+          </ul>
+          <p className="text-faint mt-1.5 text-2xs">Password for all: vestra123</p>
+        </div>
+      ) : null}
     </form>
   );
 }

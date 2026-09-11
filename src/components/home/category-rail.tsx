@@ -98,9 +98,12 @@ export function CategoryRail({
               <p className="text-ink mt-2.5 text-sm font-medium leading-tight group-hover:underline">
                 {category.name}
               </p>
-              <p className="text-faint mt-0.5 text-2xs">
-                {formatCompactNumber(category.productCount)} styles
-              </p>
+              {/* A count of nothing reads as a dead shelf; say nothing until there is one. */}
+              {category.productCount > 0 ? (
+                <p className="text-faint mt-0.5 text-2xs">
+                  {formatCompactNumber(category.productCount)} styles
+                </p>
+              ) : null}
             </Link>
           </li>
         ))}

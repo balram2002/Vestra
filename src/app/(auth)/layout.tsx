@@ -98,7 +98,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             {[
               'Free delivery above ₹1,199',
               '14-day returns and exchanges',
-              'Every seller GST-registered and KYC-verified',
+              'Every seller reviewed before they can sell',
             ].map((promise) => (
               <li key={promise} className="flex items-start gap-3 text-sm text-current/80">
                 <span

@@ -79,7 +79,7 @@ One sign-in page serves everyone. After signing in, each person lands in the rig
 
 **🏪 For sellers**
 
-- Guided onboarding with KYC documents
+- A two-minute application with business details only; tax, bank and pickup details come later, when they are needed
 - Listing editor with sizes, colours, photos and SKUs
 - Live inventory with low-stock warnings
 - Order queue with a dispatch timer
@@ -155,7 +155,7 @@ npm run dev      # http://localhost:3000
 
 ### Demo accounts
 
-After `npm run seed`, every account uses the password **`vestra123`**.
+After `npm run seed`, every account uses the password **`vestra123`**. Set `NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS=true` to list them under the sign-in form as well; it is off by default, so a real shop never advertises them.
 
 | Role | Email | Lands on |
 |---|---|---|
@@ -202,7 +202,7 @@ Pages are grouped the way the code groups them. "Who" is who can open the page: 
 | Legal | `/legal/[slug]` | Terms, privacy, returns policy and grievance officer | anyone |
 | About | `/about` | The company | anyone |
 | Sell with us | `/sell-with-us` | Why and how to open a store | anyone |
-| Apply to sell | `/sell-with-us/apply` | The seller application: business details, GST, bank account, pickup address | anyone |
+| Apply to sell | `/sell-with-us/apply` | The seller application: store name, business type, contact details, city and what you sell. A GSTIN is optional | anyone |
 
 ### 🎥 Live shopping and reels
 
@@ -252,8 +252,8 @@ These open **full-screen**, without the site header and footer.
 
 | Page | Address | What it does |
 |---|---|---|
-| Dashboard | `/seller` | The last 30 days against the 30 before: sales, orders, what needs doing today |
-| Application | `/seller/onboarding` | Where a new store's application stands, and the KYC documents still needed |
+| Dashboard | `/seller` | The last 30 days against the 30 before: sales, orders, what needs doing today, and what is left to set up |
+| Application | `/seller/onboarding` | Where a new store's application stands. A rejected one shows the reason and is corrected and resent here |
 | Orders | `/seller/orders` | New orders to confirm, pack and dispatch within the SLA, with a countdown |
 | Shipments | `/seller/shipments` | Generate labels, hand parcels to the courier, close a manifest for each pickup run |
 | Shipment | `/seller/shipments/[id]` | One parcel: contents, AWB, tracking timeline and label |
@@ -266,7 +266,7 @@ These open **full-screen**, without the site header and footer.
 | Earnings | `/seller/earnings` | Money earned, held and paid, and when the next payout clears |
 | Settlements | `/seller/settlements` | Payout statements with every order, fee and deduction |
 | Analytics | `/seller/analytics` | 90 days of trading: revenue, best sellers, returns, live-call conversion |
-| Settings | `/seller/settings` | Store profile, return policy, pickup locations and payout account |
+| Settings | `/seller/settings` | Store profile, business and tax details, pickup address, payout account and verification documents, each saved on its own |
 | Live call | `/seller/live/[id]` | The store's side of a live call: video, the shopper's messages, raised hands, offer a price, end the call |
 
 The **Live desk** switch in the top bar of every seller page opens and closes the store for live calls, and incoming calls pop up wherever the seller is.
@@ -286,11 +286,11 @@ The **Live desk** switch in the top bar of every seller page opens and closes th
 | Reviews | `/admin/reviews` | Publish held reviews, reject, or take down published ones | review moderation |
 | Categories | `/admin/categories` | The category tree: add categories, hide or show them, see tax slab and return policy | catalogue |
 | Brands | `/admin/brands` | Add the labels sellers list under, and hide or show them. A listing cannot be submitted without a brand | catalogue |
-| Sellers | `/admin/sellers` | Every store: approve, reject, put on hold, suspend or reinstate | sellers |
+| Sellers | `/admin/sellers` | Every store, with an **Applications** tab of new ones to approve or send back with a reason. Open a store for its application, set-up and documents; suspend or reinstate | sellers |
 | Users | `/admin/users` | Everyone with an account; search, and suspend or reactivate | users |
 | Coupons | `/admin/coupons` | Create discount codes and switch them on or off | coupons |
 | Promotions | `/admin/promotions` | Create automatic offers (created paused) and switch them live | promotions |
-| Homepage | `/admin/cms` | Show or hide each homepage section. Add hero and tile-grid banners (upload an image or paste an https link), hide them, delete them | content |
+| Homepage | `/admin/cms` | The hero slides and tile-grid banners: add (upload an image or paste an https link), edit, reorder, hide or delete. Until you add a hero slide, five default slides show, and **Customise these slides** turns them into banners of your own. Also shows or hides each homepage section | content |
 | Pages | `/admin/pages` | Edit the policy and help pages (terms, privacy, returns, grievance, shipping, contact, about, sell with us) and publish or unpublish them. The contact details under the contact and grievance pages come from the business-details variables | content |
 | Support | `/admin/support` | Tickets, urgent first; anything past its SLA is flagged | support |
 | Ticket | `/admin/support/[id]` | One conversation: reply, add internal notes, change status | support |
@@ -372,10 +372,9 @@ Every console page has the same layout: a sidebar you can collapse to icons, a s
 
 ### 1. Become a seller
 
-1. Go to **Sell with us** → **Apply**. Enter your business details, **GSTIN**, **bank account** and **pickup address**.
-2. Upload your **KYC documents** on the **Application** page (`/seller/onboarding`).
-3. The platform team reviews them, usually within two working days. You see the status change from **KYC submitted** to **Approved** and then **Active**.
-4. Once active, the whole seller console opens up.
+1. Go to **Sell with us** → **Apply**. Enter your business details: store name, business type, email, mobile number, city and state, and what you sell. A GSTIN is optional. It takes about two minutes, and no documents are needed.
+2. The platform team reviews it, usually within two working days. The **Application** page (`/seller/onboarding`) shows **Awaiting review**. If it is sent back, the reason is shown there, and you correct the details and send it again.
+3. Once approved, the whole seller console opens. The dashboard lists what is left to set up, and you add each item under **Settings** when you need it: a **pickup address** before your first order ships, your **GSTIN and PAN** for invoices, a **payout account** for your earnings, and verification documents.
 
 ### 2. List a product
 
@@ -445,9 +444,9 @@ Staff sign in at the same `/login` and land in the admin console. **What you can
 <details>
 <summary><b>Approve a new seller</b></summary>
 
-1. **Sellers** → open the store with status **KYC submitted**.
-2. Check the documents against the GSTIN and bank account.
-3. **Approve** (the store can start listing) or **reject** with a reason the applicant will read.
+1. **Sellers** → **Applications**, oldest first. Open a store to see everything it told you.
+2. **Approve** (the seller console opens) or **Reject** with a reason. The reason is what the applicant reads, and they can correct the application and send it again.
+3. Pickup address, tax details, bank account and documents arrive later, from the seller's Settings, and show on the same store page.
 4. Later you can put a store **on hold** or **suspend** it (its listings stop selling) and **reinstate** it.
 
 </details>
@@ -564,11 +563,12 @@ stateDiagram-v2
 
 ```mermaid
 flowchart LR
-    A["Apply to sell"] --> B["Onboarding"]
-    B -->|upload KYC| C["KYC submitted"]
-    C -->|platform reviews| D{"Documents check out?"}
-    D -->|yes| E["Approved, then Active"]
-    D -->|no| F["Rejected, with a reason"]
+    A["Apply: business details"] --> C["Awaiting review"]
+    C -->|platform reviews| D{"Approve?"}
+    D -->|yes| E["Active: console opens"]
+    D -->|no| F["Sent back, with a reason"]
+    F -->|corrected and resent| C
+    E -->|when needed| S["Set up: pickup, GST, bank"]
     E -->|problem later| G["On hold or suspended"]
     G -->|resolved| E
 ```
@@ -678,7 +678,7 @@ flowchart TB
 | Payments | Razorpay or Stripe (adapter pending, see [status](#-project-status)) | Mock gateway |
 | Shipping | Eshopbox | A simulated courier that also produces failures, RTOs and unserviceable pincodes |
 | Live video | Zoom (Server-to-Server OAuth) | A demo room on the same site |
-| Images | ImageKit | Local disk and the Next.js optimiser |
+| Images | ImageKit for uploads, Unsplash's CDN for its photography | Local disk, with images served at their own size |
 | Email | Any SMTP server | Printed to the console and saved to `.data/outbox` |
 
 ### Route groups
@@ -742,11 +742,12 @@ Copy `.env.example` to `.env.local`. Only two values are needed to run locally; 
 | `NEXT_PUBLIC_SITE_URL` | Links in emails, canonical URLs | ✅ in production (https) |
 | `NEXT_PUBLIC_SUPPORT_EMAIL`, `NEXT_PUBLIC_SUPPORT_PHONE`, `NEXT_PUBLIC_SUPPORT_HOURS`, `NEXT_PUBLIC_LEGAL_NAME`, `NEXT_PUBLIC_BUSINESS_ADDRESS`, `NEXT_PUBLIC_GRIEVANCE_OFFICER`, `NEXT_PUBLIC_GRIEVANCE_EMAIL`, `NEXT_PUBLIC_INSTAGRAM_URL` (and the other social links) | Business details: who runs the shop and how to reach a person, in the footer, on the contact and grievance pages, on invoices and in emails. An empty one is left out, never invented | recommended; India requires a named grievance officer |
 | `APP_ENV` | `development`, `staging` or `production`; how strict the startup check is | production |
+| `NEXT_PUBLIC_SHOW_DEMO_ACCOUNTS` | Lists the demo accounts under the sign-in form. Only with the demo dataset | never in production |
 | `SMTP_*`, `EMAIL_FROM`, `EMAIL_REPLY_TO` | Sending real email | production |
 | `PAYMENT_PROVIDER`, `RAZORPAY_*` / `STRIPE_*` | Real payments | production |
 | `ESHOPBOX_*`, `ESHOPBOX_MODE` | Real shipping | production |
 | `LIVE_PROVIDER`, `ZOOM_*` | Real video calls | optional |
-| `NEXT_PUBLIC_IMAGEKIT_*`, `IMAGEKIT_PRIVATE_KEY` | Image hosting and optimisation | recommended in production |
+| `NEXT_PUBLIC_IMAGEKIT_*`, `IMAGEKIT_PRIVATE_KEY` | Image hosting and optimisation. Leave `NEXT_PUBLIC_IMAGEKIT_WEB_PROXY` false unless the endpoint's web proxy is switched on in ImageKit | recommended in production |
 
 Every variable is explained in [`.env.example`](.env.example). Production rules are in [DEPLOYMENT.md](DEPLOYMENT.md).
 

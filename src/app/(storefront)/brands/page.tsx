@@ -1,15 +1,18 @@
+import { Tags } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { Breadcrumbs } from '@/components/commerce/breadcrumbs';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
 import { absoluteUrl } from '@/config/site';
 import { listBrands } from '@/server/services/catalog';
 
 export const metadata: Metadata = {
   title: 'Brands',
   description:
-    'Every label stocked on VestraWAB, from block-print cotton workshops to Goodyear-welted shoemakers.',
+    'Every label sold on VestraWAB, from A to Z.',
   alternates: { canonical: absoluteUrl('/brands') },
 };
 
@@ -36,10 +39,26 @@ export default async function BrandsPage() {
       <header className="mt-3">
         <h1 className="font-display text-ink text-2xl sm:text-3xl">Brands</h1>
         <p className="text-muted mt-2 max-w-2xl text-sm">
-          {brands.length} labels, from block-print cotton workshops in Bagru to Goodyear-welted
-          shoemakers in Kanpur.
+          {brands.length === 0
+            ? 'Labels appear here as sellers list their first products.'
+            : `${brands.length} ${brands.length === 1 ? 'label' : 'labels'} on VestraWAB, from A to Z.`}
         </p>
       </header>
+
+      {brands.length === 0 ? (
+        <div className="border-line mt-8 rounded-xl border border-dashed">
+          <EmptyState
+            icon={Tags}
+            title="No brands yet"
+            body="As sellers list their first products, their labels appear here."
+            action={
+              <Button asChild size="sm" shape="pill">
+                <Link href="/categories">Browse categories</Link>
+              </Button>
+            }
+          />
+        </div>
+      ) : null}
 
       <div className="mt-8 space-y-8">
         {Array.from(groups.entries()).map(([letter, entries]) => (

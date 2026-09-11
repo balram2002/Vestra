@@ -92,7 +92,7 @@ export function SellerSpotlight({
                   <dd className="tabular flex items-center gap-1">
                     <Star className="text-sand-500 size-3 fill-current" aria-hidden />
                     <span className="text-ink font-semibold">
-                      {formatRating(seller.rating.average)}
+                      {seller.rating.count > 0 ? formatRating(seller.rating.average) : 'New'}
                     </span>
                   </dd>
                 </div>

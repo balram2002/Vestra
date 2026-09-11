@@ -63,7 +63,7 @@ const ICON_BUTTON = [
 const PROMISES = [
   'Free delivery above ₹1,199',
   '14-day returns & exchanges',
-  'Every seller GST-verified',
+  'Every seller reviewed by our team',
   'Secure payments · UPI, cards, netbanking',
 ];
 

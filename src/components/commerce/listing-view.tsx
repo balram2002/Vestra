@@ -1,9 +1,14 @@
+import { PackageOpen } from 'lucide-react';
+import Link from 'next/link';
+
 import { AppliedFilters } from '@/components/commerce/applied-filters';
 import { FilterDrawer } from '@/components/commerce/filter-drawer';
 import { FilterRail } from '@/components/commerce/filter-rail';
 import { ListingToolbar, SortChips } from '@/components/commerce/listing-toolbar';
 import { Pagination } from '@/components/commerce/pagination';
 import { ProductGrid } from '@/components/commerce/product-grid';
+import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
 import type { ProductListResult, ProductSort } from '@/domain/types';
 import { cn } from '@/lib/cn';
 import type { RawSearchParams } from '@/lib/product-query';
@@ -140,8 +145,13 @@ export async function ListingView({
           />
 
           <div className="lg:mt-6">
-            {result.total === 0 && emptyState ? (
-              emptyState
+            {/*
+              Three different empties: the page's own wording (a search with no
+              hits), an empty shelf with no filters to blame, and filters that
+              ruled everything out. Only the last should say "clear filters".
+            */}
+            {result.total === 0 && (emptyState || result.appliedFilterCount === 0) ? (
+              (emptyState ?? <NothingListed />)
             ) : (
               <ProductGrid
                 products={result.items}
@@ -159,6 +169,35 @@ export async function ListingView({
           />
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * A listing with nothing in it and no filters to blame.
+ *
+ * Not the "nothing matches those filters" state, which tells someone to loosen
+ * a filter they never set. This is an empty shelf, most often on a young shop,
+ * so it says so and offers somewhere else to go.
+ */
+function NothingListed() {
+  return (
+    <div className="border-line rounded-xl border border-dashed">
+      <EmptyState
+        icon={PackageOpen}
+        title="Nothing listed here yet"
+        body="New products appear here as soon as sellers list them. Have a look around the rest of the shop in the meantime."
+        action={
+          <Button asChild size="sm" shape="pill">
+            <Link href="/categories">Browse all categories</Link>
+          </Button>
+        }
+        secondaryAction={
+          <Button asChild variant="secondary" size="sm" shape="pill">
+            <Link href="/sell-with-us">Sell on VestraWAB</Link>
+          </Button>
+        }
+      />
     </div>
   );
 }

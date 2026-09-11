@@ -140,7 +140,14 @@ export function ListingForm({
         </Field>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Brand">
+          <Field
+            label="Brand"
+            hint={
+              brands.length === 0
+                ? 'No brands have been added yet. Save a draft now: a brand is needed before it can go live, and the VestraWAB team adds brands on request.'
+                : undefined
+            }
+          >
             <select
               value={brandId}
               onChange={(event) => setBrandId(event.target.value)}

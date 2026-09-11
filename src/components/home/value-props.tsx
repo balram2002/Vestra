@@ -33,8 +33,8 @@ const PROPS = [
   },
   {
     icon: ShieldCheck,
-    title: 'Verified sellers only',
-    body: 'Every store is GST-registered and KYC-verified before its first listing goes live. You always see who you are buying from.',
+    title: 'Every seller reviewed',
+    body: 'Our team approves every store before it can sell, and each store page shows its real record: ratings, dispatch time and returns.',
   },
 ] as const;
 
