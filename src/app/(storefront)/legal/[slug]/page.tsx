@@ -37,6 +37,7 @@ export default async function LegalPage({ params }: PageProps) {
   return (
     <CmsPageView
       page={page}
+      contact={slug === 'grievance' ? 'grievance' : undefined}
       breadcrumbs={[
         { href: '/', label: 'Home' },
         { href: `/legal/${slug}`, label: page.title },

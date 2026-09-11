@@ -106,7 +106,7 @@ export async function sendPasswordChangedEmail(input: {
       'The password on your account has just been changed. If that was you, there is nothing to do.',
     ],
     button: { label: 'Review your account', href: absoluteUrl('/account') },
-    footnote: `If it was not you, reset your password immediately and contact us at ${siteConfig.supportEmail}.`,
+    footnote: `If it was not you, reset your password immediately and contact us at ${siteConfig.supportEmail ?? absoluteUrl('/help/contact')}.`,
   });
 
   return { ok: result.ok };

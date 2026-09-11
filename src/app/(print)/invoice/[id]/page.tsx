@@ -55,7 +55,7 @@ async function InvoiceDocument({ params }: { params: Promise<{ id: string }> }) 
             <p className="mt-0.5 text-[11px] leading-snug text-neutral-600">
               {siteConfig.legalName}
               <br />
-              Marketplace facilitator · {siteConfig.address.city}, {siteConfig.address.state}
+              Marketplace facilitator{siteConfig.address ? ` · ${siteConfig.address}` : ''}
             </p>
           </div>
 

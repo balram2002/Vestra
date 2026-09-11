@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
 import { PRODUCT_STATUS_META, SELLER_STATUS_META } from '@/domain/enums';
-import type { Category, Coupon, Promotion } from '@/domain/types';
+import type { Banner, Brand, Category, Coupon, Promotion } from '@/domain/types';
 import { formatMoney } from '@/lib/format';
 import { entityId } from '@/lib/ids';
 import { toPaise } from '@/lib/money';
@@ -23,6 +23,7 @@ import * as audit from '../services/audit';
 import { invalidate } from '../services/cache-invalidation';
 import { productTags, tags } from '../services/cache-tags';
 import { notifyQuietly } from '../services/notifications';
+import { MEDIA_VERSION } from '../seed/media';
 
 /**
  * Admin write actions.
@@ -980,5 +981,311 @@ export async function createPromotion(input: CreatePromotionInput): Promise<Acti
   });
 
   revalidatePath('/admin/promotions');
+  return { ok: true };
+}
+
+/* ------------------------------------------------------------------- brand */
+
+const createBrandSchema = z.object({
+  name: z.string().trim().min(2, 'Give the brand a name.').max(60),
+  /** Blank means derive one from the name. */
+  code: z.string().trim().max(6),
+  description: z.string().trim().max(400),
+  originCountry: z.string().trim().max(40),
+  foundedYear: z.number().int().min(1800, 'That year is too early.').max(2100).nullable(),
+  logoUrl: z.string().trim().max(500),
+  isPremium: z.boolean(),
+});
+
+export type CreateBrandInput = z.infer<typeof createBrandSchema>;
+
+/**
+ * Add a brand.
+ *
+ * A listing cannot be submitted without one, and a clean database has none,
+ * so this is the step that opens the catalogue. The code goes into every SKU
+ * made under the brand, so it is short, uppercase and unique. Without a logo
+ * the brand gets a monogram drawn by the site itself, rather than a stock
+ * photograph that would misrepresent it.
+ */
+export async function createBrand(input: CreateBrandInput): Promise<ActionResult> {
+  const actor = await requirePermission('catalog:write');
+
+  const parsed = createBrandSchema.safeParse(input);
+  if (!parsed.success) return firstIssue(parsed.error);
+  const data = parsed.data;
+
+  const slug = slugify(data.name);
+  if (!slug) return fail('name', 'Use letters or digits in the name.');
+
+  const code = (data.code || data.name.replace(/[^A-Za-z0-9]/g, '').slice(0, 4)).toUpperCase();
+  if (!/^[A-Z0-9]{2,6}$/.test(code)) return fail('code', 'Codes are 2 to 6 letters or digits.');
+  if (data.logoUrl && !/^https:\/\/\S+$/.test(data.logoUrl)) {
+    return fail('logoUrl', 'Use an https:// link to the logo, or leave it blank.');
+  }
+
+  const brands = await collections.brands();
+  if (await brands.findOne({ $or: [{ slug }, { slugHistory: slug }] })) {
+    return fail('name', 'A brand with that name already exists.');
+  }
+  if (await brands.findOne({ code })) return fail('code', `${code} is already used by another brand.`);
+
+  const now = new Date().toISOString();
+  const brand: Brand = {
+    id: entityId('brd'),
+    slug,
+    slugHistory: [],
+    name: data.name,
+    code,
+    logoUrl: data.logoUrl || `/api/media/t/brand/mulberry/${slug}-r${MEDIA_VERSION}.svg`,
+    bannerUrl: null,
+    description: data.description || `${data.name} on VestraWAB.`,
+    originCountry: data.originCountry || 'India',
+    foundedYear: data.foundedYear,
+    isPremium: data.isPremium,
+    isActive: true,
+    productCount: 0,
+    averageRating: 0,
+    categoryIds: [],
+    metaTitle: `${data.name} \u2014 Shop ${data.name} Online | VestraWAB`,
+    metaDescription: data.description || null,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await brands.insertOne(toDoc(brand));
+  invalidate([tags.brandList, tags.brand(slug)]);
+
+  await audit.record({
+    actor,
+    action: 'brand.create',
+    entityType: 'brand',
+    entityId: brand.id,
+    entityLabel: brand.name,
+    severity: 'NOTICE',
+  });
+
+  revalidatePath('/admin/brands');
+  return { ok: true };
+}
+
+/** Show or hide a brand in the shop. Its products stay reachable by direct link. */
+export async function setBrandActive(input: {
+  brandId: string;
+  isActive: boolean;
+}): Promise<ActionResult> {
+  const actor = await requirePermission('catalog:write');
+
+  const brands = await collections.brands();
+  const brand = toEntity(await brands.findOne({ _id: input.brandId }));
+  if (!brand) return { ok: false, error: 'Brand not found.' };
+
+  const patch = { isActive: input.isActive, updatedAt: new Date().toISOString() };
+  await brands.updateOne({ _id: brand.id }, { $set: patch });
+  invalidate([tags.brandList, tags.brand(brand.slug), tags.productList]);
+
+  await audit.record({
+    actor,
+    action: input.isActive ? 'brand.show' : 'brand.hide',
+    entityType: 'brand',
+    entityId: brand.id,
+    entityLabel: brand.name,
+    changes: audit.diff(brand, patch, ['isActive']),
+    severity: 'NOTICE',
+  });
+
+  revalidatePath('/admin/brands');
+  return { ok: true };
+}
+
+/* ----------------------------------------------------------------- banners */
+
+const createBannerSchema = z.object({
+  name: z.string().trim().min(2, 'Name the banner, for this list.').max(60),
+  placement: z.enum(['HOME_HERO', 'HOME_GRID']),
+  imageUrl: z.string().trim().min(1, 'Upload an image, or paste a link to one.').max(1000),
+  alt: z.string().trim().min(3, 'Describe the image for people who cannot see it.').max(160),
+  headline: z.string().trim().max(80),
+  subheadline: z.string().trim().max(160),
+  ctaLabel: z.string().trim().max(24),
+  href: z.string().trim().min(1, 'Say where the banner links to.').max(300),
+});
+
+export type CreateBannerInput = z.infer<typeof createBannerSchema>;
+
+/**
+ * Add a homepage banner.
+ *
+ * The hero and the tile grid render nothing until one exists, so a new shop
+ * opens on its categories instead of on stock photography. The image is one
+ * uploaded here or served over https; the link stays on this site or is https.
+ * A new banner goes live at the end of its row.
+ */
+export async function createBanner(input: CreateBannerInput): Promise<ActionResult> {
+  const actor = await requirePermission('cms:write');
+
+  const parsed = createBannerSchema.safeParse(input);
+  if (!parsed.success) return firstIssue(parsed.error);
+  const data = parsed.data;
+
+  if (!/^https:\/\/\S+$/.test(data.imageUrl) && !/^\/api\/media\/\S+$/.test(data.imageUrl)) {
+    return fail('imageUrl', 'Upload the image, or use an https:// link.');
+  }
+  if (!/^\/(?!\/)\S*$/.test(data.href) && !/^https:\/\/\S+$/.test(data.href)) {
+    return fail('href', 'Use a path on this site, like /category/kurtas, or an https:// link.');
+  }
+
+  const banners = await collections.banners();
+  const [last] = await banners.find({ placement: data.placement }).sort({ position: -1 }).limit(1).toArray();
+  const now = new Date().toISOString();
+
+  const banner: Banner = {
+    id: entityId('bnr'),
+    name: data.name,
+    placement: data.placement,
+    headline: data.headline || null,
+    subheadline: data.subheadline || null,
+    ctaLabel: data.ctaLabel || null,
+    href: data.href,
+    imageUrl: data.imageUrl,
+    mobileImageUrl: null,
+    alt: data.alt,
+    // The storefront sets banner type in white over the photograph.
+    theme: 'light',
+    position: last ? last.position + 1 : 0,
+    isActive: true,
+    startsAt: null,
+    endsAt: null,
+    impressions: 0,
+    clicks: 0,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await banners.insertOne(toDoc(banner));
+  invalidate([tags.content]);
+
+  await audit.record({
+    actor,
+    action: 'cms.banner.create',
+    entityType: 'banner',
+    entityId: banner.id,
+    entityLabel: banner.name,
+  });
+
+  revalidatePath('/admin/cms');
+  revalidatePath('/');
+  return { ok: true };
+}
+
+/** Take a banner off the homepage, or put it back. */
+export async function setBannerActive(input: {
+  bannerId: string;
+  isActive: boolean;
+}): Promise<ActionResult> {
+  const actor = await requirePermission('cms:write');
+
+  const banners = await collections.banners();
+  const banner = toEntity(await banners.findOne({ _id: input.bannerId }));
+  if (!banner) return { ok: false, error: 'Banner not found.' };
+
+  const patch = { isActive: input.isActive, updatedAt: new Date().toISOString() };
+  await banners.updateOne({ _id: banner.id }, { $set: patch });
+  invalidate([tags.content]);
+
+  await audit.record({
+    actor,
+    action: input.isActive ? 'cms.banner.show' : 'cms.banner.hide',
+    entityType: 'banner',
+    entityId: banner.id,
+    entityLabel: banner.name,
+    changes: audit.diff(banner, patch, ['isActive']),
+  });
+
+  revalidatePath('/admin/cms');
+  revalidatePath('/');
+  return { ok: true };
+}
+
+/** Remove a banner for good. Hiding it is the reversible option. */
+export async function deleteBanner(input: { bannerId: string }): Promise<ActionResult> {
+  const actor = await requirePermission('cms:write');
+
+  const banners = await collections.banners();
+  const banner = toEntity(await banners.findOne({ _id: input.bannerId }));
+  if (!banner) return { ok: false, error: 'Banner not found.' };
+
+  await banners.deleteOne({ _id: banner.id });
+  invalidate([tags.content]);
+
+  await audit.record({
+    actor,
+    action: 'cms.banner.delete',
+    entityType: 'banner',
+    entityId: banner.id,
+    entityLabel: banner.name,
+    severity: 'NOTICE',
+  });
+
+  revalidatePath('/admin/cms');
+  revalidatePath('/');
+  return { ok: true };
+}
+
+/* ------------------------------------------------------------------- pages */
+
+const updatePageSchema = z.object({
+  pageId: z.string().min(1),
+  title: z.string().trim().min(2, 'Give the page a title.').max(120),
+  metaDescription: z.string().trim().max(300, 'Keep the search description under 300 characters.'),
+  body: z.string().trim().min(1, 'The page needs some text.').max(40_000, 'That is longer than a page should be.'),
+  isPublished: z.boolean(),
+});
+
+export type UpdatePageInput = z.infer<typeof updatePageSchema>;
+
+/**
+ * Edit a policy or help page.
+ *
+ * The body is the same light Markdown the pages render. Contact details are
+ * not part of it: they come from configuration and are set under the page, so
+ * an edit here can never leave a stale phone number behind.
+ */
+export async function updateCmsPage(input: UpdatePageInput): Promise<ActionResult> {
+  const actor = await requirePermission('cms:write');
+
+  const parsed = updatePageSchema.safeParse(input);
+  if (!parsed.success) return firstIssue(parsed.error);
+  const data = parsed.data;
+
+  const pages = await collections.cmsPages();
+  const page = toEntity(await pages.findOne({ _id: data.pageId }));
+  if (!page) return { ok: false, error: 'Page not found.' };
+
+  const patch = {
+    title: data.title,
+    metaTitle: `${data.title} | VestraWAB`,
+    metaDescription: data.metaDescription || null,
+    body: data.body,
+    isPublished: data.isPublished,
+    updatedAt: new Date().toISOString(),
+    updatedByUserId: actor.id,
+  };
+  await pages.updateOne({ _id: page.id }, { $set: patch });
+  invalidate([tags.content]);
+
+  await audit.record({
+    actor,
+    action: 'cms.page.update',
+    entityType: 'cmsPage',
+    entityId: page.id,
+    entityLabel: page.slug,
+    changes: audit.diff(page, patch, ['title', 'metaDescription', 'isPublished']),
+    ...(page.isPublished !== data.isPublished ? { severity: 'NOTICE' as const } : {}),
+  });
+
+  revalidatePath('/admin/pages');
+  revalidatePath(`/admin/pages/${page.id}`);
+  revalidatePath(`/${page.slug}`);
   return { ok: true };
 }

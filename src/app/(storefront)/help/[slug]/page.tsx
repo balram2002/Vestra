@@ -37,6 +37,7 @@ export default async function HelpPage({ params }: PageProps) {
   return (
     <CmsPageView
       page={page}
+      contact={slug === 'contact' ? 'support' : undefined}
       breadcrumbs={[
         { href: '/', label: 'Home' },
         { href: `/help/${slug}`, label: page.title },

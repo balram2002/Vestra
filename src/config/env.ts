@@ -93,6 +93,18 @@ export function checkEnv(env: Record<string, string | undefined> = process.env):
     (strict ? errors : warnings).push('ImageKit is required on Vercel: uploads cannot be stored on its read-only disk');
   }
 
+  // How shoppers reach a person, and the grievance officer Indian e-commerce
+  // rules require a marketplace to name. Neither is invented when unset, so a
+  // deployment is told instead.
+  if (strict || env.VERCEL === '1') {
+    if (!env.NEXT_PUBLIC_SUPPORT_EMAIL) {
+      warnings.push('NEXT_PUBLIC_SUPPORT_EMAIL is empty: the footer, the contact page and emails show no support address');
+    }
+    if (!env.NEXT_PUBLIC_GRIEVANCE_OFFICER) {
+      warnings.push('NEXT_PUBLIC_GRIEVANCE_OFFICER is empty: the grievance page names no officer, which the E-Commerce Rules require');
+    }
+  }
+
   if (strict) {
     if (/dev-only|change-me/i.test(e.AUTH_SECRET)) {
       errors.push('AUTH_SECRET is still the development placeholder');

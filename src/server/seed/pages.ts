@@ -1,4 +1,4 @@
-import { RETURNS, SHIPPING } from '@/config/business';
+import { FINANCE, RETURNS, SHIPPING } from '@/config/business';
 import type { CmsPage } from '@/domain/types';
 import { entityId } from '@/lib/ids';
 import { formatMoney } from '@/lib/format';
@@ -12,7 +12,12 @@ import { formatMoney } from '@/lib/format';
  * threshold is the one the pricing engine applies. Interpolating them from
  * `config/business` is what stops the published policy drifting from the code.
  *
- * Stored as CMS documents so the content team can edit them without a deploy.
+ * Stored as CMS documents so they can be edited in Admin, Pages, without a
+ * deploy. They state no facts about the business itself: no address, phone
+ * number or officer's name. Those come from configuration and are set under
+ * the contact and grievance pages by `CmsPageView`, so nothing here can be
+ * invented or go stale. Read every page before launch all the same: they are
+ * a starting point written against this codebase's defaults.
  */
 
 const md = (strings: TemplateStringsArray, ...values: unknown[]): string =>
@@ -67,8 +72,8 @@ that do.
 ## Disputes
 
 Contact support first — most issues are resolved within two working days. These
-terms are governed by Indian law, and the courts at Bengaluru have exclusive
-jurisdiction.
+terms are governed by Indian law, and the courts where our registered office is
+located have exclusive jurisdiction.
     `,
   },
   {
@@ -168,8 +173,8 @@ automatically becomes a refund and we tell you as soon as that happens.
     body: md`
 ## Step 1 — Support
 
-Raise a ticket from your orders page or write to help@vestrawab.example. Most
-issues are resolved within two working days.
+Raise a ticket from your account, or from the order it is about. Most issues
+are resolved within two working days.
 
 ## Step 2 — Escalation
 
@@ -178,13 +183,8 @@ to be escalated. A senior agent will review it within three working days.
 
 ## Step 3 — Grievance officer
 
-As required under the Consumer Protection (E-Commerce) Rules, 2020:
-
-**Grievance Officer**
-VestraWAB Commerce Private Limited
-Prestige Atrium, 4th Floor, 12 Residency Road
-Bengaluru, Karnataka 560025
-grievance@vestrawab.example
+As required under the Consumer Protection (E-Commerce) Rules, 2020, the
+grievance officer's name and contact details are set out below.
 
 The officer acknowledges every complaint within 48 hours and resolves it within
 one month.
@@ -222,8 +222,8 @@ working day. After that, the next one.
 
 ## Tracking
 
-You get an AWB number by email and SMS as soon as the courier collects the
-parcel. Every scan appears on your order page.
+You get an AWB number by email as soon as the courier collects the parcel.
+Every scan appears on your order page.
 
 ## Failed delivery
 
@@ -307,8 +307,9 @@ from the rest.
     body: md`
 ## Support
 
-**help@vestrawab.example** · **+91 80 4718 0000**
-Monday to Saturday, 9am to 9pm IST
+A ticket from your account is the fastest way to reach us: it goes to the same
+team as an email, and keeps the conversation and the order it is about in one
+place. Our other contact details are set out below.
 
 ## Faster resolution
 
@@ -384,11 +385,6 @@ Vague copy is how the wrong thing ends up in a parcel.
 
 **Prices are honest.** The price you see includes GST. No inflated MRP existing
 only to make a discount look bigger.
-
-## Where we are
-
-Bengaluru, with sellers across Jaipur, Varanasi, Tiruppur, Kanchipuram, Kutch,
-Patiala and Kanpur.
     `,
   },
   {
@@ -405,18 +401,18 @@ carries.
 
 ## What it costs
 
-Commission starts at 12% and varies by category. There is no listing fee, no
+Commission starts at ${FINANCE.defaultCommissionPercent}% and varies by category. There is no listing fee, no
 monthly fee and no charge for the seller console.
 
 ## When you get paid
 
-Settlements run weekly. Money for an order clears the hold seven days after
-delivery — the return window is why — and lands in your account on the next
-payout run.
+Settlements run weekly. Money for an order clears the hold
+${FINANCE.settlementHoldDays} days after delivery and lands in your account on
+the next payout run.
 
 ## What you get
 
-- A catalogue tool with variants, bulk CSV import and media management
+- A catalogue tool with variants and media management
 - An order queue with labels, manifests and pickup scheduling
 - Inventory tracked across available, reserved, sold, returned and damaged
 - Settlement statements that reconcile to the paisa

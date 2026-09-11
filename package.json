@@ -16,6 +16,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "admin:create": "node --conditions=react-server --env-file-if-exists=.env.local --import ./scripts/register-loader.mjs scripts/create-admin.ts",
+    "seed:reference": "node --conditions=react-server --env-file-if-exists=.env.local --import ./scripts/register-loader.mjs scripts/seed-reference.ts",
     "seed": "node --conditions=react-server --env-file=.env.local --import ./scripts/register-loader.mjs scripts/seed.ts",
     "screenshot": "node scripts/screenshot.mjs",
     "smoke": "node scripts/smoke-funnel.mjs",
@@ -41,6 +42,7 @@
     "smoke:hardening": "node --env-file=.env.local scripts/smoke-hardening.mjs",
     "smoke:live-call": "node --env-file=.env.local scripts/smoke-live-call.mjs",
     "smoke:console": "node --env-file=.env.local scripts/smoke-console.mjs",
+    "smoke:content": "node --env-file=.env.local scripts/smoke-content.mjs",
     "audit:console": "node scripts/audit-console.mjs"
   },
   "dependencies": {

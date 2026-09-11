@@ -1,14 +1,20 @@
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import { Suspense } from 'react';
 
 import { PageHeader } from '@/components/console/page-header';
-import { SectionToggle } from '@/components/console/admin-actions';
-import { Badge } from '@/components/ui/badge';
+import { BannerToggle, DeleteBannerButton, SectionToggle } from '@/components/console/admin-actions';
+import { CreateBannerDialog } from '@/components/console/admin-create';
 import { requirePermission } from '@/server/auth/session';
 import { collections, toEntities } from '@/server/db/collections';
 import { formatDateShort } from '@/lib/format';
 
 export const metadata: Metadata = { title: 'Homepage' };
+
+const PLACEMENT_LABEL: Record<string, string> = {
+  HOME_HERO: 'Homepage hero',
+  HOME_GRID: 'Homepage tile grid',
+};
 
 /**
  * Homepage composition.
@@ -81,31 +87,50 @@ async function Sections() {
       </section>
 
       <section>
-        <h2 className="text-ink mb-2 text-md font-semibold">Banners</h2>
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <h2 className="text-ink text-md font-semibold">Banners</h2>
+          <CreateBannerDialog />
+        </div>
 
-        <ul className="grid gap-2 sm:grid-cols-2">
-          {banners.map((banner) => (
-            <li
-              key={banner.id}
-              className="border-line bg-raised rounded-md border px-4 py-3"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-ink truncate text-xs font-medium">{banner.headline}</p>
-                  <p className="text-faint truncate text-2xs">{banner.placement}</p>
+        {banners.length === 0 ? (
+          <p className="border-line text-muted rounded-md border border-dashed px-4 py-6 text-sm">
+            No banners yet. The homepage hero and tile grid stay hidden until you add one.
+          </p>
+        ) : (
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {banners.map((banner) => (
+              <li key={banner.id} className="border-line bg-raised flex gap-3 rounded-md border p-3">
+                <div className="bg-sunken relative aspect-video w-28 shrink-0 overflow-hidden rounded">
+                  <Image src={banner.imageUrl} alt="" fill sizes="112px" className="object-cover" />
                 </div>
-                <Badge tone={banner.isActive ? 'success' : 'neutral'} size="sm">
-                  {banner.isActive ? 'Live' : 'Hidden'}
-                </Badge>
-              </div>
 
-              <p className="text-muted mt-1.5 line-clamp-2 text-2xs">{banner.subheadline}</p>
-              <p className="text-faint mt-1.5 text-2xs">
-                {banner.href} - updated {formatDateShort(banner.updatedAt)}
-              </p>
-            </li>
-          ))}
-        </ul>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-ink truncate text-xs font-medium">
+                        {banner.headline ?? banner.name}
+                      </p>
+                      <p className="text-faint truncate text-2xs">
+                        {banner.name} - {PLACEMENT_LABEL[banner.placement] ?? banner.placement}
+                      </p>
+                    </div>
+                    <BannerToggle bannerId={banner.id} name={banner.name} isActive={banner.isActive} />
+                  </div>
+
+                  {banner.subheadline ? (
+                    <p className="text-muted mt-1.5 line-clamp-2 text-2xs">{banner.subheadline}</p>
+                  ) : null}
+                  <div className="mt-1.5 flex items-center justify-between gap-2">
+                    <p className="text-faint min-w-0 truncate text-2xs">
+                      {banner.href} - updated {formatDateShort(banner.updatedAt)}
+                    </p>
+                    <DeleteBannerButton bannerId={banner.id} name={banner.name} />
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
     </div>
   );

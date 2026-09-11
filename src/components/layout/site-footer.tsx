@@ -3,6 +3,7 @@ import {
   BadgeCheck,
   Facebook,
   Instagram,
+  LifeBuoy,
   Linkedin,
   Mail,
   Phone,
@@ -65,13 +66,17 @@ const GUARANTEES = [
   { label: 'GST-verified sellers', icon: BadgeCheck },
 ] as const;
 
-/** Only the accounts that have a glyph worth showing; X has no Lucide icon. */
+/**
+ * Only the accounts that have a glyph worth showing (X has no Lucide icon),
+ * and only the ones configured: a link to a handle the shop does not own sends
+ * people to somebody else.
+ */
 const SOCIAL = [
   { label: 'Instagram', href: siteConfig.social.instagram, icon: Instagram },
   { label: 'Facebook', href: siteConfig.social.facebook, icon: Facebook },
   { label: 'YouTube', href: siteConfig.social.youtube, icon: Youtube },
   { label: 'LinkedIn', href: siteConfig.social.linkedin, icon: Linkedin },
-] as const;
+].flatMap((account) => (account.href ? [{ ...account, href: account.href }] : []));
 
 export async function SiteFooter() {
   /*
@@ -121,30 +126,32 @@ export async function SiteFooter() {
             <p className="text-muted mt-4 text-sm">{siteConfig.description}</p>
           </div>
 
-          <div className="lg:text-right">
-            <h2 className="eyebrow">Follow along</h2>
-            <ul className="mt-3 flex items-center gap-1.5 lg:justify-end">
-              {SOCIAL.map((account) => (
-                <li key={account.label}>
-                  <a
-                    href={account.href}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label={`${siteConfig.name} on ${account.label}`}
-                    className={cn(
-                      'border-line bg-raised text-muted flex size-11 items-center justify-center',
-                      'rounded-full border transition-[color,border-color,transform]',
-                      'duration-(--duration-base) ease-(--ease-out)',
-                      'hover:text-accent-ink hover:border-accent-control',
-                      'motion-safe:hover:-translate-y-0.5 motion-safe:active:translate-y-0',
-                    )}
-                  >
-                    <account.icon className="size-[1.1rem]" aria-hidden />
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
+          {SOCIAL.length > 0 ? (
+            <div className="lg:text-right">
+              <h2 className="eyebrow">Follow along</h2>
+              <ul className="mt-3 flex items-center gap-1.5 lg:justify-end">
+                {SOCIAL.map((account) => (
+                  <li key={account.label}>
+                    <a
+                      href={account.href}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label={`${siteConfig.name} on ${account.label}`}
+                      className={cn(
+                        'border-line bg-raised text-muted flex size-11 items-center justify-center',
+                        'rounded-full border transition-[color,border-color,transform]',
+                        'duration-(--duration-base) ease-(--ease-out)',
+                        'hover:text-accent-ink hover:border-accent-control',
+                        'motion-safe:hover:-translate-y-0.5 motion-safe:active:translate-y-0',
+                      )}
+                    >
+                      <account.icon className="size-[1.1rem]" aria-hidden />
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
 
         {/* -------------------------------------------------------- columns */}
@@ -191,23 +198,37 @@ export async function SiteFooter() {
           */}
           <div className="border-line bg-raised col-span-2 rounded-xl border p-5 lg:col-span-2">
             <h2 className="text-ink text-sm font-semibold">Talk to a human</h2>
-            <p className="text-faint mt-1 text-xs">{siteConfig.supportHours}</p>
+            {siteConfig.supportHours ? (
+              <p className="text-faint mt-1 text-xs">{siteConfig.supportHours}</p>
+            ) : null}
 
             <address className="mt-4 space-y-1.5 not-italic">
-              <a
-                href={`mailto:${siteConfig.supportEmail}`}
+              {siteConfig.supportEmail ? (
+                <a
+                  href={`mailto:${siteConfig.supportEmail}`}
+                  className="text-muted hover:text-accent-ink flex min-h-11 items-center gap-2.5 text-sm transition-colors sm:min-h-0"
+                >
+                  <Mail className="size-4 shrink-0 opacity-60" aria-hidden />
+                  {siteConfig.supportEmail}
+                </a>
+              ) : null}
+              {siteConfig.supportPhone ? (
+                <a
+                  href={`tel:${siteConfig.supportPhone.replace(/\s/g, '')}`}
+                  className="text-muted hover:text-accent-ink flex min-h-11 items-center gap-2.5 text-sm transition-colors sm:min-h-0"
+                >
+                  <Phone className="size-4 shrink-0 opacity-60" aria-hidden />
+                  {siteConfig.supportPhone}
+                </a>
+              ) : null}
+              {/* Always offered: a ticket reaches a person whether or not the rest is set. */}
+              <Link
+                href="/account/support"
                 className="text-muted hover:text-accent-ink flex min-h-11 items-center gap-2.5 text-sm transition-colors sm:min-h-0"
               >
-                <Mail className="size-4 shrink-0 opacity-60" aria-hidden />
-                {siteConfig.supportEmail}
-              </a>
-              <a
-                href={`tel:${siteConfig.supportPhone.replace(/\s/g, '')}`}
-                className="text-muted hover:text-accent-ink flex min-h-11 items-center gap-2.5 text-sm transition-colors sm:min-h-0"
-              >
-                <Phone className="size-4 shrink-0 opacity-60" aria-hidden />
-                {siteConfig.supportPhone}
-              </a>
+                <LifeBuoy className="size-4 shrink-0 opacity-60" aria-hidden />
+                Raise a support ticket
+              </Link>
             </address>
 
             <Link
@@ -292,7 +313,7 @@ export async function SiteFooter() {
             <span className="hidden sm:inline"> · {siteConfig.attribution}.</span>
           </p>
           <p className="text-faint text-xs">
-            {siteConfig.address.city}, {siteConfig.address.state} · All prices include GST
+            {siteConfig.address ? `${siteConfig.address} · ` : ''}All prices include GST
           </p>
         </div>
       </div>

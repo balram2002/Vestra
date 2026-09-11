@@ -5,9 +5,28 @@
  * resolves its URL through here, so the canonical host is defined exactly once.
  */
 
+/** A value that is really set. A blank variable is how a host leaves one unset. */
+function configured(value: string | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
+/*
+ * Who runs the shop, and how to reach them.
+ *
+ * All of it comes from the environment and none of it has an invented default:
+ * a support number that rings nobody, or a grievance officer at an address
+ * that does not exist, is worse than showing nothing. Every surface that uses
+ * one of these leaves it out when it is not set. They are NEXT_PUBLIC_ because
+ * the footer and the sign-in screens render them in the browser, so Next
+ * inlines them at build time: change one, then redeploy.
+ */
+const supportEmail = configured(process.env.NEXT_PUBLIC_SUPPORT_EMAIL);
+
 export const siteConfig = {
   name: 'VestraWAB',
-  legalName: 'VestraWAB Commerce Private Limited',
+  /** The registered business name, on invoices, in the footer and in email. */
+  legalName: configured(process.env.NEXT_PUBLIC_LEGAL_NAME) ?? 'VestraWAB',
   /**
    * The parent brand, and the line that names it.
    *
@@ -26,23 +45,25 @@ export const siteConfig = {
   language: 'en-IN',
   country: 'IN',
   currency: 'INR',
-  supportEmail: 'help@vestrawab.example',
-  supportPhone: '+91 80 4718 0000',
-  supportHours: 'Mon to Sat, 9am to 9pm IST',
+  supportEmail,
+  supportPhone: configured(process.env.NEXT_PUBLIC_SUPPORT_PHONE),
+  /** When a person answers, e.g. "Mon to Sat, 10am to 7pm IST". */
+  supportHours: configured(process.env.NEXT_PUBLIC_SUPPORT_HOURS),
+  /** The registered office, on one line. */
+  address: configured(process.env.NEXT_PUBLIC_BUSINESS_ADDRESS),
+  /**
+   * The grievance officer the Consumer Protection (E-Commerce) Rules, 2020
+   * require an Indian marketplace to name. The email falls back to support.
+   */
+  grievanceOfficer: configured(process.env.NEXT_PUBLIC_GRIEVANCE_OFFICER),
+  grievanceEmail: configured(process.env.NEXT_PUBLIC_GRIEVANCE_EMAIL) ?? supportEmail,
+  /** Only the accounts that exist. One left unset is simply not linked. */
   social: {
-    instagram: 'https://instagram.com/vestrawab',
-    x: 'https://x.com/vestrawab',
-    facebook: 'https://facebook.com/vestrawab',
-    youtube: 'https://youtube.com/@vestrawab',
-    linkedin: 'https://linkedin.com/company/vestrawab',
-  },
-  address: {
-    line1: 'Prestige Atrium, 4th Floor',
-    line2: '12 Residency Road',
-    city: 'Bengaluru',
-    state: 'Karnataka',
-    pincode: '560025',
-    country: 'IN',
+    instagram: configured(process.env.NEXT_PUBLIC_INSTAGRAM_URL),
+    x: configured(process.env.NEXT_PUBLIC_X_URL),
+    facebook: configured(process.env.NEXT_PUBLIC_FACEBOOK_URL),
+    youtube: configured(process.env.NEXT_PUBLIC_YOUTUBE_URL),
+    linkedin: configured(process.env.NEXT_PUBLIC_LINKEDIN_URL),
   },
 } as const;
 

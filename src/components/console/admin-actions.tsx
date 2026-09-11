@@ -9,7 +9,10 @@ import { toast } from 'sonner';
 
 import { cn } from '@/lib/cn';
 import {
+  deleteBanner,
   reviewProduct,
+  setBannerActive,
+  setBrandActive,
   setCategoryActive,
   setCouponActive,
   setPromotionActive,
@@ -561,5 +564,105 @@ export function ReviewModerationActions({
         </Dialog>
       )}
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ brand */
+
+export function BrandToggle({
+  brandId,
+  name,
+  isActive,
+}: {
+  brandId: string;
+  name: string;
+  isActive: boolean;
+}) {
+  const { pending, run } = useAction();
+
+  return (
+    <Toggle
+      pending={pending}
+      on={isActive}
+      onLabel="Visible"
+      offLabel="Hidden"
+      onClick={() =>
+        run(
+          () => setBrandActive({ brandId, isActive: !isActive }),
+          isActive ? `${name} hidden from the shop` : `${name} is back in the shop`,
+        )
+      }
+    />
+  );
+}
+
+/* ------------------------------------------------------------------ banner */
+
+export function BannerToggle({
+  bannerId,
+  name,
+  isActive,
+}: {
+  bannerId: string;
+  name: string;
+  isActive: boolean;
+}) {
+  const { pending, run } = useAction();
+
+  return (
+    <Toggle
+      pending={pending}
+      on={isActive}
+      onLabel="Live"
+      offLabel="Hidden"
+      onClick={() =>
+        run(
+          () => setBannerActive({ bannerId, isActive: !isActive }),
+          isActive ? `${name} hidden from the homepage` : `${name} is live`,
+        )
+      }
+    />
+  );
+}
+
+export function DeleteBannerButton({ bannerId, name }: { bannerId: string; name: string }) {
+  const [open, setOpen] = useState(false);
+  const { pending, run } = useAction();
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button type="button" size="xs" variant="ghost" className="text-danger-600 hover:text-danger-700">
+          Delete
+        </Button>
+      </DialogTrigger>
+      <DialogContent
+        title={`Delete ${name}?`}
+        size="sm"
+        footer={
+          <>
+            <DialogClose asChild>
+              <Button type="button" variant="ghost" size="sm" disabled={pending}>
+                Keep it
+              </Button>
+            </DialogClose>
+            <Button
+              type="button"
+              variant="danger"
+              size="sm"
+              loading={pending}
+              onClick={() => run(() => deleteBanner({ bannerId }), `${name} deleted`, () => setOpen(false))}
+            >
+              Delete banner
+            </Button>
+          </>
+        }
+      >
+        <p className="text-muted text-sm">
+          It comes off the homepage and out of this list for good. To take it down for a while
+          instead, set it to Hidden.
+        </p>
+      </DialogContent>
+    </Dialog>
   );
 }

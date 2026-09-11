@@ -39,6 +39,7 @@ Required for `APP_ENV=production`:
 | Eshopbox credentials | all five `ESHOPBOX_*` values, or set `ESHOPBOX_MODE=simulation` deliberately |
 | `LIVE_PROVIDER` | `zoom` with its three S2S OAuth values for real calls; `mock` is allowed but warned about |
 | ImageKit | optional. Without it, uploads go to local disk, which does not survive a multi-instance deploy |
+| Business details | recommended: `NEXT_PUBLIC_SUPPORT_EMAIL` and `NEXT_PUBLIC_GRIEVANCE_OFFICER` (an Indian marketplace must name one), and the rest of the block in `.env.example`. Unset ones are left out, never invented, and the startup check warns about those two |
 
 Every provider falls back to a simulation when its secrets are missing. That is
 right on a laptop, and the startup check exists so it cannot happen by accident
@@ -57,8 +58,15 @@ On startup the server validates the environment and creates any missing
 database indexes, including the TTL indexes that expire rate-limit windows and
 guest carts. There is no separate migration step.
 
-**Do not run `npm run seed` against production.** It loads the demo catalogue
-and demo accounts. Create the first administrator instead:
+**Do not run `npm run seed` against production.** It wipes the database and
+loads a demo shop. Load the reference data instead (the category tree, the
+legal and help pages, the homepage layout and the roles, but no banners, stores
+or products; it only inserts what is missing and never deletes), then create the first administrator:
+
+```bash
+npm run seed:reference
+```
+
 
 ```bash
 npm run admin:create -- --email you@company.com --name "Your Name"
@@ -123,8 +131,12 @@ Vercel builds the site on its own machines and runs it as serverless functions. 
 Then:
 
 - **Import the GitHub repository** in Vercel. The Next.js preset is detected; leave the build command as `npm run build`.
-- **Put data in the database** once, from your computer. If your `.env.local` already points at the Atlas database Vercel uses, the data you see locally is the data Vercel builds from. `npm run seed` loads the demo catalogue (and wipes the database first).
+- **Load the reference data** once, from your computer, with `.env.local` pointing at the Atlas database Vercel uses: `npm run seed:reference`. It adds the category tree, site pages, homepage layout and roles, and never deletes anything. (`npm run seed` instead wipes the database and loads a demo shop.)
 - **Create the first administrator** against the same database: `npm run admin:create -- --email you@company.com --name "Your Name"`.
+- **Add your brands** in the admin console under **Catalogue → Brands**. A seller cannot submit a listing without one.
+- **Fill in the business details** in Vercel's environment variables: at least `NEXT_PUBLIC_SUPPORT_EMAIL` and `NEXT_PUBLIC_GRIEVANCE_OFFICER` (the whole block is in `.env.example`), plus `EMAIL_FROM` with an address your SMTP provider sends from. They are `NEXT_PUBLIC_`, so redeploy after setting them. Nothing is invented for an empty one: it is simply not shown.
+- **Read every page** under **Marketing → Pages**. The terms, privacy, returns and grievance policies are a starting point and they are your commitments, so edit them there. The contact details under the contact and grievance pages come from the variables above.
+- **Add homepage banners** under **Marketing → Homepage**: upload an image (needs ImageKit on Vercel) or paste an https link. Until there is one, the hero and the tile grid stay hidden.
 - **Webhooks** go to your Vercel domain: `https://<domain>/api/webhooks/payments` and `https://<domain>/api/webhooks/eshopbox`.
 - **Check** `https://<domain>/api/health` returns `"status":"ok"`.
 

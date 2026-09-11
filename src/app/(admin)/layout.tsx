@@ -2,6 +2,7 @@ import {
   BarChart3,
   BadgePercent,
   CreditCard,
+  FileText,
   FolderTree,
   LayoutDashboard,
   LayoutTemplate,
@@ -14,6 +15,7 @@ import {
   Settings,
   ShoppingCart,
   Store,
+  Tags,
   Ticket,
   Users,
 } from 'lucide-react';
@@ -111,6 +113,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             },
             { href: '/admin/reviews', label: 'Reviews', icon: <MessageSquareQuote aria-hidden /> },
             { href: '/admin/categories', label: 'Categories', icon: <FolderTree aria-hidden /> },
+            { href: '/admin/brands', label: 'Brands', icon: <Tags aria-hidden /> },
           ],
         },
         {
@@ -135,6 +138,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             { href: '/admin/coupons', label: 'Coupons', icon: <Ticket aria-hidden /> },
             { href: '/admin/promotions', label: 'Promotions', icon: <BadgePercent aria-hidden /> },
             { href: '/admin/cms', label: 'Homepage', icon: <LayoutTemplate aria-hidden /> },
+            { href: '/admin/pages', label: 'Pages', icon: <FileText aria-hidden /> },
           ],
         },
         {

@@ -31,17 +31,20 @@ export function organizationJsonLd(): JsonLdNode {
     legalName: siteConfig.legalName,
     url: absoluteUrl('/'),
     description: siteConfig.description,
-    email: siteConfig.supportEmail,
-    telephone: siteConfig.supportPhone,
-    address: {
-      '@type': 'PostalAddress',
-      streetAddress: `${siteConfig.address.line1}, ${siteConfig.address.line2}`,
-      addressLocality: siteConfig.address.city,
-      addressRegion: siteConfig.address.state,
-      postalCode: siteConfig.address.pincode,
-      addressCountry: siteConfig.address.country,
-    },
-    sameAs: Object.values(siteConfig.social),
+    // Contact fields only when they are really set: structured data naming an
+    // address nobody receives mail at is worse than none.
+    ...(siteConfig.supportEmail ? { email: siteConfig.supportEmail } : {}),
+    ...(siteConfig.supportPhone ? { telephone: siteConfig.supportPhone } : {}),
+    ...(siteConfig.address
+      ? {
+          address: {
+            '@type': 'PostalAddress',
+            streetAddress: siteConfig.address,
+            addressCountry: siteConfig.country,
+          },
+        }
+      : {}),
+    sameAs: Object.values(siteConfig.social).filter((url): url is string => Boolean(url)),
   };
 }
 

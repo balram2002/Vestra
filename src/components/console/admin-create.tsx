@@ -7,14 +7,19 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/choice';
 import { Dialog, DialogClose, DialogContent, DialogTrigger } from '@/components/ui/dialog';
+import { FileUpload } from '@/components/ui/file-upload';
 import { Input } from '@/components/ui/input';
 import { Segmented } from '@/components/ui/segmented';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import {
+  createBanner,
+  createBrand,
   createCategory,
   createCoupon,
   createPromotion,
+  type CreateBannerInput,
+  type CreateBrandInput,
   type CreateCategoryInput,
   type CreateCouponInput,
   type CreatePromotionInput,
@@ -732,6 +737,271 @@ function PromotionForm({
                 error={errors.stockLimit}
               />
             ) : null}
+          </div>
+        </fieldset>
+      </form>
+    </DialogContent>
+  );
+}
+
+/* ------------------------------------------------------------------- brand */
+
+export function CreateBrandDialog() {
+  const [open, setOpen] = useState(false);
+  const [key, setKey] = useState(0);
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (next) setKey((value) => value + 1);
+        setOpen(next);
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button size="sm">
+          <Plus className="size-3.5" aria-hidden />
+          New brand
+        </Button>
+      </DialogTrigger>
+      <BrandForm key={key} onDone={() => setOpen(false)} />
+    </Dialog>
+  );
+}
+
+function BrandForm({ onDone }: { onDone: () => void }) {
+  const formId = useId();
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const [pending, startTransition] = useTransition();
+
+  const submit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const year = text(form, 'foundedYear');
+
+    const input: CreateBrandInput = {
+      name: text(form, 'name'),
+      code: text(form, 'code').toUpperCase(),
+      description: text(form, 'description'),
+      originCountry: text(form, 'originCountry'),
+      foundedYear: year === '' ? null : Number(year),
+      logoUrl: text(form, 'logoUrl'),
+      isPremium: form.get('isPremium') === 'on',
+    };
+
+    setErrors({});
+    startTransition(async () => {
+      const result = await createBrand(input);
+      if (result.ok) {
+        toast.success(`${input.name} added`, { description: 'Sellers can choose it on their listings now.' });
+        onDone();
+      } else if (result.field) {
+        setErrors({ [result.field]: result.error });
+      } else {
+        toast.error(result.error ?? 'Could not add the brand.');
+      }
+    });
+  };
+
+  return (
+    <DialogContent
+      title="New brand"
+      description="Sellers choose from these on every listing, and a listing cannot be submitted without one."
+      footer={<Footer formId={formId} pending={pending} label="Add brand" />}
+    >
+      <form id={formId} onSubmit={submit} noValidate className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_8rem]">
+          <Input label="Name" name="name" required maxLength={60} placeholder="Label name" error={errors.name} />
+          <Input
+            label="Code"
+            name="code"
+            maxLength={6}
+            autoCapitalize="characters"
+            spellCheck={false}
+            placeholder="AUTO"
+            hint="Used in SKUs."
+            error={errors.code}
+            className="font-mono uppercase"
+          />
+        </div>
+        <Textarea
+          label="Description"
+          name="description"
+          rows={3}
+          maxLength={400}
+          hint="Optional. Shown on the brand page."
+          error={errors.description}
+        />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Input label="Country of origin" name="originCountry" defaultValue="India" maxLength={40} error={errors.originCountry} />
+          <Input
+            label="Founded"
+            name="foundedYear"
+            type="number"
+            inputMode="numeric"
+            min={1800}
+            max={2100}
+            step={1}
+            hint="Optional."
+            error={errors.foundedYear}
+          />
+        </div>
+        <Input
+          label="Logo link"
+          name="logoUrl"
+          type="url"
+          inputMode="url"
+          placeholder="https://"
+          hint="Optional. Without one, the brand gets a monogram."
+          error={errors.logoUrl}
+        />
+        <Switch name="isPremium" label="Premium label" description="Marks the brand as premium." />
+      </form>
+    </DialogContent>
+  );
+}
+
+/* ------------------------------------------------------------------ banner */
+
+export function CreateBannerDialog() {
+  const [open, setOpen] = useState(false);
+  const [key, setKey] = useState(0);
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (next) setKey((value) => value + 1);
+        setOpen(next);
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button size="sm">
+          <Plus className="size-3.5" aria-hidden />
+          New banner
+        </Button>
+      </DialogTrigger>
+      <BannerForm key={key} onDone={() => setOpen(false)} />
+    </Dialog>
+  );
+}
+
+function BannerForm({ onDone }: { onDone: () => void }) {
+  const formId = useId();
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const [imageUrl, setImageUrl] = useState('');
+  const [pending, startTransition] = useTransition();
+
+  const submit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+
+    const input: CreateBannerInput = {
+      name: text(form, 'name'),
+      placement: text(form, 'placement') === 'HOME_GRID' ? 'HOME_GRID' : 'HOME_HERO',
+      imageUrl: imageUrl.trim(),
+      alt: text(form, 'alt'),
+      headline: text(form, 'headline'),
+      subheadline: text(form, 'subheadline'),
+      ctaLabel: text(form, 'ctaLabel'),
+      href: text(form, 'href'),
+    };
+
+    setErrors({});
+    startTransition(async () => {
+      const result = await createBanner(input);
+      if (result.ok) {
+        toast.success(`${input.name} is live`, { description: 'It is on the homepage now.' });
+        onDone();
+      } else if (result.field) {
+        setErrors({ [result.field]: result.error });
+      } else {
+        toast.error(result.error ?? 'Could not add the banner.');
+      }
+    });
+  };
+
+  return (
+    <DialogContent
+      title="New banner"
+      description="Banners send shoppers to a category, a brand or a search. Until there is one, the homepage hero and tile grid stay hidden."
+      footer={<Footer formId={formId} pending={pending} label="Add banner" />}
+    >
+      <form id={formId} onSubmit={submit} noValidate className="space-y-5">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Input
+            label="Name"
+            name="name"
+            required
+            maxLength={60}
+            placeholder="Festive edit"
+            hint="Only shown in this console."
+            error={errors.name}
+          />
+          <Select label="Where it shows" name="placement" defaultValue="HOME_HERO" error={errors.placement}>
+            <option value="HOME_HERO">Homepage hero, full width</option>
+            <option value="HOME_GRID">Homepage tile grid</option>
+          </Select>
+        </div>
+
+        <fieldset className="space-y-3">
+          <Legend>Image</Legend>
+          <FileUpload
+            purpose="listing"
+            multiple={false}
+            label="Drag the image here, or browse"
+            hint="Wide, at least 1600 by 900 pixels. The words sit on it in white, so keep that area darker."
+            onUploaded={(file) => setImageUrl(file.url)}
+          />
+          <Input
+            label="Or a link to the image"
+            name="imageUrl"
+            type="url"
+            inputMode="url"
+            placeholder="https://"
+            value={imageUrl}
+            onChange={(event) => setImageUrl(event.target.value)}
+            error={errors.imageUrl}
+          />
+          <Input
+            label="Describe the image"
+            name="alt"
+            required
+            maxLength={160}
+            placeholder="What the photograph shows"
+            hint="Read aloud to people who cannot see it."
+            error={errors.alt}
+          />
+        </fieldset>
+
+        <fieldset className="space-y-3">
+          <Legend>Words and link</Legend>
+          <Input label="Headline" name="headline" maxLength={80} hint="Optional." error={errors.headline} />
+          <Input
+            label="Supporting line"
+            name="subheadline"
+            maxLength={160}
+            hint="Optional."
+            error={errors.subheadline}
+          />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input
+              label="Button label"
+              name="ctaLabel"
+              maxLength={24}
+              placeholder="Shop now"
+              hint="Optional."
+              error={errors.ctaLabel}
+            />
+            <Input
+              label="Links to"
+              name="href"
+              required
+              maxLength={300}
+              placeholder="/category/..."
+              spellCheck={false}
+              error={errors.href}
+            />
           </div>
         </fieldset>
       </form>

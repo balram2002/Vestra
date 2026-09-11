@@ -150,6 +150,9 @@ npm run dev      # http://localhost:3000
 > [!WARNING]
 > `npm run seed` **deletes every collection** before loading demo data. Run it on your laptop or a staging database, never in production.
 
+> [!NOTE]
+> **Starting a real shop instead?** Run `npm run seed:reference`. It loads only what the app cannot run without (the category tree, the legal and help pages, the homepage layout and the roles), adds no banners, stores or products, and never deletes anything. Then create your administrator with `npm run admin:create`, fill in the [business details](#-environment-variables), read and edit the policies under **Pages**, add your first brands, and add homepage banners under **Homepage**.
+
 ### Demo accounts
 
 After `npm run seed`, every account uses the password **`vestra123`**.
@@ -185,7 +188,7 @@ Pages are grouped the way the code groups them. "Who" is who can open the page: 
 
 | Page | Address | What it does | Who |
 |---|---|---|---|
-| Home | `/` | Hero carousel, category rails, product rails, brands, featured stores and offers. The sections and their order are managed from the admin **Homepage** page | anyone |
+| Home | `/` | Hero carousel, category rails, product rails, brands, featured stores and offers. Sections, their order and the banners are managed from the admin **Homepage** page. A section with nothing to show stays hidden | anyone |
 | All categories | `/categories` | Every department (women, men, kids, beauty, footwear, accessories, home) and what sits under it | anyone |
 | Category | `/category/[slug]` | Products in one category, with filters (size, colour, price, brand, rating, discount) and sorting | anyone |
 | Search | `/search?q=` | Results for a search, with the same filters and sorting | anyone |
@@ -282,11 +285,13 @@ The **Live desk** switch in the top bar of every seller page opens and closes th
 | Products | `/admin/products` | The listing review queue: approve or reject with a reason, and audit what is live | catalogue |
 | Reviews | `/admin/reviews` | Publish held reviews, reject, or take down published ones | review moderation |
 | Categories | `/admin/categories` | The category tree: add categories, hide or show them, see tax slab and return policy | catalogue |
+| Brands | `/admin/brands` | Add the labels sellers list under, and hide or show them. A listing cannot be submitted without a brand | catalogue |
 | Sellers | `/admin/sellers` | Every store: approve, reject, put on hold, suspend or reinstate | sellers |
 | Users | `/admin/users` | Everyone with an account; search, and suspend or reactivate | users |
 | Coupons | `/admin/coupons` | Create discount codes and switch them on or off | coupons |
 | Promotions | `/admin/promotions` | Create automatic offers (created paused) and switch them live | promotions |
-| Homepage | `/admin/cms` | Show or hide each homepage section | content |
+| Homepage | `/admin/cms` | Show or hide each homepage section. Add hero and tile-grid banners (upload an image or paste an https link), hide them, delete them | content |
+| Pages | `/admin/pages` | Edit the policy and help pages (terms, privacy, returns, grievance, shipping, contact, about, sell with us) and publish or unpublish them. The contact details under the contact and grievance pages come from the business-details variables | content |
 | Support | `/admin/support` | Tickets, urgent first; anything past its SLA is flagged | support |
 | Ticket | `/admin/support/[id]` | One conversation: reply, add internal notes, change status | support |
 | Audit log | `/admin/audit-logs` | Every sensitive action with who did it and the before and after | audit |
@@ -427,11 +432,11 @@ Staff sign in at the same `/login` and land in the admin console. **What you can
 
 | Role | Typical day |
 |---|---|
-| 🗂️ **Catalogue manager** | Review new listings in **Products** (approve, or reject with a reason). Keep the **Categories** tree tidy. Moderate **Reviews** |
+| 🗂️ **Catalogue manager** | Review new listings in **Products** (approve, or reject with a reason). Keep the **Categories** tree tidy and add **Brands** before their first products. Moderate **Reviews** |
 | 🎧 **Support** | Work the **Support** queue, urgent and overdue first. Reply, add internal notes, resolve. Approve **Returns**. Moderate **Reviews** |
 | 📦 **Operations** | Watch **Orders** and shipments for delays. Handle **Returns** and cancellations |
 | 💰 **Finance** | Reconcile **Payments**. Issue **manual refunds** from an order. **Run settlements**, mark payouts transferred, or hold one. Read the **Audit log** |
-| 📣 **Marketing manager** | Create **Coupons** and **Promotions** (promotions start paused; switch them live after checking). Arrange the **Homepage** |
+| 📣 **Marketing manager** | Create **Coupons** and **Promotions** (promotions start paused; switch them live after checking). Arrange the **Homepage** and its banners, and keep the **Pages** current |
 | 🛡️ **Admin** | Everything above, plus approving and suspending **Sellers**, suspending **Users** and reading the **Audit log** |
 | 👑 **Super admin** | Everything, plus platform **Settings** and **roles**, which no other role can change |
 
@@ -735,6 +740,7 @@ Copy `.env.example` to `.env.local`. Only two values are needed to run locally; 
 | `MONGODB_URI`, `MONGODB_DB` | The database | ✅ always |
 | `AUTH_SECRET` | Signing sessions (32+ random characters) | ✅ always |
 | `NEXT_PUBLIC_SITE_URL` | Links in emails, canonical URLs | ✅ in production (https) |
+| `NEXT_PUBLIC_SUPPORT_EMAIL`, `NEXT_PUBLIC_SUPPORT_PHONE`, `NEXT_PUBLIC_SUPPORT_HOURS`, `NEXT_PUBLIC_LEGAL_NAME`, `NEXT_PUBLIC_BUSINESS_ADDRESS`, `NEXT_PUBLIC_GRIEVANCE_OFFICER`, `NEXT_PUBLIC_GRIEVANCE_EMAIL`, `NEXT_PUBLIC_INSTAGRAM_URL` (and the other social links) | Business details: who runs the shop and how to reach a person, in the footer, on the contact and grievance pages, on invoices and in emails. An empty one is left out, never invented | recommended; India requires a named grievance officer |
 | `APP_ENV` | `development`, `staging` or `production`; how strict the startup check is | production |
 | `SMTP_*`, `EMAIL_FROM`, `EMAIL_REPLY_TO` | Sending real email | production |
 | `PAYMENT_PROVIDER`, `RAZORPAY_*` / `STRIPE_*` | Real payments | production |
@@ -755,6 +761,7 @@ Every variable is explained in [`.env.example`](.env.example). Production rules 
 | `npm run check` | Typecheck, lint and unit tests |
 | `npm run verify` | Typecheck, lint and a production build |
 | `npm run seed` | **Wipe** the database and load demo data |
+| `npm run seed:reference` | Load only what a fresh database needs: categories, site pages, homepage layout, roles. No banners, stores or products. Never deletes, safe on a live database |
 | `npm run admin:create -- --email you@company.com --name "Your Name"` | Create the first administrator (prompts for the password) |
 | `npm test` | Unit tests |
 | `npm run smoke` | Browse to order, end to end |
@@ -794,9 +801,8 @@ What works today, end to end: the storefront, guest and signed-in checkout, cash
 > [!IMPORTANT]
 > **Before taking real money:**
 > - **Online payments** run on the mock gateway. The Razorpay and Stripe adapters are not implemented yet; with `PAYMENT_PROVIDER=razorpay` and a secret set, checkout stops with "adapter not implemented".
-> - **Starter data for production.** Categories, legal and help pages and the homepage layout currently come only from the demo seed, which also wipes the database. A production database needs a separate loader for that reference data.
 
-Also not built yet: Google Meet as a live provider (it cannot be embedded), SMS notifications, back-in-stock alerts, recently viewed items, sellers replying to reviews, seller-run offers, brand management and bulk product upload.
+Also not built yet: Google Meet as a live provider (it cannot be embedded), SMS notifications, back-in-stock alerts, recently viewed items, sellers replying to reviews, seller-run offers and bulk product upload.
 
 ---
 

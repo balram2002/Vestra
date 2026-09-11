@@ -47,14 +47,20 @@ export function ForgotPasswordForm() {
         </div>
 
         <p className="text-faint text-2xs">
-          Nothing arrived? Check your spam folder, or write to{' '}
-          <a
-            href={`mailto:${siteConfig.supportEmail}`}
-            className="hover:text-accent-ink underline underline-offset-2"
-          >
-            {siteConfig.supportEmail}
-          </a>{' '}
-          and an agent will verify you by hand.
+          {siteConfig.supportEmail ? (
+            <>
+              Nothing arrived? Check your spam folder, or write to{' '}
+              <a
+                href={`mailto:${siteConfig.supportEmail}`}
+                className="hover:text-accent-ink underline underline-offset-2"
+              >
+                {siteConfig.supportEmail}
+              </a>{' '}
+              and an agent will verify you by hand.
+            </>
+          ) : (
+            'Nothing arrived? Check your spam folder, then ask for another link in a few minutes.'
+          )}
         </p>
 
         <p className="text-muted text-center text-xs">
