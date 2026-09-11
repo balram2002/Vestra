@@ -3,6 +3,9 @@ import 'server-only';
 import type { Collection, Document } from 'mongodb';
 
 import type {
+  LiveRequest,
+  LiveSession,
+  SellerPresence,
   Address,
   AuditLog,
   Banner,
@@ -92,6 +95,8 @@ export const COLLECTIONS = {
   sessions: 'sessions',
   /** Single-use, expiring tokens behind email verification and password reset. */
   authTokens: 'authTokens',
+  /** Fixed-window counters behind rate limits. Expired by a TTL index. */
+  rateLimits: 'rateLimits',
 
   /* sellers */
   sellers: 'sellers',
@@ -124,6 +129,11 @@ export const COLLECTIONS = {
   manifests: 'manifests',
   returns: 'returns',
   exchanges: 'exchanges',
+
+  /* live commerce */
+  sellerPresence: 'sellerPresence',
+  liveRequests: 'liveRequests',
+  liveSessions: 'liveSessions',
 
   /* engagement */
   reviews: 'reviews',
@@ -195,6 +205,10 @@ export const collections = {
   payments: () => typed<Payment>(COLLECTIONS.payments),
   refunds: () => typed<Refund>(COLLECTIONS.refunds),
   invoices: () => typed<Invoice>(COLLECTIONS.invoices),
+
+  sellerPresence: () => typed<SellerPresence>(COLLECTIONS.sellerPresence),
+  liveRequests: () => typed<LiveRequest>(COLLECTIONS.liveRequests),
+  liveSessions: () => typed<LiveSession>(COLLECTIONS.liveSessions),
 
   shipments: () => typed<Shipment>(COLLECTIONS.shipments),
   manifests: () => typed<Manifest>(COLLECTIONS.manifests),

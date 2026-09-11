@@ -25,6 +25,11 @@ import { COLLECTIONS, type CollectionName } from './collections';
  */
 const INDEXES: Partial<Record<CollectionName, IndexDescription[]>> = {
   /* ------------------------------------------------------------ identity */
+  [COLLECTIONS.rateLimits]: [
+    // Each window document carries its own end, and Mongo deletes it then.
+    { key: { expiresAt: 1 }, expireAfterSeconds: 0, name: 'ttl_window' },
+  ],
+
   [COLLECTIONS.users]: [
     { key: { email: 1 }, unique: true, name: 'uniq_email' },
     {
@@ -322,7 +327,7 @@ export async function ensureIndexes(): Promise<IndexFailure[]> {
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           failures.push({ collection: name, message });
-          console.error(`[vestra:db] could not create indexes on "${name}": ${message}`);
+          console.error(`[vestrawab:db] could not create indexes on "${name}": ${message}`);
         }
       }),
     );

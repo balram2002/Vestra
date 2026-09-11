@@ -23,6 +23,7 @@ import {
 import { collections, toEntity } from '../db/collections';
 import { mergeGuestCart } from '../services/cart';
 import { mergeGuestWishlist } from '../services/wishlist';
+import { LIMITS, clientIp, hitAll, peekAll, retryMessage } from '../security/rate-limit';
 
 /**
  * Authentication actions.
@@ -72,6 +73,14 @@ export async function signIn(input: {
     return { ok: false, error: 'Check the details below and try again.' };
   }
 
+  // Checked before any real work, so a locked-out guesser costs one small read.
+  const ip = await clientIp();
+  const limited = await peekAll([
+    [LIMITS.signInByEmail, parsed.data.email],
+    [LIMITS.signInByIp, ip],
+  ]);
+  if (!limited.allowed) return { ok: false, error: retryMessage(limited) };
+
   const users = await collections.users();
   const user = toEntity(await users.findOne({ email: parsed.data.email }));
 
@@ -80,13 +89,23 @@ export async function signIn(input: {
   // the two paths cannot be told apart by timing either.
   const generic = 'That email and password do not match.';
 
+  // Only FAILURES spend the budget: a person signing in correctly is never
+  // slowed, while guessing a password runs out after a handful of tries.
+  const failed = async (): Promise<AuthResult> => {
+    await hitAll([
+      [LIMITS.signInByEmail, parsed.data.email],
+      [LIMITS.signInByIp, ip],
+    ]);
+    return { ok: false, error: generic };
+  };
+
   if (!user) {
     await verifyPassword(parsed.data.password, 'invalid$0$$');
-    return { ok: false, error: generic };
+    return failed();
   }
 
   const valid = await verifyPassword(parsed.data.password, user.passwordHash);
-  if (!valid) return { ok: false, error: generic };
+  if (!valid) return failed();
 
   if (user.status === 'SUSPENDED') {
     return {
@@ -144,6 +163,9 @@ export async function register(input: {
     }
     return { ok: false, error: 'Check the details below.', fieldErrors };
   }
+
+  const limited = await hitAll([[LIMITS.register, await clientIp()]]);
+  if (!limited.allowed) return { ok: false, error: retryMessage(limited) };
 
   const users = await collections.users();
 
@@ -238,7 +260,7 @@ async function issueAndSendVerification(
     const token = await issueToken(userId, 'EMAIL_VERIFICATION');
     await sendVerificationEmail({ to: email, name: fullName, token });
   } catch (error) {
-    console.error('[vestra:auth] could not send a verification email', error);
+    console.error('[vestrawab:auth] could not send a verification email', error);
   }
 }
 
@@ -289,6 +311,14 @@ export async function requestPasswordReset(input: { email: string }): Promise<Au
     return { ok: false, fieldErrors: { email: 'Enter a valid email address.' } };
   }
 
+  // Each request sends an email. The budget is per address AND per caller, so
+  // nobody can bury a stranger's inbox in reset links.
+  const limited = await hitAll([
+    [LIMITS.passwordResetByEmail, parsed.data.email],
+    [LIMITS.passwordResetByIp, await clientIp()],
+  ]);
+  if (!limited.allowed) return { ok: false, error: retryMessage(limited) };
+
   const users = await collections.users();
   const user = toEntity(await users.findOne({ email: parsed.data.email }));
 
@@ -299,7 +329,7 @@ export async function requestPasswordReset(input: { email: string }): Promise<Au
       const token = await issueToken(user.id, 'PASSWORD_RESET');
       await sendPasswordResetEmail({ to: user.email, name: user.fullName, token });
     } catch (error) {
-      console.error('[vestra:auth] could not send a reset email', error);
+      console.error('[vestrawab:auth] could not send a reset email', error);
     }
   }
 
@@ -348,7 +378,7 @@ export async function resetPassword(input: {
     const { sendPasswordChangedEmail } = await import('../email/account');
     await sendPasswordChangedEmail({ to: user.email, name: user.fullName });
   } catch (error) {
-    console.error('[vestra:auth] could not send a password-changed email', error);
+    console.error('[vestrawab:auth] could not send a password-changed email', error);
   }
 
   return { ok: true };

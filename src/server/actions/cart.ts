@@ -7,6 +7,7 @@ import { CART } from '@/config/business';
 
 import { currentOwner, ensureGuestToken, getGuestToken } from '../auth/session';
 import * as cart from '../services/cart';
+import { LIMITS, clientIp, hit, peek, retryMessage } from '../security/rate-limit';
 
 /**
  * Bag mutations.
@@ -134,8 +135,22 @@ export async function applyCoupon(input: { code: string }): Promise<ActionResult
     return { ok: false, error: 'Your bag is empty.' };
   }
 
+  // Codes are short and guessable, and a script trying them one after another
+  // is the attack. Only codes that FAIL spend the budget.
+  const subject =
+    owner.kind === 'user'
+      ? owner.userId
+      : owner.kind === 'guest'
+        ? owner.guestToken
+        : await clientIp();
+  const limited = await peek(LIMITS.coupon, subject);
+  if (!limited.allowed) return { ok: false, error: retryMessage(limited) };
+
   const result = await cart.setCoupon(owner, code);
-  if (!result.ok) return { ok: false, error: result.error };
+  if (!result.ok) {
+    await hit(LIMITS.coupon, subject);
+    return { ok: false, error: result.error };
+  }
 
   refresh();
   return { ok: true };
@@ -150,7 +165,7 @@ export async function removeCoupon(): Promise<ActionResult> {
   return { ok: true };
 }
 
-/** Spend Vestra Credit on this order, or stop spending it. */
+/** Spend VestraWAB Credit on this order, or stop spending it. */
 export async function setUseCredit(input: { use: boolean }): Promise<ActionResult> {
   const owner = await currentOwner();
   const result = await cart.setCreditUsage(owner, input.use);

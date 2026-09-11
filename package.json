@@ -1,8 +1,8 @@
 {
-  "name": "vestra",
+  "name": "vestrawab",
   "version": "1.0.0",
   "private": true,
-  "description": "Vestra - multi-vendor fashion & lifestyle marketplace. Storefront, seller console and admin console on one Next.js App Router codebase.",
+  "description": "VestraWAB - multi-vendor fashion & lifestyle marketplace. Storefront, seller console and admin console on one Next.js App Router codebase.",
   "engines": {
     "node": ">=20.9.0"
   },
@@ -14,15 +14,18 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "admin:create": "node --conditions=react-server --env-file-if-exists=.env.local --import ./scripts/register-loader.mjs scripts/create-admin.ts",
     "seed": "node --conditions=react-server --env-file=.env.local --import ./scripts/register-loader.mjs scripts/seed.ts",
     "screenshot": "node scripts/screenshot.mjs",
     "smoke": "node scripts/smoke-funnel.mjs",
     "smoke:rbac": "node scripts/smoke-rbac.mjs",
     "verify": "npm run typecheck && npm run lint && npm run build",
+    "check": "npm run typecheck && npm run lint && npm test",
     "smoke:admin": "node scripts/smoke-admin.mjs",
     "restart": "powershell -NoProfile -File scripts/restart-server.ps1",
     "audit:a11y": "node scripts/audit-a11y.mjs",
     "audit:contrast": "node scripts/check-contrast.mjs",
+    "audit:palette": "node scripts/check-palette.mjs",
     "smoke:shipping": "node scripts/smoke-shipping.mjs",
     "smoke:exchange": "node scripts/smoke-exchange.mjs",
     "smoke:listing": "node scripts/smoke-listing.mjs",
@@ -30,7 +33,14 @@
     "smoke:guest": "node scripts/smoke-guest.mjs",
     "smoke:email": "node scripts/smoke-email.mjs",
     "smoke:onboarding": "node scripts/smoke-onboarding.mjs",
-    "smoke:ops": "node scripts/smoke-console-ops.mjs"
+    "smoke:ops": "node scripts/smoke-console-ops.mjs",
+    "smoke:live": "node scripts/smoke-live.mjs",
+    "smoke:account": "node --env-file=.env.local scripts/smoke-account.mjs",
+    "smoke:reviews": "node --env-file=.env.local scripts/smoke-reviews.mjs",
+    "smoke:hardening": "node --env-file=.env.local scripts/smoke-hardening.mjs",
+    "smoke:live-call": "node --env-file=.env.local scripts/smoke-live-call.mjs",
+    "smoke:console": "node --env-file=.env.local scripts/smoke-console.mjs",
+    "audit:console": "node scripts/audit-console.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",

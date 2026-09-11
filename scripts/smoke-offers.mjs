@@ -64,16 +64,57 @@ await Promise.all([
  * may be a different, sold-out one, and the add-to-bag then fails for a reason
  * unrelated to offers. Every active variant must have stock.
  */
-const candidates = await db
-  .collection('products')
-  .find({ status: 'PUBLISHED', 'priceRange.minSellingPrice': { $gte: 150000 } })
-  .limit(200)
+/*
+ * Pick the product FROM a coupon, not the other way round.
+ *
+ * The first version took the first in-stock product over Rs 1,500 and assumed
+ * some coupon would fit it. That held on a fresh seed and failed once other
+ * suites had placed orders: this shopper stopped being a first-time customer,
+ * and stock moved the "first" product to a bag no coupon covered, which the
+ * engine then correctly refused. Starting from a coupon anybody can use makes
+ * the bag qualify by construction.
+ */
+const openCoupons = await db
+  .collection('coupons')
+  .find({
+    isActive: true,
+    audience: 'ALL',
+    type: { $in: ['PERCENTAGE', 'FIXED'] },
+    paymentMethods: { $size: 0 },
+    startsAt: { $lte: new Date().toISOString() },
+    endsAt: { $gte: new Date().toISOString() },
+  })
   .toArray();
 
-const product = candidates.find((candidate) => {
-  const active = candidate.variants.filter((variant) => variant.isActive);
-  return active.length >= 2 && active.every((variant) => variant.inventory.available >= 2);
-});
+let product = null;
+for (const coupon of openCoupons) {
+  const scope = {
+    status: 'PUBLISHED',
+    // One unit must clear the minimum on its own.
+    'priceRange.minSellingPrice': { $gte: Math.max(coupon.minCartValue, 50000) },
+  };
+  if (coupon.scope === 'SELLER') scope.sellerId = { $in: coupon.sellerIds };
+  if (coupon.scope === 'BRAND') scope.brandId = { $in: coupon.brandIds };
+  if (coupon.scope === 'PRODUCT') scope._id = { $in: coupon.productIds };
+  if (coupon.scope === 'CATEGORY') {
+    const categories = await db
+      .collection('categories')
+      .find({ _id: { $in: coupon.categoryIds } })
+      .toArray();
+    scope.categoryPath = { $in: categories.map((category) => category.slug) };
+  }
+
+  const found = (await db.collection('products').find(scope).limit(200).toArray()).find(
+    (candidate) => {
+      const active = candidate.variants.filter((variant) => variant.isActive);
+      return active.length >= 2 && active.every((variant) => variant.inventory.available >= 2);
+    },
+  );
+  if (found) {
+    product = found;
+    break;
+  }
+}
 check('found a product whose sizes are all in stock', Boolean(product), product?.title ?? '');
 
 await page.goto(`${BASE}/product/${product.slug}`, { waitUntil: 'load' });

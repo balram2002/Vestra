@@ -1,0 +1,112 @@
+# Deploying VestraWAB
+
+A production deployment is one or more Node processes running the Next.js
+build, behind a TLS-terminating proxy or load balancer, talking to MongoDB.
+This page is the checklist. The reasoning behind each rule lives next to the
+code it describes.
+
+## 1. Requirements
+
+- **Node 24** (`.nvmrc` pins 24.11.0). Next 16 refuses older versions.
+- **MongoDB 6 or 7.** A standalone server is fine: nothing in the data layer
+  needs transactions. Back it up; it holds orders and payouts.
+- **A proxy that terminates TLS and sets `X-Forwarded-For`.** Per-address rate
+  limits read the first address in that header.
+
+## 2. Environment
+
+Copy `.env.example` and fill it in. `APP_ENV` decides how strict the server is
+when it starts (see `src/config/env.ts`):
+
+| `APP_ENV` | On a configuration problem |
+|---|---|
+| `development` | prints the problems and carries on |
+| `staging` | refuses to start; mock providers are warned about |
+| `production` | refuses to start, and so do mock payments, missing SMTP and a non-https site URL |
+
+`next start` always sets `NODE_ENV=production`, including on a laptop, so
+strictness deliberately keys on `APP_ENV` instead.
+
+Required for `APP_ENV=production`:
+
+| Variable | Notes |
+|---|---|
+| `NEXT_PUBLIC_SITE_URL` | `https://` origin shoppers use; canonical URLs and emails are built from it |
+| `AUTH_SECRET` | 32+ random characters. The development placeholder is refused |
+| `MONGODB_URI`, `MONGODB_DB` | |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `EMAIL_FROM` | order, password-reset and verification emails |
+| `PAYMENT_PROVIDER` | `razorpay` or `stripe`, with that provider's keys and webhook secret |
+| Eshopbox credentials | all five `ESHOPBOX_*` values, or set `ESHOPBOX_MODE=simulation` deliberately |
+| `LIVE_PROVIDER` | `zoom` with its three S2S OAuth values for real calls; `mock` is allowed but warned about |
+| ImageKit | optional. Without it, uploads go to local disk, which does not survive a multi-instance deploy |
+
+Every provider falls back to a simulation when its secrets are missing. That is
+right on a laptop, and the startup check exists so it cannot happen by accident
+in production.
+
+## 3. Build and start
+
+```bash
+npm ci
+npm run check            # typecheck, lint, unit tests
+npm run build
+APP_ENV=production npm run start
+```
+
+On startup the server validates the environment and creates any missing
+database indexes, including the TTL indexes that expire rate-limit windows and
+guest carts. There is no separate migration step.
+
+**Do not run `npm run seed` against production.** It loads the demo catalogue
+and demo accounts. Create the first administrator instead:
+
+```bash
+npm run admin:create -- --email you@company.com --name "Your Name"
+```
+
+It prompts for the password (never pass it on the command line), and refuses
+to overwrite an existing account.
+
+## 4. Behind the load balancer
+
+- **Health check:** `GET /api/health` returns `200` when the process is up and
+  can reach MongoDB, and `503` when it cannot, so a node that lost its database
+  leaves the pool. It is never cached and discloses nothing about the stack.
+- **Webhooks** (point the providers at these):
+  - payments: `POST /api/webhooks/payments`
+  - Eshopbox tracking: `POST /api/webhooks/eshopbox`
+
+  Both verify signatures and reject anything unsigned.
+- **More than one instance** is fine. Sessions are signed cookies, rate limits
+  live in MongoDB, and nothing else is held in process memory that matters
+  across requests.
+
+## 5. What is already hardened
+
+- **Rate limits** on sign-in, registration, password reset, password change,
+  coupon codes, support tickets, reviews and live requests
+  (`src/server/security/rate-limit.ts`). Sign-in, password changes and coupons
+  spend budget only on failures, so a customer who gets it right is never
+  slowed. The limiter fails open if MongoDB is unreachable.
+- **Headers:** `nosniff`, a referrer policy, `X-Frame-Options`, a baseline
+  Content-Security-Policy (`object-src`, `base-uri`, `frame-ancestors`,
+  `form-action`), HSTS in production, no `X-Powered-By`, and a Permissions-Policy
+  that allows camera and microphone only on the live-call routes.
+- **Sessions:** `httpOnly`, `Secure` in production, `SameSite=Lax`.
+- **Errors:** every boundary shows a reference digest instead of the message.
+  Console pages fail inside the console, so the navigation stays usable.
+
+## 6. Verifying a deployment
+
+`.github/workflows/ci.yml` runs typecheck, lint, unit tests, a seeded build and
+the production build on every push. Against a running staging server:
+
+```bash
+BASE_URL=https://staging.example.com npm run smoke:hardening
+BASE_URL=https://staging.example.com npm run smoke            # browse to order
+BASE_URL=https://staging.example.com npm run smoke:account    # new customer
+BASE_URL=https://staging.example.com npm run audit:console    # console layout
+```
+
+The smoke suites write test data and clean up after themselves, but they
+assume the demo seed, so run them against staging, never production.
