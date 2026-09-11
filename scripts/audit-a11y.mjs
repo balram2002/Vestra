@@ -19,6 +19,26 @@ import { chromium } from '@playwright/test';
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:3000';
 
+/*
+ * Which theme to audit.
+ *
+ *     node scripts/audit-a11y.mjs --theme dark
+ *
+ * `system` is resolved by the inline script in <head> against
+ * `prefers-color-scheme`, so emulating Chromium's colour scheme is enough to
+ * select a theme — no cookie, no localStorage seeding.
+ *
+ * This flag exists because a dark palette is a SECOND palette, and axe's
+ * colour-contrast rule is the only thing that measures it end to end on real
+ * composited pixels. `check-palette.mjs` proves the tokens are sound in
+ * isolation; only this proves nothing downstream painted ink on the wrong
+ * ground. Auditing one theme and shipping two is how an unmeasured dark mode
+ * gets out.
+ */
+const THEME = process.argv.includes('--theme')
+  ? process.argv[process.argv.indexOf('--theme') + 1]
+  : 'light';
+
 const ROUTES = [
   { path: '/', as: null },
   { path: '/category/womens-ethnic-wear', as: null },
@@ -48,10 +68,13 @@ const browser = await chromium.launch();
 const contexts = new Map();
 
 async function contextFor(as, width) {
-  const key = `${as ?? 'anon'}:${width}`;
+  const key = `${as ?? 'anon'}:${width}:${THEME}`;
   if (contexts.has(key)) return contexts.get(key);
 
-  const context = await browser.newContext({ viewport: { width, height: 900 } });
+  const context = await browser.newContext({
+    viewport: { width, height: 900 },
+    colorScheme: THEME === 'dark' ? 'dark' : 'light',
+  });
 
   if (as) {
     const page = await context.newPage();

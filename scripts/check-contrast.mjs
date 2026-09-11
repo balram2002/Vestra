@@ -26,11 +26,11 @@ const TOKENS = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'style
 const css = readFileSync(TOKENS, 'utf8');
 
 const PALETTE = Object.fromEntries(
-  [...css.matchAll(/--color-(bone-[\w]+):\s*(#[0-9a-fA-F]{6})/g)].map((m) => [m[1], m[2]]),
+  [...css.matchAll(/--color-(slate-[\w]+):\s*(#[0-9a-fA-F]{6})/g)].map((m) => [m[1], m[2]]),
 );
 
 /** Surfaces light-mode text actually sits on — the hardest case wins. */
-const SURFACES = ['bone-0', 'bone-25', 'bone-50', 'bone-100'];
+const SURFACES = ['slate-0', 'slate-25', 'slate-50', 'slate-100'];
 
 /**
  * The slice of the stylesheet that defines one theme.
@@ -55,7 +55,7 @@ function themeBlock(theme) {
 function resolve(name, theme = 'light') {
   const block = themeBlock(theme);
 
-  const viaPalette = block.match(new RegExp(`--${name}:\\s*var\\(--color-(bone-[\\w]+)\\)`));
+  const viaPalette = block.match(new RegExp(`--${name}:\\s*var\\(--color-(slate-[\\w]+)\\)`));
   if (viaPalette) return { token: viaPalette[1], hex: PALETTE[viaPalette[1]] };
 
   const literal = block.match(new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{6})`));

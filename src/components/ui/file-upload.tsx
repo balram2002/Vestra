@@ -182,9 +182,17 @@ export function FileUpload({
       {busy && items.filter((item) => item.status === 'uploading').length > 1 ? (
         <div className="flex items-center gap-3">
           <div className="bg-sunken h-1.5 flex-1 overflow-hidden rounded-full">
+            {/*
+              `scaleX`, not `width`.
+
+              A progress bar is the one element on screen that updates many times
+              a second, so animating a layout property here is the most expensive
+              version of the mistake — every frame relayouts the row. The bar is
+              full width and squashed from the left instead, which composites.
+            */}
             <div
-              className="bg-accent h-full rounded-full transition-[width] duration-200"
-              style={{ width: `${overallPercent}%` }}
+              className="bg-accent h-full origin-left rounded-full transition-transform duration-(--duration-base) ease-(--ease-out)"
+              style={{ transform: `scaleX(${overallPercent / 100})` }}
             />
           </div>
           <span className="text-faint tabular text-2xs">{overallPercent}% of batch</span>
@@ -264,8 +272,8 @@ function UploadRow({
               className="bg-sunken mt-1.5 h-1.5 overflow-hidden rounded-full"
             >
               <div
-                className="bg-accent h-full rounded-full transition-[width] duration-200"
-                style={{ width: `${percent}%` }}
+                className="bg-accent h-full origin-left rounded-full transition-transform duration-(--duration-base) ease-(--ease-out)"
+                style={{ transform: `scaleX(${percent / 100})` }}
               />
             </div>
 

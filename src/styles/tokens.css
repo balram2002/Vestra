@@ -1,140 +1,255 @@
 /*
- * Vestra Design Tokens
- * ---------------------------------------------------------------------------
- * A single source of truth shared by the storefront, the seller console and
- * the admin console. Everything downstream (components, charts, status pills)
- * consumes these tokens — never a raw hex value.
+ * MERIDIAN — design tokens
+ * ===========================================================================
+ * The single source of truth for the storefront, the seller console and the
+ * admin console. Nothing downstream ever writes a hex value, and nothing
+ * downstream names a palette step: components consume the SEMANTIC layer at the
+ * foot of this file, and the theme switch reassigns that layer underneath them.
  *
- * Palette rationale:
- *   Bone     warm neutral canvas; editorial, print-like, easy on long sessions
- *   Mulberry deep plum-wine brand colour; premium + festive, distinct in a
- *            market dominated by coral/pink/orange fashion brands
- *   Brass    muted gold used sparingly for premium / loyalty / verified marks
- *   Ember    reserved strictly for urgency semantics (sale, low stock)
+ * ---------------------------------------------------------------------------
+ * THE PALETTE, AND WHY IT IS THIS SHORT
+ * ---------------------------------------------------------------------------
+ *
+ *   slate   The ground everything stands on. A cool neutral carrying ~8° of
+ *           the brand's own hue, so a grey card next to an indigo button reads
+ *           as the same family rather than as two unrelated systems. Warm greys
+ *           read as paper and stationery; this reads as glass and photography,
+ *           which is what a marketplace is mostly made of.
+ *
+ *   iris    The brand. A true indigo — deep enough at -600 to carry white text
+ *           at 6.8:1, luminous enough at -400 to survive a near-black ground,
+ *           and far enough in hue from every status colour that it can never be
+ *           mistaken for one.
+ *
+ *   sand    The quiet third. A desaturated warm clay used at BADGE AND HAIRLINE
+ *           SCALE ONLY — premium tiers, editorial eyebrows, verified marks, the
+ *           keel under the logo. Its whole job is to stop an indigo-and-grey
+ *           interface reading as cold software. Fill a panel with it and the
+ *           effect inverts immediately.
+ *
+ * Four status hues follow (emerald / amber / rose / teal). They are not part of
+ * the brand and are never used decoratively.
+ *
+ * ---------------------------------------------------------------------------
+ * TWO STRUCTURAL RULES — read before editing
+ * ---------------------------------------------------------------------------
+ *
+ *   1. The neutral ramp must stay named `slate`. scripts/check-contrast.mjs
+ *      builds its palette by parsing the slate steps out of this file. Rename
+ *      it and the checker resolves nothing, prints SKIP, exits 0 — and passes
+ *      while measuring nothing at all.
+ *
+ *   2. The dark block must come LAST, and the dark attribute selector must not
+ *      appear anywhere above it. Both audit scripts split this file in two at
+ *      the first occurrence of that selector to tell the themes apart.
  */
 
 @theme {
-  /* ---------------------------------------------------------------- neutral */
-  --color-bone-0: #ffffff;
-  --color-bone-25: #fdfcfa;
-  --color-bone-50: #faf8f5;
-  --color-bone-100: #f4f1ec;
-  --color-bone-200: #e8e4dd;
-  --color-bone-300: #d6d1c8;
-  --color-bone-400: #aba598;
+  /* ======================================================== neutral · slate */
   /*
-   * Darkened from #807a6e, which measured 3.78:1 on bone-100 and failed WCAG AA
-   * everywhere `text-faint` was used — 1,030 nodes across every route in the
-   * axe audit. This is 4.77:1 on the worst surface it sits on, still visibly
-   * lighter than `text-muted` (bone-600). Verified by scripts/check-contrast.mjs.
-   */
-  --color-bone-500: #6f6a60;
-  --color-bone-600: #5e5950;
-  --color-bone-700: #45413a;
-  --color-bone-800: #2b2823;
-  --color-bone-900: #1a1815;
-  --color-bone-950: #111013;
-
-  /* ------------------------------------------------------------------ brand */
-  --color-mulberry-50: #fbf2f6;
-  --color-mulberry-100: #f6e3ec;
-  --color-mulberry-200: #edc7d9;
-  --color-mulberry-300: #de9cbb;
-  --color-mulberry-400: #c96895;
-  --color-mulberry-500: #ae4173;
-  --color-mulberry-600: #8f2c5b;
-  --color-mulberry-700: #6d2650;
-  --color-mulberry-800: #551e3e;
-  --color-mulberry-900: #3e1730;
-  --color-mulberry-950: #260e1d;
-
-  /* ---------------------------------------------------------------- premium */
-  --color-brass-50: #fbf7ee;
-  --color-brass-100: #f5ecd6;
-  --color-brass-200: #ead7ab;
-  --color-brass-300: #dcbc78;
-  --color-brass-400: #cba052;
-  --color-brass-500: #a97c3f;
-  --color-brass-600: #8b6231;
-  --color-brass-700: #6d4c29;
-  --color-brass-800: #4e3620;
-  --color-brass-900: #332415;
-
-  /* --------------------------------------------------------------- semantic */
-  --color-success-50: #e9f7f1;
-  --color-success-100: #cceee1;
-  --color-success-300: #6cc7a5;
-  --color-success-500: #157f5a;
-  --color-success-600: #11694a;
-  --color-success-700: #0d5239;
-  --color-success-900: #06301f;
-
-  --color-warning-50: #fdf5e7;
-  --color-warning-100: #fae8c8;
-  --color-warning-300: #eab764;
-  --color-warning-500: #b4690e;
-  --color-warning-600: #96570b;
-  --color-warning-700: #764409;
-  --color-warning-900: #452805;
-
-  --color-danger-50: #fdeeec;
-  --color-danger-100: #fbdcd8;
-  --color-danger-300: #ef9c92;
-  --color-danger-500: #c0362c;
-  --color-danger-600: #a12b23;
-  --color-danger-700: #81211b;
-  --color-danger-900: #4a110d;
-
-  --color-info-50: #eef4fc;
-  --color-info-100: #d9e6f7;
-  --color-info-300: #8ab3e4;
-  --color-info-500: #2563a8;
-  --color-info-600: #1d508b;
-  --color-info-700: #173f6d;
-  --color-info-900: #0d243e;
-
-  --color-ember-50: #fef2ec;
-  --color-ember-100: #fde2d2;
-  --color-ember-300: #f2a475;
-  --color-ember-500: #c2410c;
-  --color-ember-600: #a3350a;
-  --color-ember-700: #822a08;
-
-  /* ------------------------------------------------------- semantic aliases */
-  /*
-   * These alias the runtime semantic layer defined further down, which is what
-   * lets Tailwind generate real utilities (`bg-canvas`, `text-muted`,
-   * `border-line`) that still follow the light/dark switch: the generated rule
-   * emits `var(--color-canvas)`, which resolves to `var(--surface-canvas)` at
-   * use time, and that is what `.dark` reassigns.
+   * Thirteen steps, unevenly spaced on purpose.
    *
-   * Components should reach for these, never for a raw palette step.
+   * The light end is crowded (0 / 25 / 50 / 100 / 150 / 200) because that is
+   * where surfaces stack: a sunken well inside a raised card on a canvas, each
+   * of the three needing to be told apart at a glance and none of them allowed
+   * to look dirty. The dark end is sparse because a near-black only ever needs
+   * to be near-black.
+   *
+   * Every step carries a trace of iris (hue ~250) at very low chroma. It is
+   * invisible in isolation and unmissable in aggregate — it is the difference
+   * between a page that looks designed and a page that looks defaulted.
+   */
+  --color-slate-0: #ffffff;
+  --color-slate-25: #fbfbfd;
+  --color-slate-50: #f6f7fa;
+  --color-slate-100: #eef0f4;
+  --color-slate-150: #e6e8ee;
+  --color-slate-200: #dcdfe7;
+  --color-slate-300: #c3c8d4;
+
+  /*
+   * THE CONTROL BORDER — and the reason this step is far darker than a
+   * hairline instinctively wants to be.
+   *
+   * WCAG 1.4.11 asks 3:1 of the visual boundary that IDENTIFIES a control, and
+   * the outline of a text input or a secondary button is precisely that
+   * boundary. The value is therefore set by the worst ground it ever sits on,
+   * which is not white — it is `--surface-sunken` (#eef0f4), where inset fields
+   * and secondary buttons live.
+   *
+   * Measured: 3.12:1 on sunken, 3.55:1 on white. Lightening it to taste breaks
+   * every inset control in all three apps at once, silently.
+   */
+  --color-slate-400: #808799;
+
+  --color-slate-500: #666d81;
+  --color-slate-600: #4e5566;
+  --color-slate-700: #3a4051;
+  --color-slate-800: #272c3a;
+  --color-slate-900: #171b26;
+  --color-slate-950: #0b0d14;
+
+  /* ========================================================== brand · iris */
+  /*
+   * -600 is the solid: 6.8:1 with white, which clears AA for body text and AAA
+   * for large, so a primary button never needs a second thought.
+   * -500 is the dark-theme solid (5.1:1 with white) — bright enough to lift off
+   * near-black without becoming a neon.
+   * -200 and -300 exist for hairlines and rings, never for text.
+   */
+  --color-iris-25: #f7f8ff;
+  --color-iris-50: #f0f1fe;
+  --color-iris-100: #e2e4fd;
+  --color-iris-200: #c8cbfb;
+  --color-iris-300: #a5a7f7;
+  --color-iris-400: #8480f0;
+  --color-iris-500: #6558e6;
+  --color-iris-600: #5341d4;
+  --color-iris-700: #4634b0;
+  --color-iris-800: #3a2c8c;
+  --color-iris-900: #2f2670;
+  --color-iris-950: #1d1747;
+
+  /* ========================================================== quiet · sand */
+  /*
+   * Badge scale and hairline scale. See the header note — this ramp has a
+   * ceiling, not just a palette.
+   */
+  --color-sand-50: #faf7f2;
+  --color-sand-100: #f3ede2;
+  --color-sand-200: #e7dcc8;
+  --color-sand-300: #d5c3a1;
+  --color-sand-400: #bda372;
+  --color-sand-500: #a08553;
+  --color-sand-600: #856c42;
+  --color-sand-700: #6a5533;
+  --color-sand-800: #4d3e26;
+  --color-sand-900: #2f2617;
+
+  /* =============================================================== status */
+  /*
+   * Four hues, each with the same six-step shape:
+   *
+   *   50/100   washes, for the ground of an alert or a pill
+   *   300      the dark-theme ink — the only step readable on a dark wash
+   *   500      a solid fill (a dot, a bar, a filled badge)
+   *   600/700  the light-theme ink, tuned to sit on the -50 wash
+   *   900      deep, for the rare inverse case
+   *
+   * The inks are DARK on purpose. A "success green" that is bright enough to
+   * enjoy is never dark enough to read, and a status you have to squint at is a
+   * status that gets ignored.
+   */
+  --color-success-50: #e8f7ef;
+  --color-success-100: #c6ebd8;
+  --color-success-300: #4cc189;
+  --color-success-500: #0b7a4b;
+  --color-success-600: #096540;
+  --color-success-700: #074f32;
+  --color-success-900: #042d1c;
+
+  --color-warning-50: #fdf5e8;
+  --color-warning-100: #f9e8c5;
+  --color-warning-300: #e0ae52;
+  --color-warning-400: #c1901f;
+  --color-warning-500: #8f6206;
+  --color-warning-600: #765105;
+  --color-warning-700: #5c3f04;
+  --color-warning-900: #362503;
+
+  --color-danger-50: #fdedef;
+  --color-danger-100: #fbd7dc;
+  --color-danger-300: #f0919d;
+  --color-danger-500: #c4283f;
+  --color-danger-600: #a32034;
+  --color-danger-700: #821a29;
+  --color-danger-900: #4b0f18;
+
+  /*
+   * Teal, not blue, and that is the entire point.
+   *
+   * A blue "in transit" pill beside an indigo primary button is two blues, and
+   * the pill stops reading as a status and starts reading as a second action.
+   * ~180° of separation plus a hard drop in chroma is what keeps them apart at
+   * a glance and in peripheral vision.
+   */
+  --color-info-50: #e6f6f6;
+  --color-info-100: #c1e8e9;
+  --color-info-300: #4bb8bd;
+  --color-info-500: #06717a;
+  --color-info-600: #055c64;
+  --color-info-700: #04484f;
+  --color-info-900: #032a2e;
+
+  /* ============================================================ status fills
+   *
+   * A SOLID ground for white text, and the reason these exist as their own
+   * tokens rather than reusing the `-600` steps above.
+   *
+   * The dark block at the foot of this file remaps `--color-*-600` and `-700`
+   * to the `-300` step, because those steps are INK meant to sit on a pale
+   * tint, and a dark ink on a dark wash is unreadable. That remap is correct
+   * for every `text-*-600` in the codebase — and catastrophic for the handful
+   * of places that used the same step as a BACKGROUND under white text. After
+   * dark, `bg-danger-600 text-white` became white on `#f0919d`: 1.7:1, on a
+   * destructive button and on every sale flash in the grid.
+   *
+   * One token cannot be both "ink on a tint" and "fill under white". So the
+   * fill role gets its own name, declared once as a literal, and NEVER
+   * reassigned by the theme — a red delete button is the same red in both
+   * themes, because white-on-red does not care what the page behind it is
+   * doing.
+   *
+   * Every value here is the `-600` step's literal, and every one clears 7:1
+   * against white. Measured by `check-palette.mjs`, which now asserts them.
+   */
+  --color-success-fill: #096540;
+  --color-warning-fill: #765105;
+  --color-danger-fill: #a32034;
+  --color-danger-fill-hover: #821a29;
+  --color-info-fill: #055c64;
+  --color-premium-fill: #856c42;
+
+  /* ====================================================== semantic aliases */
+  /*
+   * These alias the RUNTIME layer defined below, which is the mechanism that
+   * lets Tailwind emit real utilities (`bg-canvas`, `text-muted`,
+   * `border-line`) that still follow the theme switch: the generated rule emits
+   * `var(--color-*)`, that resolves to `var(--surface-*)` at use time, and the
+   * dark block reassigns the target.
+   *
+   * Components reach for THESE. Never for a palette step, never for a hex.
    */
   --color-canvas: var(--surface-canvas);
   --color-raised: var(--surface-raised);
   --color-sunken: var(--surface-sunken);
+  --color-veil: var(--surface-veil);
   --color-inverse: var(--surface-inverse);
+  --color-overlay: var(--surface-overlay);
 
   --color-ink: var(--text-primary);
   --color-muted: var(--text-secondary);
   --color-faint: var(--text-tertiary);
   --color-on-inverse: var(--text-inverse);
   /*
-   * Text that sits ON the accent. Deliberately NOT theme-flipped: the accent is
-   * a mid-to-dark mulberry in both themes, so light text is correct in both,
-   * and `--text-inverse` would put near-black on it in dark mode.
+   * Text that sits ON the accent. Deliberately NOT theme-flipped: iris is a
+   * mid-to-deep indigo in both themes, so white is correct in both — and
+   * `--text-inverse` would put near-black on it the moment the lights went out.
    */
-  --color-on-accent: var(--color-bone-50);
+  --color-on-accent: #ffffff;
 
   /*
-   * The sticky site header's height. Anything else that sticks has to sit
-   * below it, and a hard-coded offset in three files is three chances to be
-   * wrong by four pixels.
+   * Borders split by ROLE, not by weight. The role is what tells you which one
+   * you need; a scale of four greys does not.
+   *
+   *   line          dividers, table rows, card edges       decorative
+   *   line-strong   panel outlines, table frames           decorative
+   *   line-control  inputs, selects, secondary buttons     >= 3:1, required
+   *   line-bold     control hover, emphasis, active states
    */
-  --header-height: 6.25rem;
-
   --color-line: var(--border-subtle);
   --color-line-strong: var(--border-default);
+  --color-line-control: var(--border-control);
   --color-line-bold: var(--border-strong);
 
   --color-accent: var(--accent-solid);
@@ -142,216 +257,417 @@
   --color-accent-soft: var(--accent-soft);
   --color-accent-ink: var(--accent-text);
   --color-accent-line: var(--accent-border);
+  --color-accent-control: var(--accent-border-strong);
 
-  /* ------------------------------------------------------------ typography */
+  --color-premium: var(--sand-solid);
+  --color-premium-soft: var(--sand-soft);
+  --color-premium-ink: var(--sand-text);
+  --color-premium-line: var(--sand-border);
+
+  /* ============================================================ typography */
   /*
-   * `--font-inter` and `--font-fraunces` are injected by `next/font` in the
-   * root layout. Naming them here keeps every consumer on the token rather
-   * than on a next/font import, and the stacks still degrade sensibly if a
-   * face fails to load.
+   * Three voices, meant to be told apart without being told.
+   *
+   *   sans     Inter. The most rigorously hinted UI face in existence, and the
+   *            reason a 13px console table stays readable at 125% Windows
+   *            scaling. Loaded variable, so the scale can ask for 550 where 500
+   *            is thin and 600 is heavy.
+   *   display  Plus Jakarta Sans at 700-800 with hard negative tracking. A
+   *            geometric humanist with a high x-height and genuinely elegant
+   *            round forms — it holds its shape at 96px over a photograph,
+   *            which is where most of these headlines actually live.
+   *            The CONSOLES never use it; see `.console-type` in global.css.
+   *   mono     IBM Plex Mono, and ONLY for identifiers a human compares
+   *            character by character: AWBs, GSTINs, SKUs, order and invoice
+   *            numbers. Its slashed zero and flagged one are the whole reason
+   *            it is here.
+   *
+   * Injected by next/font in the root layout so they are self-hosted, which
+   * removes a render-blocking third-party round trip (LCP) and emits a
+   * size-adjust fallback so the swap does not reflow the page (CLS).
    */
-  --font-display: var(--font-fraunces), 'Iowan Old Style', Georgia, 'Times New Roman', serif;
   --font-sans:
     var(--font-inter), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
     'Helvetica Neue', Arial, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-display:
+    var(--font-jakarta), var(--font-inter), ui-sans-serif, system-ui, 'Segoe UI', Arial,
+    sans-serif;
+  --font-mono:
+    var(--font-plex-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   /*
-   * Scale rationale: 15px base, not 14. Below 15 a long product description
-   * reads as fine print, and the whole shop feels cramped and dated. The
-   * display end is deliberately far from the body end — a flat scale is what
-   * makes a page look like a template.
+   * 15px base, and a scale that is deliberately NOT geometric.
+   *
+   * The body end is tight (11 / 13 / 14 / 15 / 16 / 18) because that is where
+   * information density lives and a ratio of 1.25 between two table sizes is
+   * simply wrong. The display end accelerates hard (24 / 30 / 38 / 50 / 68 /
+   * 92) because a flat scale is the single most reliable way to make a page
+   * look like a template — real editorial design has a gap between "a heading"
+   * and "a statement", and the gap is where the drama is.
+   *
+   * Weight and tracking ride on the STEP, so no component ever has to remember
+   * that 68px wants 800 and -0.045em.
    */
-  --text-2xs: 0.75rem;
-  --text-2xs--line-height: 1.0625rem;
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-2xs--letter-spacing: 0.005em;
   --text-xs: 0.8125rem;
-  --text-xs--line-height: 1.1875rem;
+  --text-xs--line-height: 1.15rem;
   --text-sm: 0.875rem;
-  --text-sm--line-height: 1.375rem;
+  --text-sm--line-height: 1.3125rem;
   --text-base: 0.9375rem;
-  --text-base--line-height: 1.5rem;
+  --text-base--line-height: 1.4688rem;
   --text-md: 1rem;
-  --text-md--line-height: 1.625rem;
+  --text-md--line-height: 1.5625rem;
   --text-lg: 1.125rem;
-  --text-lg--line-height: 1.75rem;
-  --text-xl: 1.375rem;
-  --text-xl--line-height: 1.875rem;
-  --text-xl--letter-spacing: -0.01em;
-  --text-2xl: 1.75rem;
-  --text-2xl--line-height: 2.125rem;
-  --text-2xl--letter-spacing: -0.015em;
-  --text-3xl: 2.25rem;
-  --text-3xl--line-height: 2.5rem;
-  --text-3xl--letter-spacing: -0.02em;
-  --text-4xl: 3rem;
-  --text-4xl--line-height: 3.125rem;
-  --text-4xl--letter-spacing: -0.025em;
-  --text-5xl: 4rem;
-  --text-5xl--line-height: 4rem;
-  --text-5xl--letter-spacing: -0.03em;
-  --text-6xl: 5rem;
-  --text-6xl--line-height: 4.85rem;
-  --text-6xl--letter-spacing: -0.035em;
+  --text-lg--line-height: 1.7rem;
+  --text-lg--letter-spacing: -0.01em;
+  --text-xl: 1.3125rem;
+  --text-xl--line-height: 1.75rem;
+  --text-xl--letter-spacing: -0.018em;
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: 1.85rem;
+  --text-2xl--letter-spacing: -0.024em;
+  --text-3xl: 1.875rem;
+  --text-3xl--line-height: 2.1rem;
+  --text-3xl--letter-spacing: -0.03em;
+  --text-3xl--font-weight: 700;
+  --text-4xl: 2.375rem;
+  --text-4xl--line-height: 2.5rem;
+  --text-4xl--letter-spacing: -0.036em;
+  --text-4xl--font-weight: 700;
+  --text-5xl: 3.125rem;
+  --text-5xl--line-height: 3.15rem;
+  --text-5xl--letter-spacing: -0.042em;
+  --text-5xl--font-weight: 700;
+  --text-6xl: 4.25rem;
+  --text-6xl--line-height: 4.1rem;
+  --text-6xl--letter-spacing: -0.046em;
+  --text-6xl--font-weight: 800;
+  --text-7xl: 5.75rem;
+  --text-7xl--line-height: 5.4rem;
+  --text-7xl--letter-spacing: -0.05em;
+  --text-7xl--font-weight: 800;
 
-  /* --------------------------------------------------------------- geometry */
-  --radius-xs: 2px;
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 10px;
-  --radius-xl: 14px;
-  --radius-2xl: 20px;
+  /* ============================================================== geometry */
+  /*
+   * A wide range, used narrowly.
+   *
+   * One radius everywhere is what makes an interface look like a wireframe. The
+   * rule here is that radius tracks SIZE: a 4px chip, a 10px control, a 14px
+   * card, a 28px panel, a 36px hero. Two elements of the same size must never
+   * disagree, and two elements of different sizes must never agree.
+   */
+  --radius-xs: 4px;
+  --radius-sm: 7px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-2xl: 24px;
+  --radius-3xl: 32px;
+  --radius-4xl: 44px;
+  --radius-pill: 999px;
 
-  /* Deliberately restrained elevation — premium retail reads flat, not floaty. */
-  --shadow-xs: 0 1px 2px 0 rgb(26 24 21 / 0.05);
-  --shadow-sm: 0 1px 3px 0 rgb(26 24 21 / 0.07), 0 1px 2px -1px rgb(26 24 21 / 0.05);
-  --shadow-md: 0 4px 12px -2px rgb(26 24 21 / 0.09), 0 2px 4px -2px rgb(26 24 21 / 0.05);
-  --shadow-lg: 0 12px 28px -6px rgb(26 24 21 / 0.12), 0 4px 8px -4px rgb(26 24 21 / 0.06);
-  --shadow-xl: 0 24px 56px -12px rgb(26 24 21 / 0.18);
+  /* ============================================================= elevation */
+  /*
+   * Every level leads with a HAIRLINE RING before it spends anything on blur,
+   * so a card has a crisp edge rather than only a soft haze. The ring is also
+   * what keeps elevation legible after dark, where a drop shadow cast on
+   * near-black is very nearly invisible.
+   *
+   * The blur is tinted with the neutral's own hue rather than pure black — a
+   * black shadow under a cool-grey card reads as dirt on the screen.
+   *
+   * Two-part shadows throughout: a tight, dark contact shadow that anchors the
+   * element to the surface, and a wide, soft ambient one that gives it height.
+   * A single blur can do one or the other, never both, which is why one-line
+   * shadows always look either flat or foggy.
+   *
+   * NEVER ANIMATE box-shadow — it repaints on every frame. Cross-fade a
+   * pseudo-element instead; `.lift` in global.css does exactly that.
+   */
+  --shadow-xs: 0 0 0 1px var(--elevation-ring);
+  --shadow-sm: 0 0 0 1px var(--elevation-ring), 0 1px 2px -1px var(--elevation-1);
+  --shadow-md:
+    0 0 0 1px var(--elevation-ring), 0 4px 10px -3px var(--elevation-2),
+    0 2px 4px -2px var(--elevation-1);
+  --shadow-lg:
+    0 0 0 1px var(--elevation-ring), 0 12px 28px -8px var(--elevation-2),
+    0 4px 10px -6px var(--elevation-1);
+  --shadow-xl:
+    0 0 0 1px var(--elevation-ring), 0 28px 60px -14px var(--elevation-3),
+    0 10px 22px -12px var(--elevation-2);
+  --shadow-2xl:
+    0 0 0 1px var(--elevation-ring), 0 48px 96px -24px var(--elevation-3),
+    0 18px 36px -18px var(--elevation-2);
+  /* A control that floats over content: a carousel arrow, a filter FAB. */
+  --shadow-pop:
+    0 0 0 1px var(--elevation-ring), 0 8px 18px -6px var(--elevation-2),
+    0 2px 6px -3px var(--elevation-2);
+  /* The brand glow, for a primary CTA at rest. Sparingly, and never on a row. */
+  --shadow-accent: 0 8px 24px -10px var(--accent-glow);
+  /* Inset, for a well or a pressed segment. */
+  --shadow-inset: inset 0 1px 2px 0 var(--elevation-1);
 
-  /* ------------------------------------------------------------- animation */
-  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
-  --ease-in-out-quart: cubic-bezier(0.76, 0, 0.24, 1);
+  /* ================================================================ motion */
+  /*
+   * Numbers, not adjectives.
+   *
+   * Micro-interactions live at 120-220ms; anything that travels a real distance
+   * gets longer. ease-out on enter and ease-in on exit, always: something
+   * arriving should decelerate into place, something leaving should get out of
+   * the way.
+   *
+   * The spring curves below are CSS approximations of the physics springs in
+   * lib/motion.ts. Anything that DRAGS uses the real spring; anything that
+   * merely transitions uses these, because a transition of one property does
+   * not need a physics engine attached to it.
+   */
+  --duration-instant: 100ms;
+  --duration-fast: 150ms;
+  --duration-base: 220ms;
+  --duration-slow: 320ms;
+  --duration-drawer: 380ms;
+  --duration-page: 420ms;
+  --duration-hero: 720ms;
 
-  /* --------------------------------------------------------------- layout */
-  --spacing-header: 4rem;
-  --spacing-header-lg: 4.5rem;
-  --spacing-shell: 15rem;
+  /* The house curve. Decelerates hard and late — expensive-feeling. */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  /* Overshoots ~4%. For a badge count, a like, a chip toggling on. */
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.5, 1);
+  /* Overshoots hard. For something that pops into existence. */
+  --ease-bounce: cubic-bezier(0.18, 1.62, 0.44, 1);
 
-  /* --------------------------------------------------------------- charts */
-  --color-chart-1: #6d2650;
-  --color-chart-2: #2563a8;
-  --color-chart-3: #a97c3f;
-  --color-chart-4: #157f5a;
-  --color-chart-5: #c2410c;
-  --color-chart-6: #7e5aa8;
-  --color-chart-7: #0f7a86;
-  --color-chart-8: #8f2c5b;
+  --stagger-step: 48ms;
 
-  /* ------------------------------------------------------------ breakpoint */
-  --breakpoint-xs: 25rem;
+  /* ================================================================ layout */
+  /*
+   * The sticky stack's height. Anything else that sticks measures from these,
+   * and a hard-coded offset repeated in three files is three chances to be four
+   * pixels wrong on one of them.
+   */
+  --spacing-announce: 2.25rem;
+  --spacing-header: 3.75rem;
+  --spacing-header-lg: 4.75rem;
+  --spacing-console-header: 3.875rem;
+  --spacing-shell: 16.5rem;
+  --spacing-shell-collapsed: 4.5rem;
+  --spacing-bottom-nav: 4.125rem;
+  --header-height: calc(var(--spacing-announce) + var(--spacing-header));
+
+  /* ================================================================ charts */
+  /*
+   * Ordered for CATEGORICAL use: adjacent entries are far apart in hue AND in
+   * lightness, so a stacked bar survives both greyscale printing and
+   * deuteranopia. Series one is the brand, because series one is usually "us".
+   */
+  --color-chart-1: #5341d4;
+  --color-chart-2: #06717a;
+  --color-chart-3: #bd6b1c;
+  --color-chart-4: #0b7a4b;
+  --color-chart-5: #a0399c;
+  --color-chart-6: #8480f0;
+  --color-chart-7: #c4283f;
+  --color-chart-8: #4e5566;
+
+  /* =========================================================== breakpoints */
+  --breakpoint-xs: 26rem;
   --breakpoint-3xl: 100rem;
 }
 
 /*
- * Semantic surface layer. Components reference these, so a theme change is a
- * token change — not a component change.
+ * ===========================================================================
+ * SEMANTIC RUNTIME LAYER
+ * ===========================================================================
+ * Components reference these and only these, so a theme change is a token
+ * change and never a component change. That single property is what allows an
+ * entire palette to be replaced without editing one colour class downstream.
  */
 @layer theme {
   :root {
-    /* Scrollbars, form controls and overscroll follow this. */
+    /* Scrollbars, native form controls and overscroll all follow this. */
     color-scheme: light;
 
-    --surface-canvas: var(--color-bone-50);
-    --surface-raised: var(--color-bone-0);
-    --surface-sunken: var(--color-bone-100);
-    --surface-inverse: var(--color-bone-950);
-    --surface-overlay: rgb(26 24 21 / 0.48);
+    /*
+     * Three grounds, not two.
+     *
+     * canvas is the page, raised is a card, sunken is a well inside a card. A
+     * system with only two can never nest, and the first time a console needs a
+     * panel inside a panel it invents a fourth grey on the spot.
+     */
+    --surface-canvas: var(--color-slate-50);
+    --surface-raised: var(--color-slate-0);
+    --surface-sunken: var(--color-slate-100);
+    --surface-inverse: var(--color-slate-950);
+    --surface-overlay: rgb(11 13 20 / 0.55);
+    /*
+     * Behind a blurred sticky bar. Opaque enough to set type on, sheer enough
+     * that content moving underneath stays visible — which is the entire reason
+     * to blur rather than simply going solid.
+     */
+    --surface-veil: rgb(255 255 255 / 0.78);
 
-    --border-subtle: var(--color-bone-200);
-    --border-default: var(--color-bone-300);
-    --border-strong: var(--color-bone-400);
+    --border-subtle: var(--color-slate-200);
+    --border-default: var(--color-slate-300);
+    --border-control: var(--color-slate-400);
+    --border-strong: var(--color-slate-600);
 
-    --text-primary: var(--color-bone-900);
-    --text-secondary: var(--color-bone-600);
-    --text-tertiary: var(--color-bone-500);
-    --text-inverse: var(--color-bone-50);
+    --text-primary: var(--color-slate-900);
+    --text-secondary: var(--color-slate-600);
+    --text-tertiary: var(--color-slate-500);
+    --text-inverse: var(--color-slate-50);
 
-    --accent-solid: var(--color-mulberry-700);
-    --accent-solid-hover: var(--color-mulberry-800);
-    --accent-soft: var(--color-mulberry-50);
-    --accent-text: var(--color-mulberry-700);
-    --accent-border: var(--color-mulberry-200);
+    --accent-solid: var(--color-iris-600);
+    --accent-solid-hover: var(--color-iris-700);
+    --accent-soft: var(--color-iris-50);
+    --accent-text: var(--color-iris-700);
+    --accent-border: var(--color-iris-200);
+    --accent-border-strong: var(--color-iris-500);
+    --accent-glow: rgb(83 65 212 / 0.42);
 
-    --focus-ring: var(--color-mulberry-500);
+    --sand-solid: var(--color-sand-500);
+    --sand-soft: var(--color-sand-50);
+    --sand-text: var(--color-sand-700);
+    --sand-border: var(--color-sand-200);
 
-    --chart-grid: var(--color-bone-200);
-    --chart-axis: var(--color-bone-500);
+    --focus-ring: var(--color-iris-500);
+
+    --elevation-ring: rgb(23 27 38 / 0.07);
+    --elevation-1: rgb(23 27 38 / 0.07);
+    --elevation-2: rgb(23 27 38 / 0.1);
+    --elevation-3: rgb(23 27 38 / 0.16);
+
+    --chart-grid: var(--color-slate-200);
+    --chart-axis: var(--color-slate-500);
   }
 
   /*
-   * The dark palette, declared once.
+   * ------------------------------------------------------------------ dark
    *
-   * `[data-theme='dark']` is stamped on <html> by the inline script in
-   * `<head>`, which resolves `system` against `prefers-color-scheme` BEFORE the
-   * first paint. Doing that in script rather than in a `@media` block is what
-   * lets this list exist in one place instead of twice — see `lib/theme.ts` for
-   * the trade it makes.
+   * Declared exactly ONCE, under one selector.
    *
-   * `.dark` is kept alongside it so anything that sets a class still works.
+   * The attribute is stamped on <html> by the inline script in <head>, which
+   * resolves "system" against prefers-color-scheme BEFORE the first paint.
+   * Doing that in script rather than in a media query is what lets this list
+   * exist once instead of twice — and a palette written twice is a palette that
+   * drifts. See lib/theme.ts for the trade that makes.
+   *
+   * The `.dark` class is honoured alongside it so anything that sets a class
+   * still works.
+   *
+   * NOTHING above this point may mention the attribute selector literally: both
+   * audit scripts split this file at its first occurrence.
    */
   :root[data-theme='dark'],
   .dark {
     color-scheme: dark;
 
-    --surface-canvas: var(--color-bone-950);
-    --surface-raised: #1a1815;
-    --surface-sunken: #0b0a0c;
-    --surface-inverse: var(--color-bone-50);
-    --surface-overlay: rgb(8 7 9 / 0.7);
-
-    --border-subtle: #2e2a26;
-    --border-default: #3d3830;
-    --border-strong: #55504a;
-
-    --text-primary: var(--color-bone-50);
-    --text-secondary: #a9a294;
     /*
-     * Lightened from #857f73, which measured 4.45:1 on `surface-raised` and
-     * failed WCAG AA by a hair. It shipped unmeasured because the contrast
-     * checker only ever looked at the light palette; it now checks both.
+     * Not pure black, and not one flat grey either.
+     *
+     * Pure black is a mirror — it shows every fingerprint on an OLED phone and
+     * it makes white text buzz. These three are lifted just enough to be
+     * surfaces, and they keep the same canvas/raised/sunken relationship as the
+     * light theme so nesting behaves identically after dark.
      */
-    --text-tertiary: #888275;
-    --text-inverse: var(--color-bone-950);
+    --surface-canvas: var(--color-slate-950);
+    --surface-raised: #141824;
+    --surface-sunken: #080a10;
+    --surface-inverse: var(--color-slate-50);
+    --surface-overlay: rgb(3 4 8 / 0.72);
+    --surface-veil: rgb(11 13 20 / 0.8);
 
-    --accent-solid: var(--color-mulberry-500);
-    --accent-solid-hover: var(--color-mulberry-400);
-    --accent-soft: rgb(174 65 115 / 0.14);
-    --accent-text: var(--color-mulberry-300);
-    --accent-border: rgb(174 65 115 / 0.34);
+    --border-subtle: #1f2432;
+    --border-default: #2b3140;
+    /* 3.4:1 on the worst dark surface — the same 1.4.11 rule as in light. */
+    --border-control: #6a7285;
+    --border-strong: #8d95a6;
 
-    --focus-ring: var(--color-mulberry-400);
+    --text-primary: #eef0f5;
+    --text-secondary: #a4abbb;
+    --text-tertiary: #7e8698;
+    --text-inverse: var(--color-slate-950);
 
     /*
-     * Status tints, re-tuned for a dark canvas.
+     * The accent lifts one step and no more.
      *
-     * `-50` and `-100` are pale washes designed to sit on near-white. On a dark
-     * page they became bright panels — an alert banner lit up like a lightbox,
-     * which is the opposite of the calm a warning should carry. Here they are a
-     * low-alpha wash of the same hue instead, so the SHAPE of every alert is
-     * unchanged and only its ground moves.
-     *
-     * The `-700` text steps flip too: they are dark inks meant for a pale
-     * tint, and unreadable on one of these washes. The `-300` steps are the
-     * same hues at a light enough value to read on them.
-     *
-     * Doing it here rather than in components is the point of the token layer:
-     * forty-eight call sites adapt without being touched.
+     * -600 on near-black is a bruise; -400 with white on it measures 3.3:1 and
+     * fails body text outright. -500 is the only step that is both bright
+     * enough to read as the brand and dark enough to keep white legible
+     * (5.1:1).
      */
-    --color-success-50: rgb(21 127 90 / 0.16);
-    --color-success-100: rgb(21 127 90 / 0.28);
+    --accent-solid: var(--color-iris-500);
+    --accent-solid-hover: var(--color-iris-400);
+    --accent-soft: rgb(101 88 230 / 0.16);
+    --accent-text: var(--color-iris-300);
+    --accent-border: rgb(101 88 230 / 0.34);
+    --accent-border-strong: var(--color-iris-400);
+    --accent-glow: rgb(101 88 230 / 0.5);
+
+    --sand-solid: var(--color-sand-400);
+    --sand-soft: rgb(189 163 114 / 0.14);
+    --sand-text: var(--color-sand-300);
+    --sand-border: rgb(189 163 114 / 0.32);
+
+    --focus-ring: var(--color-iris-400);
+
+    /*
+     * Elevation inverts.
+     *
+     * A shadow tuned for white does nothing whatsoever on #141824, so the blur
+     * goes near-black and deepens, while the ring becomes a light hairline —
+     * after dark the ring is what actually carries the edge and the blur is
+     * only there to give it somewhere to sit.
+     */
+    --elevation-ring: rgb(255 255 255 / 0.08);
+    --elevation-1: rgb(0 0 0 / 0.44);
+    --elevation-2: rgb(0 0 0 / 0.56);
+    --elevation-3: rgb(0 0 0 / 0.7);
+
+    /*
+     * Status tints, re-tuned for a dark ground.
+     *
+     * The -50 and -100 steps are pale washes designed to sit on near-white; on
+     * a dark page they light up like a lightbox, which is the exact opposite of
+     * the calm a warning is supposed to carry. Here they become a low-alpha
+     * wash of the same hue, so the SHAPE of every alert in the app is unchanged
+     * and only its ground moves.
+     *
+     * The -600/-700 inks flip too: they are dark inks meant for a pale tint and
+     * are unreadable on one of these washes. The -300 steps are the same hues
+     * at a value that reads on them — each one verified by check-palette.mjs
+     * against the wash COMPOSITED over --surface-raised, which is the ground a
+     * browser actually paints.
+     */
+    --color-success-50: rgb(11 122 75 / 0.17);
+    --color-success-100: rgb(11 122 75 / 0.3);
     --color-success-600: var(--color-success-300);
     --color-success-700: var(--color-success-300);
 
-    --color-warning-50: rgb(180 105 14 / 0.18);
-    --color-warning-100: rgb(180 105 14 / 0.30);
+    --color-warning-50: rgb(143 98 6 / 0.19);
+    --color-warning-100: rgb(143 98 6 / 0.32);
     --color-warning-600: var(--color-warning-300);
     --color-warning-700: var(--color-warning-300);
 
-    --color-danger-50: rgb(192 54 44 / 0.18);
-    --color-danger-100: rgb(192 54 44 / 0.30);
+    --color-danger-50: rgb(196 40 63 / 0.17);
+    --color-danger-100: rgb(196 40 63 / 0.3);
     --color-danger-600: var(--color-danger-300);
     --color-danger-700: var(--color-danger-300);
 
-    --color-info-50: rgb(37 99 168 / 0.18);
-    --color-info-100: rgb(37 99 168 / 0.30);
+    --color-info-50: rgb(6 113 122 / 0.17);
+    --color-info-100: rgb(6 113 122 / 0.3);
     --color-info-600: var(--color-info-300);
     --color-info-700: var(--color-info-300);
 
-    --color-ember-50: rgb(194 65 12 / 0.18);
-    --color-ember-100: rgb(194 65 12 / 0.30);
-    --color-ember-600: var(--color-ember-300);
+    --color-sand-50: rgb(189 163 114 / 0.14);
+    --color-sand-100: rgb(189 163 114 / 0.26);
+    --color-sand-200: rgb(189 163 114 / 0.38);
+    --color-sand-600: var(--color-sand-300);
+    --color-sand-700: var(--color-sand-300);
 
-    --chart-grid: #2e2a26;
-    --chart-axis: #857f73;
+    --chart-grid: #1f2432;
+    --chart-axis: #7e8698;
   }
 }

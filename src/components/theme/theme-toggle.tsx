@@ -50,7 +50,7 @@ export function ThemeToggle({ className }: { className?: string }) {
             title={THEME_LABEL[option]}
             onClick={() => setTheme(option)}
             className={cn(
-              'grid size-7 place-items-center rounded-full transition-colors',
+              'grid size-11 place-items-center rounded-full transition-colors lg:size-7',
               'focus-visible:outline-accent focus-visible:outline-2 focus-visible:outline-offset-2',
               active ? 'bg-raised text-ink shadow-sm' : 'text-faint hover:text-ink',
             )}
@@ -83,7 +83,7 @@ export function ThemeToggleCompact({ className }: { className?: string }) {
       aria-label={`Theme: ${THEME_LABEL[theme]}. Switch to ${THEME_LABEL[next[theme]].toLowerCase()}.`}
       title={`Theme: ${THEME_LABEL[theme]}`}
       className={cn(
-        'text-muted hover:bg-sunken hover:text-ink grid size-10 place-items-center rounded-full transition-colors',
+        'text-muted hover:bg-sunken hover:text-ink grid size-11 shrink-0 place-items-center rounded-full transition-colors',
         'focus-visible:outline-accent focus-visible:outline-2 focus-visible:outline-offset-2',
         className,
       )}

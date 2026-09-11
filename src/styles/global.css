@@ -1,20 +1,47 @@
 @import 'tailwindcss';
 @import './tokens.css';
 
-/* Dark mode is class-driven so users can override the OS preference. */
-@custom-variant dark (&:where(.dark, .dark *));
+/*
+ * MERIDIAN — base layer, utilities, keyframes.
+ * ===========================================================================
+ * The theme is stamped as `data-theme` on <html> by the inline script in
+ * <head>, before the first paint. `.dark` is honoured alongside it so anything
+ * that sets a class still works.
+ *
+ * In practice the `dark:` variant is used almost nowhere in this codebase —
+ * every component reads a semantic token and the token layer does the flipping,
+ * which is exactly the property that allows a whole palette to be replaced
+ * without touching a component's colour classes. The variant is declared for
+ * the rare case that genuinely needs it (an image treatment, a blend mode, a
+ * gradient that must invert) and pointed at the right selector, because a
+ * variant that silently matches nothing is worse than no variant at all.
+ */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *, .dark, .dark *));
+
+/* ==========================================================================
+   BASE
+   ========================================================================== */
 
 @layer base {
   *,
   *::before,
   *::after {
     border-color: var(--border-subtle);
+    min-width: 0;
   }
 
   html {
     -webkit-text-size-adjust: 100%;
     -webkit-tap-highlight-color: transparent;
     scroll-behavior: smooth;
+    /* Anything that scrolls to an anchor has to clear the sticky header. */
+    scroll-padding-top: calc(var(--header-height) + 1.5rem);
+    /*
+     * Reserve the scrollbar's width at all times. Without it, opening a modal
+     * (which locks the body) removes the gutter and shunts the entire page
+     * ~15px sideways — the single most noticeable jank in any app with dialogs.
+     */
+    scrollbar-gutter: stable;
   }
 
   body {
@@ -23,23 +50,57 @@
     font-family: var(--font-sans);
     font-size: var(--text-base);
     line-height: var(--text-base--line-height);
-    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    /*
+     * Inter's optical sizing and contextual alternates. `cv11` gives the
+     * single-storey `g` that keeps a dense table from looking cramped; `ss01`
+     * is the disambiguated `l`, which matters the moment a customer reads an
+     * order number aloud over the phone.
+     */
+    font-feature-settings: 'cv11', 'ss01';
+    font-optical-sizing: auto;
+    /*
+     * Stops the whole page rubber-banding past its ends on touch, which is what
+     * makes a sticky header appear to detach during an over-scroll.
+     */
     overscroll-behavior-y: none;
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  /*
+   * Headings take the display face by default.
+   *
+   * Doing it here rather than per component is what stops half the shop
+   * shipping in the UI face because somebody forgot a class. The CONSOLES opt
+   * out — see `.console-type` below — because a fashion display face in a
+   * fulfilment queue is decoration in a place that wants clarity.
+   */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-display);
     color: var(--text-primary);
-    font-weight: 600;
-    letter-spacing: -0.011em;
+    font-weight: 700;
+    letter-spacing: -0.022em;
     text-wrap: balance;
   }
 
-  p { text-wrap: pretty; }
+  p {
+    text-wrap: pretty;
+  }
 
-  /* One consistent, always-visible focus treatment across all three apps. */
+  /*
+   * One consistent, always-visible focus treatment across all three apps.
+   * Never removed — only ever replaced.
+   *
+   * 2px at 2px offset clears the control's own border, and the ring measures
+   * 4.9:1 on every light surface and 6.1:1 on every dark one, comfortably past
+   * WCAG 1.4.11's 3:1 floor for a focus indicator.
+   */
   :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
     outline: 2px solid var(--focus-ring);
     outline-offset: 2px;
@@ -50,150 +111,1007 @@
   }
 
   ::selection {
-    background-color: var(--color-mulberry-200);
-    color: var(--color-mulberry-950);
+    background-color: var(--color-iris-200);
+    color: var(--color-iris-950);
   }
+  :root[data-theme='dark'] ::selection,
   .dark ::selection {
-    background-color: var(--color-mulberry-700);
-    color: var(--color-bone-50);
+    background-color: var(--color-iris-700);
+    color: #ffffff;
   }
 
-  /* Numeric data (prices, KPIs, table figures) must never jitter while it updates. */
-  .tabular {
-    font-variant-numeric: tabular-nums;
-    font-feature-settings: 'tnum';
-  }
-
+  /* Spinners on a quantity field are a smaller target than the field itself. */
   input[type='number']::-webkit-outer-spin-button,
   input[type='number']::-webkit-inner-spin-button {
     -webkit-appearance: none;
     margin: 0;
   }
-  input[type='number'] { -moz-appearance: textfield; }
+  input[type='number'] {
+    -moz-appearance: textfield;
+  }
 
-  input[type='search']::-webkit-search-cancel-button { -webkit-appearance: none; }
+  input[type='search']::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+  }
 
-  img { color: transparent; }
+  /* An <img> with a broken or pending src must not paint its alt text as ink. */
+  img {
+    color: transparent;
+  }
 
-  /* Scrollbars: subtle, themed, never a scroll-jump on overlay open. */
+  /* Media never overflows its column, in any of the three apps. */
+  img,
+  video,
+  canvas,
+  svg {
+    display: block;
+    max-width: 100%;
+  }
+
+  /* Scrollbars: subtle, themed, and never a layout jump when an overlay opens. */
   * {
     scrollbar-width: thin;
     scrollbar-color: var(--border-default) transparent;
   }
-  ::-webkit-scrollbar { width: 10px; height: 10px; }
-  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
   ::-webkit-scrollbar-thumb {
     background-color: var(--border-default);
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     border: 3px solid transparent;
     background-clip: content-box;
   }
-  ::-webkit-scrollbar-thumb:hover { background-color: var(--border-strong); }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--border-strong);
+  }
+
+  /* A dialog's backdrop is painted by the component, never by the UA. */
+  dialog::backdrop {
+    background: transparent;
+  }
 }
 
+/* ==========================================================================
+   UTILITIES
+   ========================================================================== */
+
 @layer utilities {
-  .surface { background-color: var(--surface-raised); }
-  .surface-canvas { background-color: var(--surface-canvas); }
-  .surface-sunken { background-color: var(--surface-sunken); }
+  /* ------------------------------------------------------------- surfaces */
 
-  .text-primary { color: var(--text-primary); }
-  .text-secondary { color: var(--text-secondary); }
-  .text-tertiary { color: var(--text-tertiary); }
+  .surface {
+    background-color: var(--surface-raised);
+  }
+  .surface-canvas {
+    background-color: var(--surface-canvas);
+  }
+  .surface-sunken {
+    background-color: var(--surface-sunken);
+  }
 
-  .border-subtle { border-color: var(--border-subtle); }
-  .border-default { border-color: var(--border-default); }
-  .border-strong { border-color: var(--border-strong); }
+  /*
+   * A translucent bar that content scrolls under.
+   *
+   * The blur is what makes it read as glass rather than as a semi-transparent
+   * rectangle, and the SATURATE is the detail that is always missing when this
+   * looks cheap: a plain blur greys out the colour behind it, so a product
+   * photograph sliding under the header turns to mud. Pushing saturation back
+   * up keeps the colour alive through the frost.
+   */
+  .glass {
+    background-color: var(--surface-veil);
+    backdrop-filter: blur(20px) saturate(1.9);
+    -webkit-backdrop-filter: blur(20px) saturate(1.9);
+  }
+  /*
+   * Where backdrop-filter is unavailable the veil alone is far too sheer to
+   * set type on, so it goes fully opaque rather than shipping unreadable glass.
+   */
+  @supports not (backdrop-filter: blur(1px)) {
+    .glass {
+      background-color: var(--surface-raised);
+    }
+  }
 
-  .accent-bg { background-color: var(--accent-solid); }
-  .accent-fg { color: var(--accent-text); }
+  /*
+   * A hairline that exists only where it should.
+   *
+   * `border-b` on a sticky header draws a hard line at the top of the page
+   * before anything has scrolled, which is a seam in an otherwise clean first
+   * impression. This is the same line drawn with a gradient that fades at both
+   * ends, so it reads as a shadow of a line rather than a rule.
+   */
+  .hairline-b {
+    position: relative;
+  }
+  .hairline-b::after {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    bottom: 0;
+    height: 1px;
+    background-image: linear-gradient(
+      to right,
+      transparent,
+      var(--border-subtle) 12%,
+      var(--border-subtle) 88%,
+      transparent
+    );
+    pointer-events: none;
+  }
 
-  .font-display { font-family: var(--font-display); }
+  /*
+   * The brand wash.
+   *
+   * A very low-chroma indigo bloom, for the top of an auth screen or the
+   * ground behind a feature panel. Two radial stops rather than a linear
+   * gradient: a linear ramp always has a visible diagonal seam at large sizes,
+   * and a bloom does not.
+   */
+  .wash-brand {
+    background-image:
+      radial-gradient(ellipse 80% 60% at 15% 0%, var(--accent-soft) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 50% at 95% 10%, var(--sand-soft) 0%, transparent 55%);
+  }
 
-  /* Editorial eyebrow used across section headers in all three apps. */
+  /*
+   * Fine noise, at 2.5% opacity.
+   *
+   * Large flat fills band on 8-bit panels — a hero gradient shows five visible
+   * steps on most laptop screens. A trace of noise dithers the ramp and the
+   * banding disappears. Inlined as an SVG turbulence so it costs no request,
+   * and pinned to `background-attachment: fixed` so it does not swim when the
+   * element scrolls.
+   */
+  .grain::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.025;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* ---------------------------------------------------------------- type */
+
+  .font-display {
+    font-family: var(--font-display);
+  }
+  .font-sans {
+    font-family: var(--font-sans);
+  }
+
+  /*
+   * Console opt-out.
+   *
+   * Set once on a console shell, it puts every heading inside back on the UI
+   * face. A whole console does not want the fashion voice, and the alternative
+   * is `font-sans` repeated on a hundred headings and forgotten on the
+   * hundred-and-first.
+   */
+  .console-type :is(h1, h2, h3, h4, h5, h6) {
+    font-family: var(--font-sans);
+    font-weight: 600;
+    letter-spacing: -0.012em;
+  }
+
+  /*
+   * Numeric data — prices, KPIs, table figures, countdowns — must never jitter
+   * as it updates. Tabular figures are the difference between a live total that
+   * settles and one that twitches.
+   */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
+  }
+
+  /*
+   * Identifiers a human compares character by character: order numbers, AWBs,
+   * GSTINs, SKUs, invoice numbers. Proportional digits and a narrow `1` make
+   * that harder than it needs to be, and these are usually being read against
+   * something printed or spoken down a phone line.
+   */
+  .ident {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.005em;
+  }
+
+  /* Editorial eyebrow, used above section headings across all three apps. */
   .eyebrow {
     font-size: var(--text-2xs);
     font-weight: 600;
-    letter-spacing: 0.14em;
+    letter-spacing: 0.15em;
     text-transform: uppercase;
     color: var(--text-tertiary);
+    font-feature-settings: 'cpsp';
   }
 
-  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-  .no-scrollbar::-webkit-scrollbar { display: none; }
+  /*
+   * The display face at its loudest: hero headlines and section titles.
+   *
+   * The tracking is the point. Plus Jakarta at 700 with default tracking reads
+   * like a friendly system font at a large size; pulled in to -0.035em with the
+   * line height dropped below 1, it reads like a brand.
+   *
+   * Deliberately sets NO COLOUR. `color: inherit` here would be the obvious fix
+   * for headings on inverse surfaces, and it is a trap: this block is emitted
+   * after Tailwind's own utilities in the same layer, so it would beat
+   * `text-ink` on source order and every section title in the app would lose
+   * its colour. Same failure mode as `.rail` versus `sm:grid` below.
+   *
+   * The base layer paints every h1-h6 with `--text-primary`. On an INVERSE
+   * surface — a hero over a photograph, the auth panel, a dark feature block —
+   * that is near-black on near-black, so those headings must carry an explicit
+   * colour class of their own.
+   */
+  .headline {
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: -0.035em;
+    line-height: 0.97;
+    text-wrap: balance;
+  }
 
-  .clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
-  .clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  /* One notch quieter: a section title rather than a statement. */
+  .title {
+    font-family: var(--font-display);
+    font-weight: 700;
+    letter-spacing: -0.026em;
+    line-height: 1.1;
+    text-wrap: balance;
+  }
 
-  /* Page gutter: one rule so storefront and consoles align to the same grid. */
-  .gutter { padding-inline: 1rem; }
-  @media (min-width: 40rem) { .gutter { padding-inline: 1.5rem; } }
-  @media (min-width: 80rem) { .gutter { padding-inline: 2.5rem; } }
+  .clamp-1 {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
 
-  .shell-max { max-width: 96rem; margin-inline: auto; }
+  /* Long, unbreakable strings — an email, a tracking URL — in a narrow column. */
+  .break-anywhere {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  /* -------------------------------------------------------------- layout */
+
+  /*
+   * The page gutter — and, on a scroll container, the SNAPPORT inset too.
+   *
+   * `scroll-padding-inline` is the half of this that is always forgotten, and
+   * it is inert on anything that does not scroll, so it costs nothing to set
+   * here. Without it a snapping rail aligns each slide to its PADDING box
+   * rather than its content box: the carousel has a 32px gutter, the slide
+   * snaps to x=0, and the hero sits flush against the viewport edge while every
+   * other section on the page starts 32px in. That mismatch is exactly what
+   * makes a carousel look bolted on rather than laid out.
+   */
+  .gutter {
+    padding-inline: 1rem;
+    scroll-padding-inline: 1rem;
+  }
+  @media (min-width: 40rem) {
+    .gutter {
+      padding-inline: 1.5rem;
+      scroll-padding-inline: 1.5rem;
+    }
+  }
+  @media (min-width: 64rem) {
+    .gutter {
+      padding-inline: 2.5rem;
+      scroll-padding-inline: 2.5rem;
+    }
+  }
+  @media (min-width: 90rem) {
+    .gutter {
+      padding-inline: 3.5rem;
+      scroll-padding-inline: 3.5rem;
+    }
+  }
+
+  .shell-max {
+    max-width: 92rem;
+    margin-inline: auto;
+  }
+  .shell-narrow {
+    max-width: 50rem;
+    margin-inline: auto;
+  }
+  .shell-prose {
+    max-width: 42rem;
+    margin-inline: auto;
+  }
+
+  /*
+   * Break out of the gutter to the full viewport width, from inside a container
+   * that has one. For a rail that should bleed off both edges on a phone while
+   * its heading stays aligned to the grid.
+   */
+  .bleed {
+    margin-inline: calc(50% - 50vw);
+    padding-inline: calc(50vw - 50%);
+  }
+
+  /*
+   * Stretched link.
+   *
+   * A table row is 44px tall and the anchor inside it is 19px, so the thing a
+   * finger has to hit is a quarter of the row it looks like. The row cannot
+   * simply become the anchor — the cell also holds a second line of meta that
+   * is not part of the link's name, and wrapping both would announce
+   * "VS26270001401 3 items 2 sellers" as the link text.
+   *
+   * So the anchor keeps its text and its accessible name, and grows an
+   * invisible overlay that covers the nearest positioned ancestor. One link,
+   * one name, a 44px target.
+   *
+   * Only ONE anchor per row may carry this, or the row gets two overlapping
+   * full-size targets and the top one wins silently.
+   */
+  .row-link::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /*
+   * A horizontal scroller that snaps, bleeds to both edges, and keeps its first
+   * and last item aligned to the page gutter.
+   *
+   * DO NOT COMBINE THIS WITH A RESPONSIVE DISPLAY UTILITY. It sets `display`
+   * from this layer, which is emitted after Tailwind's own utilities in the
+   * same layer — so `sm:grid` on the same element loses on SOURCE ORDER, not on
+   * specificity, and silently does nothing. A row that is a rail on a phone and
+   * a grid on a desktop must spell both out in Tailwind classes.
+   */
+  .rail {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    overscroll-behavior-x: contain;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .rail::-webkit-scrollbar {
+    display: none;
+  }
+  .rail > * {
+    scroll-snap-align: start;
+    flex: none;
+  }
+
+  /* The same scroller without mandatory snapping, for free-scrolling chip rows. */
+  .rail-loose {
+    scroll-snap-type: x proximity;
+  }
+
+  /* -------------------------------------------------------------- effects */
+
+  /*
+   * The scrim under copy set over a photograph.
+   *
+   * Bottom-weighted and EASED rather than a flat wash: a linear gradient has a
+   * visible edge where it meets the image, and a flat 40% black greys out the
+   * whole picture in order to protect two lines of text. These stops
+   * approximate an ease-out ramp, which is what makes the transition invisible.
+   */
+  .scrim {
+    background-image: linear-gradient(
+      to top,
+      rgb(6 7 12 / 0.86) 0%,
+      rgb(6 7 12 / 0.72) 14%,
+      rgb(6 7 12 / 0.46) 32%,
+      rgb(6 7 12 / 0.2) 52%,
+      rgb(6 7 12 / 0.06) 72%,
+      transparent 100%
+    );
+  }
+  .scrim-soft {
+    background-image: linear-gradient(
+      to top,
+      rgb(6 7 12 / 0.62) 0%,
+      rgb(6 7 12 / 0.32) 30%,
+      rgb(6 7 12 / 0.09) 60%,
+      transparent 100%
+    );
+  }
+  /* For a full-bleed hero where the copy sits inline-start rather than bottom. */
+  .scrim-start {
+    background-image: linear-gradient(
+      to right,
+      rgb(6 7 12 / 0.8) 0%,
+      rgb(6 7 12 / 0.58) 26%,
+      rgb(6 7 12 / 0.26) 50%,
+      rgb(6 7 12 / 0.04) 74%,
+      transparent 100%
+    );
+  }
+
+  /*
+   * Fade the edges of a scroller so items dissolve rather than being guillotined.
+   *
+   * `mask-image` composites on the GPU and costs nothing; the usual alternative
+   * is an absolutely positioned gradient overlay, which sits on top of the
+   * content and eats the pointer events of whatever is underneath it.
+   */
+  .fade-edges-x {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 2.5rem,
+      #000 calc(100% - 2.5rem),
+      transparent
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 2.5rem,
+      #000 calc(100% - 2.5rem),
+      transparent
+    );
+  }
+  .fade-edge-end {
+    -webkit-mask-image: linear-gradient(to right, #000 78%, transparent);
+    mask-image: linear-gradient(to right, #000 78%, transparent);
+  }
+
+  /*
+   * Hover lift, done without repainting a shadow.
+   *
+   * `box-shadow` is not a compositable property — animating it re-rasterises
+   * the element on every frame, and on a grid of twenty-four product cards that
+   * is a dropped-frame machine. Instead the resting card owns a pseudo-element
+   * carrying the LARGER shadow at zero opacity, and the hover cross-fades that
+   * pseudo-element's opacity, which the compositor handles for free.
+   */
+  .lift {
+    position: relative;
+    transition: transform var(--duration-base) var(--ease-out);
+  }
+  .lift::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: var(--shadow-lg);
+    opacity: 0;
+    transition: opacity var(--duration-base) var(--ease-out);
+    pointer-events: none;
+  }
+  .lift:hover::after,
+  .lift:focus-within::after {
+    opacity: 1;
+  }
+  @media (hover: hover) {
+    .lift:hover {
+      transform: translate3d(0, -3px, 0);
+    }
+  }
+
+  /*
+   * A gradient hairline that traces the top edge of a raised surface.
+   *
+   * This is the trick that makes a dark card look lit rather than flat: real
+   * objects catch light on their upper edge. One pseudo-element, no cost.
+   */
+  .edge-lit {
+    position: relative;
+  }
+  .edge-lit::before {
+    content: '';
+    position: absolute;
+    inset-inline: 12%;
+    top: 0;
+    height: 1px;
+    background-image: linear-gradient(
+      to right,
+      transparent,
+      rgb(255 255 255 / 0.14),
+      transparent
+    );
+    pointer-events: none;
+  }
+
+  /*
+   * Animated disclosure for every `<details>` in the app.
+   *
+   * The filter rail, the PDP's spec sections and the help accordions are all
+   * native `<details>`, which is the right element: it collapses with no
+   * JavaScript, it is keyboard-operable for free, and its content is findable
+   * by in-page search even while closed. The one thing it has never done is
+   * animate — a `<details>` snaps open, because `height: auto` was not an
+   * interpolable value and `content-visibility` could not be transitioned.
+   *
+   * Both of those are now solvable, and this is the whole fix:
+   *
+   *   `interpolate-size: allow-keywords`  makes `auto` a value that can be
+   *                                       animated to, so the height ramp is
+   *                                       real rather than a measured
+   *                                       JavaScript approximation.
+   *   `::details-content`                 is the wrapper the UA already creates
+   *                                       around everything after the summary,
+   *                                       so no extra element is needed.
+   *   `transition-behavior: allow-discrete` lets `content-visibility` flip at
+   *                                       the correct end of the transition
+   *                                       instead of hiding the content
+   *                                       instantly on close.
+   *
+   * Wrapped in `@supports` because it is decoration: where the feature is
+   * missing the disclosure simply snaps, which is exactly what it did before.
+   * Nothing depends on the animation running.
+   *
+   * `interpolate-size` is set on `:root` rather than on the element because it
+   * is an inherited property and the transition has to see it on the animating
+   * box's own computed style.
+   */
+  @supports (interpolate-size: allow-keywords) and (selector(::details-content)) {
+    :root {
+      interpolate-size: allow-keywords;
+    }
+
+    details::details-content {
+      block-size: 0;
+      /*
+       * `clip`, not `hidden`. `overflow: hidden` creates a scroll container, so
+       * a focus ring on a control near the edge of an open group would be
+       * clipped and the browser would scroll the box to reveal it.
+       */
+      overflow-y: clip;
+      transition:
+        block-size var(--duration-base) var(--ease-out),
+        content-visibility var(--duration-base) allow-discrete;
+    }
+
+    details[open]::details-content {
+      block-size: auto;
+    }
+  }
+
+  /*
+   * A mega-menu column.
+   *
+   * Lives here rather than in the component because the delay has to be
+   * ASYMMETRIC — applied on the way in and not on the way out — and neither an
+   * inline style nor a Tailwind variant can express that.
+   *
+   * An inline `transition-delay` applies to both directions, so the columns
+   * would take as long to leave as to arrive, and the menu would smear on the
+   * way out. A Tailwind arbitrary variant would work in principle but the
+   * per-column value is computed at runtime, and a class built from a runtime
+   * value never reaches the compiled stylesheet at all.
+   *
+   * So the component hands in `--col-delay` and the delay is attached only to
+   * the open state.
+   */
+  .mega-col {
+    opacity: 0;
+    transform: translateY(4px);
+    transition:
+      opacity var(--duration-base) var(--ease-out),
+      transform var(--duration-base) var(--ease-out);
+  }
+  .group:hover .mega-col,
+  .group:focus-within .mega-col {
+    opacity: 1;
+    transform: none;
+    /* The panel's own 130ms of hover intent, plus this column's place in line. */
+    transition-delay: calc(130ms + var(--col-delay, 0ms));
+  }
+
+  /*
+   * Scroll-triggered entrance. Driven by `ui/reveal`, which only ever flips
+   * `data-shown` on the element — no React state, no re-render, no style prop
+   * churn on scroll.
+   *
+   * The default is VISIBLE, and the hidden state is gated on `html.js`, which
+   * the theme boot script stamps before the first paint. So an element that
+   * ships at `opacity: 0` can only ever be hidden on a page where the observer
+   * is actually going to run. Without scripting — or if the observer somehow
+   * never fires — the content is simply there, which is the correct failure
+   * mode for a decorative animation.
+   */
+  html.js .reveal[data-shown='false'] {
+    opacity: 0;
+    transform: translate3d(var(--reveal-shift, 0), var(--reveal-travel, 14px), 0)
+      scale(var(--reveal-scale, 1));
+  }
+
+  .reveal {
+    transition:
+      opacity var(--duration-slow) var(--ease-out),
+      transform var(--duration-slow) var(--ease-out);
+    transition-delay: var(--reveal-delay, 0s);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /*
+     * Not merely "do not animate" — do not HIDE. The reduced-motion rule at the
+     * foot of this file zeroes every transition, which without this would leave
+     * a revealed element stuck at `opacity: 0` until the observer fired: a blank
+     * page for exactly the people who asked for less motion.
+     */
+    html.js .reveal[data-shown='false'] {
+      opacity: 1;
+      transform: none;
+    }
+  }
 
   .skeleton {
+    background-color: var(--surface-sunken);
     background-image: linear-gradient(
       90deg,
-      var(--surface-sunken) 0%,
-      color-mix(in oklab, var(--surface-sunken) 55%, var(--border-subtle)) 50%,
-      var(--surface-sunken) 100%
+      transparent 0%,
+      color-mix(in oklab, var(--surface-sunken) 45%, var(--border-subtle)) 50%,
+      transparent 100%
     );
     background-size: 200% 100%;
-    animation: vestra-shimmer 1.4s ease-in-out infinite;
+    animation: mrd-shimmer 1.6s var(--ease-in-out) infinite;
+  }
+
+  /*
+   * Promote to its own layer before an animation starts, and release it after.
+   *
+   * `will-change` left on permanently is a memory leak written in CSS — it pins
+   * a compositor layer for every element that carries it. Scoped to a
+   * hover/open state is the only correct use.
+   */
+  .gpu {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
+
+  /*
+   * Anything that is only ever revealed by a pointer.
+   *
+   * On touch there is no hover, so a control hidden until hover is a control
+   * that does not exist. This makes the "appears on hover" pattern opt-in to
+   * pointer devices and always-visible everywhere else.
+   */
+  @media (hover: none) {
+    .hover-only {
+      opacity: 1 !important;
+      transform: none !important;
+    }
   }
 }
 
-@keyframes vestra-shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+/* ==========================================================================
+   KEYFRAMES
+   ========================================================================== */
+
+@keyframes mrd-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
-@keyframes vestra-fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+@keyframes mrd-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
-@keyframes vestra-rise {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+/* The workhorse entrance: a short rise with a slight settle. */
+@keyframes mrd-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
 }
 
-@keyframes vestra-pop {
-  0% { transform: scale(0.86); opacity: 0; }
-  60% { transform: scale(1.03); }
-  100% { transform: scale(1); opacity: 1; }
+@keyframes mrd-rise-sm {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 5px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* For something that appears in place: a badge count, a toast, a popover. */
+@keyframes mrd-pop {
+  0% {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* A dot or ring that pulses once to draw the eye. Never loops. */
+@keyframes mrd-ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  75%,
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
 }
 
 /*
- * Navigation progress bar. Eases towards 90% and holds: the bar must never
- * complete before the page actually has.
+ * Navigation progress. Eases toward 90% and holds: the bar must never complete
+ * before the page actually has, because a bar that finishes early teaches
+ * people that it is lying to them.
  */
-@keyframes route-progress {
-  0%   { transform: translateX(-100%); }
-  40%  { transform: translateX(-40%); }
-  75%  { transform: translateX(-18%); }
-  100% { transform: translateX(-8%); }
+@keyframes mrd-progress {
+  0% {
+    transform: translateX(-100%);
+  }
+  35% {
+    transform: translateX(-52%);
+  }
+  70% {
+    transform: translateX(-22%);
+  }
+  100% {
+    transform: translateX(-9%);
+  }
 }
 
-/* Drawer entry. Used by the mobile navigation and the filter rail. */
-@keyframes slide-in {
-  from { transform: translateX(-100%); }
-  to { transform: translateX(0); }
+/* A sheen that travels once across a surface. For a skeleton hand-off. */
+@keyframes mrd-sheen {
+  from {
+    transform: translateX(-120%) skewX(-14deg);
+  }
+  to {
+    transform: translateX(240%) skewX(-14deg);
+  }
 }
 
-@keyframes vestra-cart-fly {
-  0% { transform: scale(1) translate(0, 0); opacity: 1; }
-  100% { transform: scale(0.2) translate(var(--fly-x, 0), var(--fly-y, -160px)); opacity: 0; }
+/* Drawer and sheet entrances. Exits are owned by the component's exit variant. */
+@keyframes mrd-slide-from-left {
+  from {
+    transform: translate3d(-100%, 0, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes mrd-slide-from-right {
+  from {
+    transform: translate3d(100%, 0, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes mrd-slide-from-bottom {
+  from {
+    transform: translate3d(0, 100%, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes mrd-slide-from-top {
+  from {
+    transform: translate3d(0, -100%, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/*
+ * EXITS.
+ * ---------------------------------------------------------------------------
+ * Radix's `Presence` keeps a closing element mounted until its CSS animation
+ * fires `animationend`, so an exit is expressible entirely in CSS — no
+ * `forceMount`, no `AnimatePresence`, and no lifting every drawer's open state
+ * into its caller.
+ *
+ * Without these, every overlay in the app simply CEASED TO EXIST on close: the
+ * open animation played and the close was a single frame. That reads as a bug
+ * even when nobody can say what went wrong, because things that slide in are
+ * expected to slide out.
+ *
+ * Every exit is shorter than its entrance and eased with `--ease-in` rather
+ * than `--ease-out`. Something arriving should decelerate into place; something
+ * leaving should get out of the way, and quickly — a slow dismissal is the most
+ * irritating animation there is, because it stands between a person and what
+ * they asked for.
+ */
+
+@keyframes mrd-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes mrd-pop-out {
+  to {
+    transform: scale(0.97);
+    opacity: 0;
+  }
+}
+
+@keyframes mrd-slide-to-left {
+  to {
+    transform: translate3d(-100%, 0, 0);
+  }
+}
+
+@keyframes mrd-slide-to-right {
+  to {
+    transform: translate3d(100%, 0, 0);
+  }
+}
+
+@keyframes mrd-slide-to-bottom {
+  to {
+    transform: translate3d(0, 100%, 0);
+  }
+}
+
+@keyframes mrd-slide-to-top {
+  to {
+    transform: translate3d(0, -100%, 0);
+  }
+}
+
+/* A marquee that runs on transform only, so it never triggers layout. */
+@keyframes mrd-marquee {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+/*
+ * The autoplay countdown ring on a carousel's play/pause control.
+ *
+ * The length is handed in as `--countdown-length` — the circle's circumference,
+ * which only the component knows — so one keyframe serves any radius. The
+ * property is unregistered, so it resolves at computed-value time and
+ * `stroke-dashoffset` interpolates between two plain numbers, which is exactly
+ * what is wanted here.
+ */
+@keyframes mrd-countdown {
+  from {
+    stroke-dashoffset: var(--countdown-length, 100);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/*
+ * A bar draining to nothing over its own duration.
+ *
+ * For a countdown whose remaining time is known but whose tick must not be
+ * computed in React. The caller sets `animation-duration` to the seconds left
+ * and re-keys the element when the server corrects that figure, so the motion is
+ * continuous while the TRUTH still comes from the server.
+ *
+ * `scaleX` rather than width: width relayouts its parent on every frame, and
+ * this sits inside a card that is already animating in.
+ */
+@keyframes mrd-drain {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+/* A slow, continuous drift for a decorative gradient blob. */
+@keyframes mrd-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(3%, -4%, 0) scale(1.06);
+  }
 }
 
 @layer utilities {
-  .animate-fade-in { animation: vestra-fade-in 0.22s var(--ease-out-quint) both; }
-  .animate-rise { animation: vestra-rise 0.26s var(--ease-out-quint) both; }
-  .animate-pop { animation: vestra-pop 0.24s var(--ease-out-quint) both; }
+  .animate-fade-in {
+    animation: mrd-fade-in var(--duration-base) var(--ease-out) both;
+  }
+  .animate-rise {
+    animation: mrd-rise var(--duration-slow) var(--ease-out) both;
+  }
+  .animate-rise-sm {
+    animation: mrd-rise-sm var(--duration-base) var(--ease-out) both;
+  }
+  .animate-pop {
+    animation: mrd-pop var(--duration-base) var(--ease-spring) both;
+  }
+  .animate-ping-once {
+    animation: mrd-ping 900ms var(--ease-out) 1 both;
+  }
+  .animate-sheen {
+    animation: mrd-sheen 1.2s var(--ease-in-out) infinite;
+  }
+  .animate-drift {
+    animation: mrd-drift 18s var(--ease-in-out) infinite;
+  }
+
+  /*
+   * List and grid entrances.
+   *
+   * The delay is driven by an index handed in as `--i`, so a parent staggers
+   * its children without a JavaScript timer and without a hydrated component
+   * per item. Capped at eight: past that the last card waits a third of a
+   * second for no reason, and the effect stops reading as sequence and starts
+   * reading as lag.
+   *
+   * DELIBERATELY NOT USED IN THE CONSOLES. A staggered fulfilment queue puts a
+   * third of a second between a person and their work, on every navigation, all
+   * day.
+   */
+  .stagger > * {
+    animation: mrd-rise var(--duration-slow) var(--ease-out) both;
+    animation-delay: calc(min(var(--i, 0), 8) * var(--stagger-step));
+  }
 }
 
-/* Honour the OS reduced-motion setting everywhere, including Radix animations. */
+/* ==========================================================================
+   PREFERENCES
+   ========================================================================== */
+
+/*
+ * Honour the OS reduced-motion setting everywhere, including Radix animations,
+ * framer-motion's CSS fallbacks and cross-document view transitions.
+ *
+ * Non-essential motion is DISABLED, not merely shortened — a 1ms animation is
+ * still a repaint, and `view-transition` in particular will still cross-fade an
+ * entire page unless its pseudo-elements are told not to.
+ *
+ * Note what is NOT disabled: `scroll-behavior` is set to auto rather than
+ * removed, so a "back to top" control still works. It simply jumps.
+ */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -203,24 +1121,40 @@
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
-}
 
-@media print {
-  .no-print { display: none !important; }
-  body { background: #fff; color: #000; }
-  .print-page { break-after: page; }
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
 }
 
 /*
- * Filter drawer entry. Declared here rather than inline so it respects the
- * reduced-motion guard the rest of the system uses -- the drawer still opens,
- * it just does not travel.
+ * Forced-colours mode replaces the entire palette with the user's own. Anything
+ * carrying meaning through colour alone has to grow a border there, or it
+ * vanishes.
  */
-@keyframes slide-in-right {
-  from {
-    transform: translateX(100%);
+@media (forced-colors: active) {
+  .glass,
+  .surface,
+  .skeleton {
+    background: Canvas;
   }
-  to {
-    transform: translateX(0);
+  .lift::after,
+  .edge-lit::before {
+    display: none;
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+    color: #000;
+  }
+  .print-page {
+    break-after: page;
   }
 }

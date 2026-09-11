@@ -22,20 +22,47 @@ let width = 1440;
 // Full-page shots of a long listing come out 10,000px tall and are useless for
 // review once scaled to fit. `--fold` captures just the viewport instead.
 let fold = false;
+/*
+ * How long to let the page settle before capturing.
+ *
+ * The default suits a warm cache. It is a FLAG rather than a fixed larger
+ * number because the demo dataset points at third-party photography: on a cold
+ * optimiser cache each derivative is fetched and re-encoded on demand, and a
+ * shot taken too early shows broken-image icons that read as a bug in the page
+ * rather than as a cold cache.
+ */
+let settleMs = 2600;
+/*
+ * Which theme to paint.
+ *
+ * `system` is resolved by the inline script in <head> against
+ * `prefers-color-scheme`, so setting Chromium's emulated colour scheme is
+ * enough to pick a theme — no cookie, no localStorage seeding.
+ *
+ * This flag exists because a redesign cannot be reviewed one theme at a time.
+ * Reviewing only the light palette is exactly the mistake that shipped an
+ * unmeasured dark mode in Phase 22.
+ */
+let theme = 'light';
 const routes = [];
 
 while (argv.length) {
   const arg = argv.shift();
   if (arg === '--as') as = argv.shift();
   else if (arg === '--width') width = Number.parseInt(argv.shift(), 10);
+  else if (arg === '--theme') theme = argv.shift();
   else if (arg === '--fold') fold = true;
+  else if (arg === '--settle') settleMs = Number.parseInt(argv.shift(), 10);
   else routes.push(arg);
 }
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:3000';
 
 const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width, height: fold ? 844 : 1200 } });
+const page = await browser.newPage({
+  viewport: { width, height: fold ? 844 : 1200 },
+  colorScheme: theme,
+});
 
 const problems = [];
 page.on('console', (message) => {
@@ -57,10 +84,11 @@ for (const route of routes) {
   const before = problems.length;
   try {
     await page.goto(BASE + route, { waitUntil: 'load', timeout: 45000 });
-    await page.waitForTimeout(2600);
+    await page.waitForTimeout(settleMs);
 
     const name =
       (fold ? 'fold_' : '') +
+      (theme === 'light' ? '' : `${theme}_`) +
       (width === 1440 ? '' : `${width}_`) +
       (route.replace(/[/?=&]/g, '_').replace(/^_/, '') || 'home');
     await page.screenshot({ path: `${outDir}/${name}.png`, fullPage: !fold });

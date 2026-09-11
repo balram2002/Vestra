@@ -19,7 +19,7 @@ export type Theme = (typeof THEMES)[number];
 /** What actually gets painted. `system` resolves to one of these. */
 export type ResolvedTheme = 'light' | 'dark';
 
-export const THEME_STORAGE_KEY = 'vestra-theme';
+export const THEME_STORAGE_KEY = 'meridian-theme';
 
 export function isTheme(value: unknown): value is Theme {
   return typeof value === 'string' && (THEMES as readonly string[]).includes(value);
@@ -36,6 +36,13 @@ export function isTheme(value: unknown): value is Theme {
  * Written as a string because it has to be in the document before React
  * exists. Kept small and total: any failure falls back to light rather than
  * throwing inside `<head>`, where an exception would stop the parser.
+ *
+ * It also stamps `js` on `<html>`, which is the hook that lets CSS know
+ * scripting is available. `ui/reveal` uses it: an element that starts at
+ * `opacity: 0` in the markup is invisible to anyone without JavaScript, and
+ * invisible FOREVER if the observer never runs. Gating the hidden state on
+ * `html.js` means the failure mode is "the content is simply there", which is
+ * the correct one.
  */
 export const themeInitScript = `
 (function () {
@@ -48,8 +55,10 @@ export const themeInitScript = `
     var root = document.documentElement;
     root.setAttribute('data-theme', resolved);
     root.style.colorScheme = resolved;
+    root.classList.add('js');
   } catch (error) {
     document.documentElement.setAttribute('data-theme', 'light');
+    document.documentElement.classList.add('js');
   }
 })();
 `.trim();
