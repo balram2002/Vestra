@@ -1,12 +1,12 @@
 'use client';
 
-import { motion, useReducedMotion } from 'framer-motion';
-import { ArrowRight } from 'lucide-react';
+import { animate, motion, useMotionValue, useReducedMotion, useTransform } from 'framer-motion';
+import type { AnimationPlaybackControls, MotionValue, PanInfo } from 'framer-motion';
+import { ArrowRight, ChevronLeft, ChevronRight, Pause, Play } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { Carousel, CarouselItem, useSlideParallax } from '@/components/ui/carousel';
 import type { Banner } from '@/domain/types';
 import { cn } from '@/lib/cn';
 import { spring, tween } from '@/lib/motion';
@@ -15,103 +15,383 @@ import { spring, tween } from '@/lib/motion';
  * Home hero.
  *
  * The first thing anyone sees, and the single surface most responsible for
- * whether a shop reads as expensive or cheap. Everything here follows from five
- * decisions:
+ * whether a shop reads as expensive or cheap.
  *
- * **1. One slide at a time, with a peek.** Not a mosaic of three equal panels.
- * A mosaic reads well on a desktop and becomes two and a half screens of
- * scrolling on a phone before the first product. One cinematic panel with the
- * next one's edge showing says "there is more, swipe" in the language people
- * already use for a hero — and it gives the headline room to be a headline.
+ * ---------------------------------------------------------------------------
+ * WHY THIS DOES NOT USE `ui/carousel`
+ * ---------------------------------------------------------------------------
+ * That component is a real scroll container with a spring writing `scrollLeft`,
+ * which is the right trade for a product rail: a rail is a LIST, people flick
+ * through it, and the platform's own momentum beats anything written by hand.
  *
- * **2. The aspect ratio changes, the layout does not.** Portrait on a phone
- * (4:5 fills a tall screen), landscape on a desktop (21:9 is a poster). The
- * same markup, the same overlay, the same code path — the alternative is two
- * hero implementations and one of them is always the neglected one.
+ * A hero is not a list. It advances on a timer, it wraps around, and the
+ * movement is the point -- it is a title sequence, not a scrollbar. Driving
+ * that through a scroll container fights the browser on three fronts at once:
+ * snapping has to be suspended mid-animation, a wrap from the last slide to the
+ * first is a jump the length of the whole track, and an interrupted autoplay
+ * leaves the scroller somewhere between two snap points.
  *
- * **3. Copy sits on a scrim, never on raw photography.** `.scrim` is an eased
- * bottom-weighted gradient rather than a flat wash: it guarantees contrast
- * where the words are without greying out the picture that is doing the
- * selling. The type is white in both themes because it sits on a photograph in
- * both themes — this is the one place a token would be wrong.
+ * So the hero owns its transport: ONE transform, driven by ONE spring.
  *
- * **4. The panel has depth, and the copy is directed.** The slide recedes as it
- * leaves the centre, the photograph lags its own frame by 44px, and the copy
- * stack rises line by line on a spring every time the slide becomes current. A
- * hero where only the picture changes is a slideshow; this is a title sequence.
- * See `CarouselItem`'s `depth`, `useSlideParallax`, and `COPY_LINE` below.
+ * ---------------------------------------------------------------------------
+ * HOW THE WRAP WORKS, AND WHY NOTHING EVER TELEPORTS ON SCREEN
+ * ---------------------------------------------------------------------------
+ * `page` is an unbounded integer, not an index -- it counts steps taken, and it
+ * may go negative. The slide shown at a page is `page mod count`, so the track
+ * can travel forever in either direction and "last to first" is one step
+ * forward like any other.
  *
- * **5. Autoplay, but on our terms.** It advances slowly, pauses on hover,
- * focus, touch and a hidden tab, never runs under `prefers-reduced-motion`, and
- * ships a visible pause control with a countdown ring. All of that is
- * `ui/carousel`'s doing; the hero just opts in.
+ * Each slide is then placed at the page NEAREST the one currently at rest, by
+ * shortest circular distance. The furthest slide from the viewer is therefore
+ * the one whose placement changes when a move completes -- and it is off screen
+ * by definition, so the reshuffle is invisible. Placements are computed from
+ * the SETTLED page rather than the target, so nothing moves under a spring
+ * that is still running.
  *
- * A Client Component, and only because of decision 4: the panel has to know
- * which slide is currently settled in order to re-run its entrance. The images
- * and copy are still handed in as plain props from a Server Component page.
+ * A JUMP TO ANY SLIDE takes the shorter way round for the same reason: the
+ * destination has to be a placed slide, or the track would travel into empty
+ * space and land on nothing. With five slides, jumping from the first to the
+ * last arrives from the left, in one step, which is also what it means.
+ *
+ * With fewer than three slides there is no "far side" to hide a reshuffle in,
+ * so the wrap is switched off and the track simply clamps.
+ *
+ * ---------------------------------------------------------------------------
+ * EVERY WAY IN, ONE WAY THROUGH
+ * ---------------------------------------------------------------------------
+ * Autoplay, the arrows, the dots, the keyboard and the release of a drag all
+ * call `travel`, so there is a single definition of how this thing moves and a
+ * single running animation to interrupt. A drag that ends where it started
+ * springs back through the same call.
+ *
+ * Autoplay runs every three seconds and stops for anything that suggests
+ * someone is looking: hover, focus inside, a finger down, a hidden tab, the
+ * hero scrolled out of view, or `prefers-reduced-motion`. It ships a real pause
+ * control, because autoplay without one is a dark pattern.
  */
+
+const AUTOPLAY_MS = 3000;
+
+/** How far a drag must go, as a fraction of a slide, to count as a move. */
+const DRAG_THRESHOLD = 0.22;
+
+/** Seconds of a fling projected forward, so a flick beats the threshold. */
+const FLING_PROJECTION = 0.12;
+
 export function HeroCarousel({ banners }: { banners: Banner[] }) {
   const shown = banners.slice(0, 5);
-  const [active, setActive] = useState(0);
+  const count = shown.length;
 
-  if (shown.length === 0) return null;
+  if (count === 0) return null;
+  return <Hero shown={shown} count={count} />;
+}
+
+function Hero({ shown, count }: { shown: Banner[]; count: number }) {
+  const reduced = useReducedMotion() ?? false;
+  const wrap = count >= 3;
+
+  const viewport = useRef<HTMLDivElement>(null);
+  const track = useRef<HTMLDivElement>(null);
+  const running = useRef<AnimationPlaybackControls | null>(null);
+
+  const x = useMotionValue(0);
+  const [step, setStep] = useState(0);
+  const stepRef = useRef(0);
+
+  const [page, setPage] = useState(0);
+  const pageRef = useRef(0);
+  /** The page the placements are measured from. Only a finished move moves it. */
+  const [settled, setSettled] = useState(0);
+
+  const [playing, setPlaying] = useState(true);
+  const [hovering, setHovering] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [awake, setAwake] = useState(true);
+
+  const current = ((page % count) + count) % count;
+
+  /* ------------------------------------------------------------ measuring */
+
+  /*
+   * One slide's width IS the step.
+   *
+   * Each slide carries its own trailing gap, so the measured width already
+   * includes it and there is no breakpoint arithmetic duplicated in JavaScript
+   * -- the CSS stays the single source of how wide a slide is.
+   *
+   * Only the TRACK needs this number. Slides place themselves in percentages
+   * of their own width, so they are already in the right places on the very
+   * first paint, before any measuring has happened.
+   */
+  useEffect(() => {
+    const slide = track.current?.querySelector<HTMLElement>('[data-slide]');
+    if (!slide) return;
+
+    const measure = () => {
+      const width = slide.offsetWidth;
+      stepRef.current = width;
+      setStep(width);
+      // Keep the current slide in place across a resize or an orientation
+      // change; recomputing the target is cheaper than re-running the spring.
+      x.set(-pageRef.current * width);
+    };
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(slide);
+    return () => observer.disconnect();
+  }, [x]);
+
+  /* -------------------------------------------------------------- moving */
+
+  const travel = useCallback(
+    (to: number) => {
+      const width = stepRef.current;
+      const target = -to * width;
+
+      pageRef.current = to;
+      setPage(to);
+
+      running.current?.stop();
+
+      if (reduced || width === 0) {
+        x.set(target);
+        setSettled(to);
+        return;
+      }
+
+      running.current = animate(x, target, {
+        ...spring.glide,
+        onComplete: () => setSettled(to),
+      });
+    },
+    [reduced, x],
+  );
+
+  const step1 = useCallback(
+    (direction: 1 | -1) => {
+      const next = pageRef.current + direction;
+      if (wrap) {
+        travel(next);
+        return;
+      }
+      // Clamped: at an end, going further is a no-op rather than a dead spring.
+      travel(Math.min(count - 1, Math.max(0, next)));
+    },
+    [count, travel, wrap],
+  );
+
+  /** Where a slide sits, in pages, relative to the settled page. */
+  const placementOf = useCallback(
+    (index: number) => {
+      if (!wrap) return index;
+      const base = ((settled % count) + count) % count;
+      const ahead = (index - base + count) % count;
+      const half = Math.floor(count / 2);
+      return settled + (ahead > half ? ahead - count : ahead);
+    },
+    [count, settled, wrap],
+  );
+
+  const goTo = useCallback((index: number) => travel(placementOf(index)), [placementOf, travel]);
+
+  /* ------------------------------------------------------------ autoplay */
+
+  const paused = hovering || dragging || focused || !awake || !playing || reduced || count < 2;
+
+  /*
+   * `page` is in the dependencies, and that is the whole reset.
+   *
+   * Without it the timer keeps its own rhythm: someone picks a slide from the
+   * dots, and a tick left over from before whips it away half a second later.
+   * Re-running on every move gives each slide its full three seconds however
+   * it was arrived at.
+   */
+  useEffect(() => {
+    if (paused || step === 0) return;
+    const timer = window.setInterval(() => step1(1), AUTOPLAY_MS);
+    return () => window.clearInterval(timer);
+  }, [paused, step, step1, page]);
+
+  // A hidden tab must not burn through the slides in the background, and an
+  // off-screen hero has nobody watching it.
+  useEffect(() => {
+    const onVisibility = () => setAwake(!document.hidden);
+    document.addEventListener('visibilitychange', onVisibility);
+
+    const node = viewport.current;
+    const observer = node
+      ? new IntersectionObserver(([entry]) => setAwake(entry.isIntersecting && !document.hidden), {
+          threshold: 0.35,
+        })
+      : null;
+    if (node && observer) observer.observe(node);
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      observer?.disconnect();
+    };
+  }, []);
+
+  /* --------------------------------------------------------------- input */
+
+  const onDragEnd = (_event: unknown, info: PanInfo) => {
+    setDragging(false);
+    const width = stepRef.current || 1;
+    const projected = info.offset.x + info.velocity.x * FLING_PROJECTION;
+
+    if (projected < -width * DRAG_THRESHOLD) step1(1);
+    else if (projected > width * DRAG_THRESHOLD) step1(-1);
+    // Not far enough: the same call springs it back where it came from.
+    else travel(pageRef.current);
+  };
 
   return (
-    <section className="pt-3 sm:pt-4" aria-label="Featured">
-      <Carousel
-        label="Featured collections"
-        dots
-        counter
-        autoPlay={shown.length > 1}
-        interval={6500}
-        onActiveChange={setActive}
+    <section
+      className="gutter shell-max pt-3 sm:pt-4"
+      aria-roledescription="carousel"
+      aria-label="Featured collections"
+      onKeyDown={(event) => {
+        if (event.key === 'ArrowRight') {
+          event.preventDefault();
+          step1(1);
+        }
+        if (event.key === 'ArrowLeft') {
+          event.preventDefault();
+          step1(-1);
+        }
+      }}
+    >
+      <div
+        ref={viewport}
+        className="relative overflow-hidden"
         /*
-         * The gutter lives on the SCROLLER, not on the section, so the first
-         * slide lines up with the page grid and the last can still scroll clear
-         * of the right edge. Putting it on the section instead clips the peek.
+         * Hover is a MOUSE idea. On a touch screen `pointerenter` fires on a
+         * tap and there is no matching leave, so treating it as hover would
+         * stop autoplay for good the first time anyone touched the hero.
          */
-        contentClassName="gutter shell-max gap-3 sm:gap-4"
+        onPointerEnter={(event) => {
+          if (event.pointerType === 'mouse') setHovering(true);
+        }}
+        onPointerLeave={(event) => {
+          if (event.pointerType === 'mouse') setHovering(false);
+        }}
+        onFocusCapture={() => setFocused(true)}
+        onBlurCapture={() => setFocused(false)}
       >
-        {shown.map((banner, index) => (
-          <CarouselItem
-            key={banner.id}
-            index={index + 1}
-            total={shown.length}
-            /*
-             * The peek shrinks as the screen grows, and that is the opposite of
-             * the obvious rule.
-             *
-             * A peek says "swipe me", which is a phone instruction — so on a
-             * phone it is generous (12%). On a desktop the arrows and the
-             * counter already say there is more, and a 21:9 panel showing 8% of
-             * the next one shows 115px of a 60px headline: an unreadable slab of
-             * type competing with the slide that is actually being read. At 4%
-             * the next panel reads as an edge rather than as content.
-             */
-            className="w-[88%] sm:w-[84%] lg:w-[96%]"
-            /*
-             * Depth, on.
-             *
-             * A hero shows one slide at a time with a sliver of the next, so
-             * receding the neighbour is honest — it IS behind.
-             *
-             * The matching parallax is applied by `HeroPanel` itself, through
-             * `useSlideParallax`, because it has to move the photograph inside
-             * the panel rather than the panel inside its slot. See the note on
-             * that hook.
-             */
-            depth
-          >
-            <HeroPanel
+        <motion.div
+          ref={track}
+          className="relative touch-pan-y"
+          style={{ x }}
+          drag={count > 1 ? 'x' : false}
+          dragElastic={0.1}
+          dragMomentum={false}
+          onPointerDown={() => setDragging(true)}
+          /* A tap that never became a drag still has to release the pause. */
+          onPointerUp={() => setDragging(false)}
+          onPointerCancel={() => setDragging(false)}
+          onDragEnd={onDragEnd}
+        >
+          {/*
+            The track has no height of its own: every slide is absolutely
+            placed, so the first one is left in flow to give the section its
+            height. Sizing the track by hand would need the aspect ratio
+            duplicated in three breakpoints.
+          */}
+          {shown.map((banner, index) => (
+            <Slide
+              key={banner.id}
               banner={banner}
-              // Only the first is the LCP candidate; the rest are a swipe away.
-              priority={index === 0}
-              current={index === active}
+              first={index === 0}
+              placement={placementOf(index)}
+              step={step}
+              x={x}
+              current={index === current}
+              total={count}
+              index={index}
+              reduced={reduced}
             />
-          </CarouselItem>
-        ))}
-      </Carousel>
+          ))}
+        </motion.div>
+
+        {count > 1 ? (
+          <>
+            <Arrow side="left" onClick={() => step1(-1)} />
+            <Arrow side="right" onClick={() => step1(1)} />
+          </>
+        ) : null}
+      </div>
+
+      {count > 1 ? (
+        <div className="mt-3 flex items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => setPlaying((value) => !value)}
+            aria-label={playing ? 'Pause the carousel' : 'Play the carousel'}
+            className={cn(
+              'text-muted hover:text-ink grid size-8 shrink-0 place-items-center rounded-full',
+              'hover:bg-sunken transition-colors',
+              'focus-visible:outline-accent focus-visible:outline-2 focus-visible:outline-offset-2',
+            )}
+          >
+            {playing ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
+          </button>
+
+          <ol className="flex items-center gap-1.5">
+            {shown.map((banner, index) => (
+              <li key={banner.id}>
+                <button
+                  type="button"
+                  onClick={() => goTo(index)}
+                  aria-label={`Go to slide ${index + 1} of ${count}`}
+                  aria-current={index === current ? 'true' : undefined}
+                  className={cn(
+                    'block h-1.5 rounded-full transition-all duration-(--duration-base)',
+                    'focus-visible:outline-accent focus-visible:outline-2 focus-visible:outline-offset-4',
+                    index === current ? 'bg-ink w-6' : 'bg-line-strong hover:bg-muted w-1.5',
+                  )}
+                />
+              </li>
+            ))}
+          </ol>
+
+          <p className="text-faint tabular shrink-0 text-2xs" aria-hidden>
+            {String(current + 1).padStart(2, '0')} / {String(count).padStart(2, '0')}
+          </p>
+        </div>
+      ) : null}
+
+      {/* Announced only when it is not moving on its own; otherwise it would
+          interrupt a screen reader every three seconds. */}
+      <p className="sr-only" aria-live={paused ? 'polite' : 'off'}>
+        Slide {current + 1} of {count}: {shown[current]?.headline}
+      </p>
     </section>
+  );
+}
+
+/* ---------------------------------------------------------------- pieces */
+
+function Arrow({ side, onClick }: { side: 'left' | 'right'; onClick: () => void }) {
+  const Icon = side === 'left' ? ChevronLeft : ChevronRight;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={side === 'left' ? 'Previous slide' : 'Next slide'}
+      className={cn(
+        'absolute top-1/2 hidden -translate-y-1/2 lg:grid',
+        'size-10 place-items-center rounded-full',
+        'bg-raised/85 text-ink border-line border shadow-sm backdrop-blur-sm',
+        'transition-[background-color,transform] duration-(--duration-base)',
+        'hover:bg-raised hover:scale-105',
+        'focus-visible:outline-accent focus-visible:outline-2 focus-visible:outline-offset-2',
+        side === 'left' ? 'left-3' : 'right-3',
+      )}
+    >
+      <Icon className="size-5" aria-hidden />
+    </button>
   );
 }
 
@@ -119,221 +399,190 @@ export function HeroCarousel({ banners }: { banners: Banner[] }) {
  * The copy stack's entrance.
  *
  * Each line rises 18px on a spring, 70ms apart, and the whole set RE-RUNS every
- * time its slide becomes current — which is what makes an advance feel authored
- * rather than mechanical.
+ * time its slide becomes current -- which is what makes an advance feel
+ * authored rather than mechanical.
  *
- * `spring.glide` rather than a tween: it is the same curve the rail itself
- * travels on, so the copy settles in sympathy with the slide instead of on an
- * unrelated timeline. Opacity gets a plain tween, because a fade is not
- * travelling through space and "how bouncy is this fade" has no answer — see
- * the note at the top of `lib/motion`.
+ * `spring.glide` rather than a tween: it is the same curve the track travels
+ * on, so the copy settles in sympathy with the slide instead of on an unrelated
+ * timeline. Opacity gets a plain tween, because a fade is not travelling
+ * through space -- see the note at the top of `lib/motion`.
  */
 const COPY_STACK = {
   hidden: {},
-  show: { transition: { staggerChildren: 0.07, delayChildren: 0.14 } },
+  show: { transition: { staggerChildren: 0.07, delayChildren: 0.12 } },
 };
 
 const COPY_LINE = {
   hidden: { opacity: 0, y: 18 },
-  show: {
-    opacity: 1,
-    y: 0,
-    transition: { ...spring.glide, opacity: tween.slow },
-  },
+  show: { opacity: 1, y: 0, transition: { ...spring.glide, opacity: tween.slow } },
 };
 
-function HeroPanel({
+function Slide({
   banner,
-  priority = false,
-  current = false,
+  first,
+  placement,
+  step,
+  x,
+  current,
+  index,
+  total,
+  reduced,
 }: {
   banner: Banner;
-  priority?: boolean;
-  /** Whether this slide is the one currently settled in the viewport. */
-  current?: boolean;
+  /** The one slide left in flow, which gives the track its height. */
+  first: boolean;
+  placement: number;
+  step: number;
+  x: MotionValue<number>;
+  current: boolean;
+  index: number;
+  total: number;
+  reduced: boolean;
 }) {
-  const reduced = useReducedMotion() ?? false;
-
   /*
    * 44px of counter-drift on the photograph.
    *
    * This is what stops the panel reading as a sheet of paper sliding sideways:
    * the image lags its own frame, so the frame becomes a window rather than a
-   * card. It is applied to the media layer alone — see `useSlideParallax` for
-   * why moving the whole slide is wrong.
+   * card. Derived from the track's own position, so it follows a drag exactly
+   * as it follows the spring.
    */
-  const parallaxX = useSlideParallax(44);
-
-  /*
-   * The entrance is driven by `animate`, not by a mount.
-   *
-   * Every slide stays mounted — they all live in one scroll container — so the
-   * stack toggles between `hidden` and `show` as `current` changes. Leaving the
-   * viewport returns it to `hidden`, which is what lets the entrance play again
-   * on the way back rather than only once per session.
-   *
-   * Under reduced motion the stack is pinned to `show` permanently: the copy is
-   * simply there, with no travel and no re-runs.
-   */
-  const animate = reduced || current ? 'show' : 'hidden';
+  const parallax = useTransform(x, (value) => {
+    if (reduced || step === 0) return 0;
+    const distance = (value + placement * step) / step;
+    return Math.max(-1.5, Math.min(1.5, distance)) * -44;
+  });
 
   return (
-    <Link
-      href={banner.href}
+    <motion.div
+      data-slide
       className={cn(
-        'group relative isolate flex overflow-hidden rounded-xl sm:rounded-2xl',
-        'aspect-4/5 sm:aspect-16/10 lg:aspect-21/9',
-        'focus-visible:outline-accent focus-visible:outline-2 focus-visible:outline-offset-2',
+        'w-[88%] pr-3 sm:w-[84%] sm:pr-4 lg:w-[96%]',
+        first ? 'relative' : 'absolute inset-y-0 left-0',
       )}
+      /*
+       * A percentage of the slide's OWN width, which is exactly one step --
+       * so this needs no measurement and is right on the first paint.
+       */
+      style={{ x: `${placement * 100}%` }}
+      aria-hidden={!current}
     >
-      {/*
-        The media layer is overscaled by 10%, and it has to be.
-
-        The parallax below translates this layer by up to 44px against its
-        frame. Without headroom that drift would drag the image off its own
-        trailing edge and expose the panel's background as a bar down one side.
-        10% gives ~5% of the panel's width on each side, which covers 44px at
-        every width this panel is used at — the narrowest case is a 343px phone
-        panel, where 5% is only 17px, but the phone layout never scrolls far
-        enough off-centre for the full drift to apply.
-      */}
-      <motion.div aria-hidden className="absolute inset-0 scale-110" style={{ x: parallaxX }}>
+      <Link
+        href={banner.href}
+        tabIndex={current ? undefined : -1}
+        draggable={false}
+        aria-roledescription="slide"
+        aria-label={`${index + 1} of ${total}: ${banner.headline}`}
+        className={cn(
+          'group relative isolate flex overflow-hidden rounded-xl sm:rounded-2xl',
+          'aspect-4/5 sm:aspect-16/10 lg:aspect-21/9',
+          'focus-visible:outline-accent focus-visible:outline-2 focus-visible:outline-offset-2',
+        )}
+      >
         {/*
-          Two sources, one element.
-
-          `<picture>` would need `next/image` to be abandoned — and with it the
-          loader, the AVIF negotiation and the size hints. Rendering two `Image`s
-          and switching them with a breakpoint class costs one extra DOM node and
-          keeps all of that. Only the visible one is ever fetched: the hidden one
-          is `display:none`, and browsers do not fetch images inside it.
+          The media layer is overscaled by 10%, and it has to be: the parallax
+          translates it by up to 44px against its frame, and without headroom
+          that drift would expose the panel's background down one side.
         */}
-        {banner.mobileImageUrl ? (
-          <>
-            <Image
-              src={banner.mobileImageUrl}
-              alt={banner.alt}
-              fill
-              priority={priority}
-              sizes="88vw"
-              className="object-cover transition-transform duration-(--duration-hero) ease-out motion-safe:group-hover:scale-[1.04] sm:hidden"
-            />
+        <motion.div aria-hidden className="absolute inset-0 scale-110" style={{ x: parallax }}>
+          {banner.mobileImageUrl ? (
+            <>
+              <Image
+                src={banner.mobileImageUrl}
+                alt={banner.alt}
+                fill
+                priority={first}
+                sizes="88vw"
+                draggable={false}
+                className="object-cover transition-transform duration-(--duration-hero) ease-out motion-safe:group-hover:scale-[1.04] sm:hidden"
+              />
+              <Image
+                src={banner.imageUrl}
+                alt={banner.alt}
+                fill
+                priority={first}
+                sizes="(max-width: 64rem) 80vw, 92vw"
+                draggable={false}
+                className="hidden object-cover transition-transform duration-(--duration-hero) ease-out motion-safe:group-hover:scale-[1.04] sm:block"
+              />
+            </>
+          ) : (
             <Image
               src={banner.imageUrl}
               alt={banner.alt}
               fill
-              priority={priority}
-              sizes="(max-width: 64rem) 80vw, 92vw"
-              className="hidden object-cover transition-transform duration-(--duration-hero) ease-out motion-safe:group-hover:scale-[1.04] sm:block"
+              priority={first}
+              sizes="(max-width: 40rem) 88vw, (max-width: 64rem) 80vw, 92vw"
+              draggable={false}
+              className="object-cover transition-transform duration-(--duration-hero) ease-out motion-safe:group-hover:scale-[1.04]"
             />
-          </>
-        ) : (
-          <Image
-            src={banner.imageUrl}
-            alt={banner.alt}
-            fill
-            priority={priority}
-            sizes="(max-width: 40rem) 88vw, (max-width: 64rem) 80vw, 92vw"
-            className="object-cover transition-transform duration-(--duration-hero) ease-out motion-safe:group-hover:scale-[1.04]"
-          />
-        )}
-      </motion.div>
+          )}
+        </motion.div>
 
-      {/*
-        The scrim.
-
-        Bottom-weighted on a phone where the copy sits under the image, and
-        angled from the leading edge on a wide screen where it sits beside it —
-        a bottom-only gradient on a 21:9 panel puts a dark band under a headline
-        that is nowhere near the bottom.
-      */}
-      <div aria-hidden className="scrim absolute inset-0 sm:hidden" />
-      <div aria-hidden className="scrim-start absolute inset-0 hidden sm:block" />
-
-      <motion.div
-        variants={COPY_STACK}
-        initial="hidden"
-        animate={animate}
-        className={cn(
-          'relative mt-auto w-full p-5 sm:p-9 lg:p-12',
-          'sm:mt-0 sm:flex sm:max-w-2xl sm:flex-col sm:justify-center',
-        )}
-      >
         {/*
-          The eyebrow leads with a rule rather than sitting alone.
-
-          A 24px hairline before the word is the cheapest editorial signal there
-          is: it turns a floating label into a masthead, and it gives the eye a
-          left edge to start from on a 21:9 panel where the copy is otherwise
-          adrift in the middle of a photograph.
+          Bottom-weighted on a phone where the copy sits under the image, and
+          angled from the leading edge on a wide screen where it sits beside it.
         */}
-        <motion.p
-          variants={COPY_LINE}
-          className="flex items-center gap-2.5 text-2xs font-semibold uppercase tracking-[0.2em] text-white/75"
+        <div aria-hidden className="scrim absolute inset-0 sm:hidden" />
+        <div aria-hidden className="scrim-start absolute inset-0 hidden sm:block" />
+
+        <motion.div
+          variants={COPY_STACK}
+          initial="hidden"
+          animate={reduced || current ? 'show' : 'hidden'}
+          className={cn(
+            'relative mt-auto w-full p-5 sm:p-9 lg:p-12',
+            'sm:mt-0 sm:flex sm:max-w-2xl sm:flex-col sm:justify-center',
+          )}
         >
-          {/*
-            The rule DRAWS itself in rather than fading.
-
-            `scaleX` from the leading edge on the same spring as its line — a
-            24px hairline that simply appears is the one element in the stack
-            that would look pasted on.
-          */}
-          <motion.span
-            aria-hidden
-            className="h-px w-6 origin-left bg-white/50"
-            variants={{
-              hidden: { scaleX: 0 },
-              show: { scaleX: 1, transition: spring.glide },
-            }}
-          />
-          {banner.eyebrow || 'Featured'}
-        </motion.p>
-
-        <motion.h2
-          variants={COPY_LINE}
-          className="headline mt-4 max-w-2xl text-4xl text-white sm:text-5xl lg:text-6xl"
-        >
-          {banner.headline}
-        </motion.h2>
-
-        {banner.subheadline ? (
           <motion.p
             variants={COPY_LINE}
-            className="mt-4 max-w-md text-pretty text-sm leading-relaxed text-white/85 sm:text-md"
+            className="flex items-center gap-2.5 text-2xs font-semibold uppercase tracking-[0.2em] text-white/75"
           >
-            {banner.subheadline}
-          </motion.p>
-        ) : null}
-
-        {/*
-          A pill, and a real one — not a text link with an arrow.
-
-          This is the only CTA on the fold and it is sitting on a photograph, so
-          it needs a solid ground to be findable at all. `bg-white`/`text-black`
-          rather than the accent: the panel already has whatever colours the
-          photograph brought, and an indigo button on an unpredictable image is a
-          contrast risk no token can solve. White on black is safe on every
-          photograph ever shot.
-        */}
-        {banner.ctaLabel ? (
-          <motion.span
-            variants={COPY_LINE}
-            className={cn(
-              'mt-6 inline-flex w-fit items-center gap-2 rounded-full bg-white px-6',
-              'text-sm font-semibold text-black',
-              'transition-transform duration-(--duration-base) ease-(--ease-out)',
-              'motion-safe:group-hover:scale-[1.03]',
-              'h-11 sm:h-12',
-            )}
-          >
-            {banner.ctaLabel}
-            <ArrowRight
-              className="size-4 transition-transform group-hover:translate-x-0.5"
+            {/* The rule DRAWS itself in rather than fading: a 24px hairline that
+                simply appears is the one element that would look pasted on. */}
+            <motion.span
               aria-hidden
+              className="h-px w-6 origin-left bg-white/50"
+              variants={{ hidden: { scaleX: 0 }, show: { scaleX: 1, transition: spring.glide } }}
             />
-          </motion.span>
-        ) : null}
-      </motion.div>
-    </Link>
+            {banner.eyebrow || 'Featured'}
+          </motion.p>
+
+          <motion.h2
+            variants={COPY_LINE}
+            className="headline mt-4 max-w-2xl text-4xl text-white sm:text-5xl lg:text-6xl"
+          >
+            {banner.headline}
+          </motion.h2>
+
+          {banner.subheadline ? (
+            <motion.p
+              variants={COPY_LINE}
+              className="mt-4 max-w-md text-pretty text-sm leading-relaxed text-white/85 sm:text-md"
+            >
+              {banner.subheadline}
+            </motion.p>
+          ) : null}
+
+          {banner.ctaLabel ? (
+            <motion.span
+              variants={COPY_LINE}
+              className={cn(
+                'mt-6 inline-flex w-fit items-center gap-2 rounded-full bg-white px-6',
+                'text-sm font-semibold text-black',
+                'transition-transform duration-(--duration-base) ease-(--ease-out)',
+                'motion-safe:group-hover:scale-[1.03]',
+                'h-11 sm:h-12',
+              )}
+            >
+              {banner.ctaLabel}
+              <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
+            </motion.span>
+          ) : null}
+        </motion.div>
+      </Link>
+    </motion.div>
   );
 }
 

@@ -36,7 +36,7 @@ const browser = await chromium.launch();
 async function sessionFor(email) {
   const context = await browser.newContext();
   const page = await context.newPage();
-  await page.goto(`${BASE}/login`, { waitUntil: 'load' });
+  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
   await page.fill('input[name="email"]', email);
   await page.fill('input[name="password"]', PASSWORD);
   await Promise.all([
@@ -57,7 +57,7 @@ if (ticket) {
   const agent = await sessionFor('support@vestra.test');
   const messagesBefore = ticket.messages.length;
 
-  await agent.page.goto(`${BASE}/admin/support/${ticket._id}`, { waitUntil: 'load' });
+  await agent.page.goto(`${BASE}/admin/support/${ticket._id}`, { waitUntil: 'domcontentloaded' });
   await agent.page.getByLabel(/Reply to the customer/i).waitFor({ state: 'visible', timeout: 20000 });
 
   const detailText = await agent.page.locator('body').innerText();
@@ -118,7 +118,7 @@ if (ticket) {
   const customer = await db.collection('users').findOne({ _id: ticket.userId });
   if (customer) {
     const shopper = await sessionFor(customer.email);
-    await shopper.page.goto(`${BASE}/account/support`, { waitUntil: 'load' });
+    await shopper.page.goto(`${BASE}/account/support`, { waitUntil: 'domcontentloaded' });
     await shopper.page.waitForTimeout(1800);
     const customerView = await shopper.page.locator('body').innerText();
 
@@ -155,7 +155,7 @@ if (order) {
 
   // Support can read orders but must not be able to move money.
   const supportAgent = await sessionFor('support@vestra.test');
-  await supportAgent.page.goto(`${BASE}/admin/orders/${order.orderNumber}`, { waitUntil: 'load' });
+  await supportAgent.page.goto(`${BASE}/admin/orders/${order.orderNumber}`, { waitUntil: 'domcontentloaded' });
   await supportAgent.page.waitForTimeout(1800);
   const supportView = await supportAgent.page.locator('body').innerText();
   check('support can open the order', supportView.includes(order.orderNumber));
@@ -169,7 +169,7 @@ if (order) {
   /* -------------------------------------------------- finance refunds */
 
   const finance = await sessionFor('finance@vestra.test');
-  await finance.page.goto(`${BASE}/admin/orders/${order.orderNumber}`, { waitUntil: 'load' });
+  await finance.page.goto(`${BASE}/admin/orders/${order.orderNumber}`, { waitUntil: 'domcontentloaded' });
   await finance.page.waitForTimeout(1800);
 
   const refundTrigger = finance.page.getByRole('button', { name: 'Refund this order' });

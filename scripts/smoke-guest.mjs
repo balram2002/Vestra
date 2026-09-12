@@ -73,7 +73,7 @@ check('found a buyable product', Boolean(product), product?.title ?? '');
 
 /* ------------------------------------------------------------- add to bag */
 
-await page.goto(`${BASE}/product/${product.slug}`, { waitUntil: 'load' });
+await page.goto(`${BASE}/product/${product.slug}`, { waitUntil: 'domcontentloaded' });
 await page.waitForTimeout(1200);
 
 const sizeButtons = page.locator('#size-options button[aria-pressed]');
@@ -88,14 +88,14 @@ for (let i = 0; i < sizeCount; i++) {
 await page.getByRole('button', { name: /add to bag/i }).first().click();
 await page.waitForTimeout(2500);
 
-await page.goto(`${BASE}/bag`, { waitUntil: 'load' });
+await page.goto(`${BASE}/bag`, { waitUntil: 'domcontentloaded' });
 await page.waitForTimeout(1500);
 const bagText = await page.locator('body').innerText();
 check('a guest can fill a bag without signing in', /Your bag/i.test(bagText) && !/sign in to/i.test(bagText));
 
 /* -------------------------------------------------------------- checkout */
 
-const response = await page.goto(`${BASE}/checkout`, { waitUntil: 'load' });
+const response = await page.goto(`${BASE}/checkout`, { waitUntil: 'domcontentloaded' });
 await page.waitForTimeout(1800);
 
 // The whole point: checkout must not bounce an anonymous visitor to login.
@@ -171,7 +171,7 @@ if (order) {
 
   /* -------------------------------------------------- reachable by them */
 
-  const own = await page.goto(`${BASE}/orders/${order._id}`, { waitUntil: 'load' });
+  const own = await page.goto(`${BASE}/orders/${order._id}`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1500);
   const ownText = await page.locator('body').innerText();
   check('the guest can open their own order', own?.status() === 200 && ownText.includes(order.orderNumber));
@@ -182,7 +182,7 @@ if (order) {
   // A different browser, with no cookie, must not be able to read it.
   const stranger = await browser.newContext();
   const strangerPage = await stranger.newPage();
-  const denied = await strangerPage.goto(`${BASE}/orders/${order._id}`, { waitUntil: 'load' });
+  const denied = await strangerPage.goto(`${BASE}/orders/${order._id}`, { waitUntil: 'domcontentloaded' });
   await strangerPage.waitForTimeout(800);
   const deniedText = await strangerPage.locator('body').innerText();
   check(
@@ -195,14 +195,14 @@ if (order) {
   // And neither can a signed-in customer who simply knows the id.
   const nosy = await browser.newContext();
   const nosyPage = await nosy.newPage();
-  await nosyPage.goto(`${BASE}/login`, { waitUntil: 'load' });
+  await nosyPage.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
   await nosyPage.fill('input[name="email"]', 'ananya.iyer@example.com');
   await nosyPage.fill('input[name="password"]', 'vestra123');
   await Promise.all([
     nosyPage.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 30000 }),
     nosyPage.click('button[type="submit"]'),
   ]);
-  const nosyResponse = await nosyPage.goto(`${BASE}/orders/${order._id}`, { waitUntil: 'load' });
+  const nosyResponse = await nosyPage.goto(`${BASE}/orders/${order._id}`, { waitUntil: 'domcontentloaded' });
   await nosyPage.waitForTimeout(800);
   const nosyText = await nosyPage.locator('body').innerText();
   check(

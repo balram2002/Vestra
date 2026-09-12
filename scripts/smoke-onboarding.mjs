@@ -168,6 +168,13 @@ try {
   const updated = await db.collection('users').findOne({ _id: applicant._id });
   check('the applicant owns the store and has the seller role', updated.sellerId === store._id && updated.roles.includes('SELLER'));
 
+  // Wait for the words rather than for a moment: the status screen streams in
+  // behind the shell, so reading the body too early reads the skeleton.
+  await page
+    .getByText(/We are reviewing your application/)
+    .first()
+    .waitFor({ timeout: 30000 })
+    .catch(() => {});
   const status = await page.locator('body').innerText();
   check('the status screen says it is being reviewed', /We are reviewing your application/.test(status));
 
@@ -175,7 +182,12 @@ try {
 
   for (const path of ['/seller', '/seller/products', '/seller/settings']) {
     await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(600);
+    /*
+     * The console redirects a store that cannot trade yet, and it does so from
+     * inside a streamed boundary -- so the move happens in the browser, after
+     * the shell has arrived. Waiting for the URL is the only honest check.
+     */
+    await page.waitForURL('**/seller/onboarding', { timeout: 30000 }).catch(() => {});
     check(`a store in review is kept out of ${path}`, new URL(page.url()).pathname === '/seller/onboarding', page.url());
   }
 

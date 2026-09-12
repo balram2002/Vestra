@@ -147,6 +147,8 @@ export const COLLECTIONS = {
   settlements: 'settlements',
 
   /* content */
+  /** Site furniture an administrator edits: strips, promises, footer columns. */
+  siteContent: 'siteContent',
   homeSections: 'homeSections',
   banners: 'banners',
   cmsPages: 'cmsPages',
@@ -224,6 +226,7 @@ export const collections = {
 
   settlements: () => typed<Settlement>(COLLECTIONS.settlements),
 
+  /* Site furniture is one document; `raw` reads it, so there is no entity type. */
   homeSections: () => typed<HomeSection>(COLLECTIONS.homeSections),
   banners: () => typed<Banner>(COLLECTIONS.banners),
   cmsPages: () => typed<CmsPage>(COLLECTIONS.cmsPages),

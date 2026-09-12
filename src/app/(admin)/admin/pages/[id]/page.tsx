@@ -5,10 +5,12 @@ import { Suspense } from 'react';
 
 import { CmsPageForm } from '@/components/console/cms-page-form';
 import { PageHeader } from '@/components/console/page-header';
+import { SectionBuilder } from '@/components/console/section-builder';
+import { ADDABLE_SECTION_KINDS } from '@/domain/sections';
 import { siteConfig } from '@/config/site';
 import { formatDateTime } from '@/lib/format';
 import { requirePermission } from '@/server/auth/session';
-import { collections, toEntity } from '@/server/db/collections';
+import { collections, toEntities, toEntity } from '@/server/db/collections';
 
 export const metadata: Metadata = { title: 'Edit page' };
 
@@ -62,6 +64,24 @@ async function Editor({ params }: { params: Promise<{ id: string }> }) {
           isPublished: page.isPublished,
         }}
       />
+
+      {/*
+        The same builder the homepage uses, scoped to this page's slug.
+        A landing page is a page like any other: the copy above is its article,
+        and these are the rails, tiles and features arranged around it.
+      */}
+      <div className="mt-10">
+        <SectionBuilder
+          page={page.slug}
+          sections={toEntities(
+            await (await collections.homeSections())
+              .find({ page: page.slug })
+              .sort({ position: 1 })
+              .toArray(),
+          )}
+          addable={ADDABLE_SECTION_KINDS}
+        />
+      </div>
     </>
   );
 }

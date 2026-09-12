@@ -4,11 +4,13 @@ import {
   CreditCard,
   FileText,
   FolderTree,
+  Inbox,
   LayoutDashboard,
   LayoutTemplate,
   LifeBuoy,
   MessageSquareQuote,
   Package,
+  Palette,
   Receipt,
   RotateCcw,
   ScrollText,
@@ -102,6 +104,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           label: 'Catalogue',
           items: [
             {
+              /*
+               * First in the section, because it is the only one with work in
+               * it: sellers publish their own listings now, and this is where
+               * staff see what has gone up.
+               */
+              href: '/admin/catalogue',
+              label: 'New from sellers',
+              icon: <Inbox aria-hidden />,
+              badge: (
+                <Suspense fallback={null}>
+                  <CatalogueInboxBadge />
+                </Suspense>
+              ),
+            },
+            {
               href: '/admin/products',
               label: 'Products',
               icon: <Package aria-hidden />,
@@ -139,6 +156,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             { href: '/admin/promotions', label: 'Promotions', icon: <BadgePercent aria-hidden /> },
             { href: '/admin/cms', label: 'Homepage', icon: <LayoutTemplate aria-hidden /> },
             { href: '/admin/pages', label: 'Pages', icon: <FileText aria-hidden /> },
+            { href: '/admin/appearance', label: 'Appearance', icon: <Palette aria-hidden /> },
           ],
         },
         {
@@ -167,6 +185,12 @@ async function ReturnsBadge() {
   const returns = await collections.returns();
   const count = await returns.countDocuments({ status: 'RETURN_REQUESTED' });
   return <QueueBadge count={count} />;
+}
+
+async function CatalogueInboxBadge() {
+  await requireAnyRole(STAFF_ROLES);
+  const { inboxCount } = await import('@/server/services/catalog-review');
+  return <QueueBadge count={await inboxCount()} />;
 }
 
 async function ReviewQueueBadge() {

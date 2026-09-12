@@ -71,7 +71,7 @@ page.on('console', (message) => {
 page.on('pageerror', (error) => problems.push(`pageerror: ${String(error).slice(0, 160)}`));
 
 if (as) {
-  await page.goto(`${BASE}/login`, { waitUntil: 'load' });
+  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
   await page.fill('input[name="email"]', as);
   await page.fill('input[name="password"]', 'vestra123');
   await Promise.all([
@@ -83,7 +83,7 @@ if (as) {
 for (const route of routes) {
   const before = problems.length;
   try {
-    await page.goto(BASE + route, { waitUntil: 'load', timeout: 45000 });
+    await page.goto(BASE + route, { waitUntil: 'domcontentloaded', timeout: 45000 });
     await page.waitForTimeout(settleMs);
 
     const name =

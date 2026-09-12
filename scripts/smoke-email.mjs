@@ -72,7 +72,7 @@ const address = `smoke.email.${stamp}@example.test`;
 try {
   /* ------------------------------------------------------- verification */
 
-  await page.goto(`${BASE}/register`, { waitUntil: 'load' });
+  await page.goto(`${BASE}/register`, { waitUntil: 'domcontentloaded' });
   /*
    * By ROLE, not by label. "Email me about new arrivals" is a checkbox whose
    * label also starts with "Email", and a loose label match hits both.
@@ -113,7 +113,7 @@ try {
 
     /* ------------------------------------------- following the link works */
 
-    await page.goto(`${BASE}/verify-email?token=${token}`, { waitUntil: 'load' });
+    await page.goto(`${BASE}/verify-email?token=${token}`, { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(1500);
     const confirmed = await page.locator('body').innerText();
     check('following the link confirms the address', /Email confirmed/i.test(confirmed), confirmed.slice(0, 80));
@@ -123,7 +123,7 @@ try {
 
     /* ------------------------------------------ and cannot be used twice */
 
-    await page.goto(`${BASE}/verify-email?token=${token}`, { waitUntil: 'load' });
+    await page.goto(`${BASE}/verify-email?token=${token}`, { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(1200);
     const replay = await page.locator('body').innerText();
     check(
@@ -135,7 +135,7 @@ try {
 
   /* ------------------------------------------------------ password reset */
 
-  await page.goto(`${BASE}/forgot-password`, { waitUntil: 'load' });
+  await page.goto(`${BASE}/forgot-password`, { waitUntil: 'domcontentloaded' });
   await page.getByRole('textbox', { name: 'Email', exact: true }).fill(address);
   await page.getByRole('button', { name: /send reset link/i }).click();
   await page.waitForTimeout(2000);
@@ -155,7 +155,7 @@ try {
 
     const resetToken = reset.html.match(/reset-password\?token=([^"&]+)/)?.[1];
 
-    await page.goto(`${BASE}/reset-password?token=${resetToken}`, { waitUntil: 'load' });
+    await page.goto(`${BASE}/reset-password?token=${resetToken}`, { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(1200);
     await page.locator('input[name="password"]').fill('vestra456');
     await page.locator('input[name="confirm"]').fill('vestra456');
@@ -170,7 +170,7 @@ try {
 
     /* --------------------------------- an unknown address reveals nothing */
 
-    await page.goto(`${BASE}/forgot-password`, { waitUntil: 'load' });
+    await page.goto(`${BASE}/forgot-password`, { waitUntil: 'domcontentloaded' });
     await page.getByRole('textbox', { name: 'Email', exact: true }).fill(`nobody.${stamp}@example.test`);
     await page.getByRole('button', { name: /send reset link/i }).click();
     await page.waitForTimeout(1500);

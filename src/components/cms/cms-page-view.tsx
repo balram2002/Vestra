@@ -1,10 +1,13 @@
 import Link from 'next/link';
+import { Suspense } from 'react';
 
 import { Breadcrumbs } from '@/components/commerce/breadcrumbs';
 import { Prose } from '@/components/cms/prose';
+import { PageSections } from '@/components/home/page-sections';
 import { siteConfig } from '@/config/site';
 import type { CmsPage } from '@/domain/types';
 import { formatDate } from '@/lib/format';
+import { getPageSections } from '@/server/services/content';
 
 /**
  * The shared shell for every policy and help page, so they cannot drift apart
@@ -21,23 +24,43 @@ export function CmsPageView({
   contact?: 'support' | 'grievance';
 }) {
   return (
-    <div className="gutter shell-max py-6">
-      <Breadcrumbs items={breadcrumbs} />
+    <>
+      <div className="gutter shell-max py-6">
+        <Breadcrumbs items={breadcrumbs} />
 
-      <article className="mt-4">
-        <h1 className="font-display text-ink text-2xl sm:text-3xl">{page.title}</h1>
-        <p className="text-faint mt-1.5 text-xs">
-          Last updated <time dateTime={page.updatedAt}>{formatDate(page.updatedAt)}</time>
-        </p>
+        <article className="mt-4">
+          <h1 className="font-display text-ink text-2xl sm:text-3xl">{page.title}</h1>
+          <p className="text-faint mt-1.5 text-xs">
+            Last updated <time dateTime={page.updatedAt}>{formatDate(page.updatedAt)}</time>
+          </p>
 
-        <div className="mt-6">
-          <Prose markdown={page.body} />
-        </div>
+          <div className="mt-6">
+            <Prose markdown={page.body} />
+          </div>
 
-        {contact ? <ContactDetails kind={contact} /> : null}
-      </article>
-    </div>
+          {contact ? <ContactDetails kind={contact} /> : null}
+        </article>
+      </div>
+
+      {/*
+        Anything the page has been composed with, under its copy.
+
+        A landing page is a page like any other: this is the same renderer the
+        homepage uses, so a rail added to "Sell with us" behaves exactly as a
+        rail added to the front page -- including its skeleton while it loads.
+        Pages with nothing composed render nothing at all.
+      */}
+      <Suspense fallback={null}>
+        <ComposedSections slug={page.slug} />
+      </Suspense>
+    </>
   );
+}
+
+async function ComposedSections({ slug }: { slug: string }) {
+  const sections = await getPageSections(slug);
+  if (sections.length === 0) return null;
+  return <PageSections sections={sections} />;
 }
 
 /**

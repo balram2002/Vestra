@@ -53,7 +53,7 @@ page.on('console', (message) => {
   if (message.type() === 'error') consoleErrors.push(message.text());
 });
 
-const go = (path) => page.goto(BASE + path, { waitUntil: 'load', timeout: 45000 });
+const go = (path) => page.goto(BASE + path, { waitUntil: 'domcontentloaded', timeout: 45000 });
 
 try {
   /* ------------------------------------------------------------- sign in */

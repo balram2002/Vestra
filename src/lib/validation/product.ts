@@ -148,3 +148,79 @@ export const mediaLimits = {
   acceptedImageTypes: CATALOG.acceptedImageTypes,
   acceptedVideoTypes: CATALOG.acceptedVideoTypes,
 };
+
+/**
+ * The short form.
+ *
+ * What it takes to put a product in the shop in one sitting, which is a much
+ * shorter list than what the long form asks for. A seller adding their first
+ * product needs a name, where it belongs, a price, stock and a photograph --
+ * everything else has a sensible default and can be filled in later from the
+ * listing page.
+ *
+ * Prices are PAISE, like every other price in the system.
+ */
+export const quickListingSchema = z.object({
+  title: z.string().trim().min(3, 'Give the product a name').max(140),
+  brandId: z.string().min(1, 'Choose a brand, or add yours'),
+  categoryId: z.string().min(1, 'Choose a category'),
+  gender: z.enum(GENDERS).optional(),
+  description: z.string().trim().max(4000).optional(),
+  mrp: money,
+  sellingPrice: money,
+  stock: z.number().int().min(0, 'Cannot be negative').max(100_000),
+  /** Empty means one size, which is most of homeware, beauty and accessories. */
+  sizes: z.array(z.string().trim().min(1).max(24)).max(24),
+  color: z.string().trim().min(1).max(40),
+  returnable: z.boolean().optional(),
+  codAvailable: z.boolean().optional(),
+});
+
+export type QuickListingInput = z.infer<typeof quickListingSchema>;
+
+export interface PublishReadiness {
+  title: string;
+  brandId: string;
+  categoryId: string;
+  mediaCount: number;
+  variants: Array<{ mrp: number; sellingPrice: number; available: number; isActive: boolean }>;
+}
+
+/**
+ * What stands between a listing and the shop.
+ *
+ * Deliberately shorter than `readinessBlockers`, which is the standard for the
+ * old review queue. A seller publishes their own listings now, so this checks
+ * only what makes a listing WORK -- something to show, something to buy, and a
+ * price that is not a legal problem. Copy quality is not a gate; an empty
+ * description sells badly, which is the seller's business, not a blocker.
+ */
+export function publishBlockers(input: PublishReadiness): Blocker[] {
+  const blockers: Blocker[] = [];
+
+  if (input.title.trim().length < 3) {
+    blockers.push({ field: 'title', message: 'Give the product a name.' });
+  }
+  if (!input.brandId) blockers.push({ field: 'brandId', message: 'Choose a brand, or add yours.' });
+  if (!input.categoryId) blockers.push({ field: 'categoryId', message: 'Choose a category.' });
+  if (input.mediaCount < 1) blockers.push({ field: 'media', message: 'Add at least one photo.' });
+
+  const active = input.variants.filter((variant) => variant.isActive);
+  if (active.length === 0) {
+    blockers.push({ field: 'variants', message: 'Add a price and stock.' });
+    return blockers;
+  }
+
+  if (active.every((variant) => variant.available === 0)) {
+    blockers.push({ field: 'stock', message: 'Add stock to at least one size.' });
+  }
+  if (active.some((variant) => variant.sellingPrice <= 0)) {
+    blockers.push({ field: 'sellingPrice', message: 'Set a selling price.' });
+  }
+  // A selling price above MRP is not a discount, it is a legal problem.
+  if (active.some((variant) => variant.sellingPrice > variant.mrp)) {
+    blockers.push({ field: 'sellingPrice', message: 'Selling price cannot be above MRP.' });
+  }
+
+  return blockers;
+}

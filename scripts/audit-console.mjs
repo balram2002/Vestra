@@ -83,7 +83,7 @@ for (const role of ROLES) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
 
-  await page.goto(`${BASE}/login`, { waitUntil: 'load' });
+  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
   await page.fill('input[name="email"]', role.email);
   await page.fill('input[name="password"]', PASSWORD);
   await Promise.all([
@@ -103,7 +103,7 @@ for (const role of ROLES) {
 
     for (const width of WIDTHS) {
       await page.setViewportSize({ width, height: 900 });
-      const response = await page.goto(BASE + route, { waitUntil: 'load', timeout: 45000 });
+      const response = await page.goto(BASE + route, { waitUntil: 'domcontentloaded', timeout: 45000 });
       status = response?.status() ?? 0;
       await page.waitForTimeout(700);
 

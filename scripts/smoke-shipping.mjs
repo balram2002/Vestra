@@ -160,7 +160,7 @@ const browser = await chromium.launch();
 async function sessionFor(email) {
   const context = await browser.newContext();
   const page = await context.newPage();
-  await page.goto(`${BASE}/login`, { waitUntil: 'load' });
+  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
   await page.fill('input[name="email"]', email);
   await page.fill('input[name="password"]', PASSWORD);
   await Promise.all([
@@ -177,7 +177,7 @@ if (parcel) {
   const ownerUser = await db.collection('users').findOne({ _id: seller.ownerUserId });
   const { context, page } = await sessionFor(ownerUser.email);
 
-  await page.goto(`${BASE}/seller/shipments`, { waitUntil: 'load' });
+  await page.goto(`${BASE}/seller/shipments`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1200);
   const listText = await page.locator('body').innerText();
   check('seller shipment queue renders', /Shipments/i.test(listText));
@@ -185,19 +185,19 @@ if (parcel) {
   // The queue defaults to "needs action", which is correctly EMPTY for a seller
   // with nothing left to label or hand over. The full history is a tab away, so
   // that is where the listing itself is checked.
-  await page.goto(`${BASE}/seller/shipments?status=ALL`, { waitUntil: 'load' });
+  await page.goto(`${BASE}/seller/shipments?status=ALL`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1200);
   const allText = await page.locator('body').innerText();
   check('queue lists parcels', /SH\d{10}/.test(allText), allText.slice(-200));
 
-  await page.goto(`${BASE}/seller/shipments/${parcel._id}`, { waitUntil: 'load' });
+  await page.goto(`${BASE}/seller/shipments/${parcel._id}`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(800);
   const detailText = await page.locator('body').innerText();
   check('seller parcel detail renders', detailText.includes(parcel.shipmentNumber));
   check('parcel detail shows the AWB', detailText.includes(parcel.awb), detailText.slice(0, 160));
   check('parcel detail shows the tracking timeline', /Shipment created|Packed|Picked up|Delivered/i.test(detailText));
 
-  await page.goto(`${BASE}/seller/shipments/${parcel._id}/label`, { waitUntil: 'load' });
+  await page.goto(`${BASE}/seller/shipments/${parcel._id}/label`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(600);
   const labelText = await page.locator('body').innerText();
   const barcodes = await page.locator('svg[role="img"]').count();
@@ -221,7 +221,7 @@ if (parcel) {
   const otherUser = await db.collection('users').findOne({ _id: other.ownerUserId });
   const intruder = await sessionFor(otherUser.email);
   const response = await intruder.page.goto(`${BASE}/seller/shipments/${parcel._id}`, {
-    waitUntil: 'load',
+    waitUntil: 'domcontentloaded',
   });
   await intruder.page.waitForTimeout(600);
   const intruderText = await intruder.page.locator('body').innerText();
@@ -253,7 +253,7 @@ if (trackedOrder) {
   const customer = await db.collection('users').findOne({ _id: trackedOrder.userId });
   const { context, page } = await sessionFor(customer.email);
 
-  await page.goto(`${BASE}/orders/${trackedOrder._id}`, { waitUntil: 'load' });
+  await page.goto(`${BASE}/orders/${trackedOrder._id}`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(900);
   const text = await page.locator('body').innerText();
 

@@ -9,8 +9,10 @@ import { cn } from '@/lib/cn';
 import { currentOwner, getSessionUser } from '@/server/auth/session';
 import { getBagCount } from '@/server/services/cart';
 import { getMegaMenu } from '@/server/services/catalog';
+import { getSiteContent } from '@/server/services/site-content';
 import { getWishlistCount } from '@/server/services/wishlist';
 import { workspacesFor } from '@/server/services/workspaces';
+import { DEFAULT_SITE_CONTENT } from '@/domain/site-content';
 
 import { AccountMenu } from './account-menu';
 import { HeaderShell } from './header-shell';
@@ -61,15 +63,15 @@ const ICON_BUTTON = [
   'motion-safe:active:scale-90',
 ].join(' ');
 
-/** The site-wide promises. One place, so the strip and the footer cannot disagree. */
-const PROMISES = [
-  'Free delivery above ₹1,199',
-  '14-day returns & exchanges',
-  'Every seller reviewed by our team',
-  'Secure payments · UPI, cards, netbanking',
-];
-
-function AnnouncementStrip() {
+/**
+ * The strip's words are DATA.
+ *
+ * "Free delivery above ₹1,199" is a commercial decision that changes without a
+ * deploy, and a threshold here that disagrees with the one at checkout is worse
+ * than no promise at all. Edited under Appearance; what the shop ships with
+ * lives in `domain/site-content`.
+ */
+function AnnouncementStrip({ items }: { items: string[] }) {
   return (
     <div
       className={cn(
@@ -92,7 +94,7 @@ function AnnouncementStrip() {
         'dark:bg-sunken dark:text-muted dark:border-line dark:border-b',
       )}
     >
-      <Marquee items={PROMISES} speed={46} staticFrom="md" />
+      <Marquee items={items} speed={46} staticFrom="md" />
     </div>
   );
 }
@@ -130,14 +132,25 @@ function HeaderBar({ children }: { children?: React.ReactNode }) {
 export function SiteHeaderFallback() {
   return (
     <HeaderShell>
-      <AnnouncementStrip />
+      {/*
+        The defaults, not the edited copy: this is the placeholder that ships
+        inside the static shell, and reading the database here would make the
+        whole header dynamic for the sake of a band that is about to be
+        replaced.
+      */}
+      <AnnouncementStrip items={DEFAULT_STRIP} />
       <HeaderBar />
     </HeaderShell>
   );
 }
 
+const DEFAULT_STRIP = DEFAULT_SITE_CONTENT.announcements
+  .filter((item) => item.isActive)
+  .map((item) => item.text);
+
 export async function SiteHeader() {
-  const menu = await getMegaMenu();
+  const [menu, content] = await Promise.all([getMegaMenu(), getSiteContent()]);
+  const { headerActions } = content;
 
   const quickLinks = menu.map(({ department }) => ({
     label: department.name,
@@ -146,11 +159,14 @@ export async function SiteHeader() {
 
   return (
     <HeaderShell>
-      <AnnouncementStrip />
+      <AnnouncementStrip
+        items={content.announcements.filter((item) => item.isActive).map((item) => item.text)}
+      />
 
       <HeaderBar>
         <MobileNav
           menu={menu}
+          showWishlist={headerActions.wishlist}
           accountSlot={
             <Suspense fallback={null}>
               <MobileWorkspaces />
@@ -170,7 +186,7 @@ export async function SiteHeader() {
 
         <div className="ml-auto flex items-center gap-0.5 lg:gap-1">
           {/* Two triggers — a phone icon and a desktop field — over one overlay. */}
-          <HeaderSearch quickLinks={quickLinks} />
+          {headerActions.search ? <HeaderSearch quickLinks={quickLinks} /> : null}
 
           {/*
             Desktop only, and deliberately.
@@ -196,13 +212,17 @@ export async function SiteHeader() {
               <HeaderAccount />
             </Suspense>
 
-            <Suspense fallback={<CountIconFallback label="Wishlist" icon="heart" />}>
-              <WishlistIcon />
-            </Suspense>
+            {headerActions.wishlist ? (
+              <Suspense fallback={<CountIconFallback label="Wishlist" icon="heart" />}>
+                <WishlistIcon />
+              </Suspense>
+            ) : null}
 
-            <Suspense fallback={<CountIconFallback label="Bag" icon="bag" />}>
-              <BagIcon />
-            </Suspense>
+            {headerActions.bag ? (
+              <Suspense fallback={<CountIconFallback label="Bag" icon="bag" />}>
+                <BagIcon />
+              </Suspense>
+            ) : null}
           </div>
         </div>
       </HeaderBar>

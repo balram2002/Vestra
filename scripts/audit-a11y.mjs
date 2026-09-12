@@ -78,7 +78,7 @@ async function contextFor(as, width) {
 
   if (as) {
     const page = await context.newPage();
-    await page.goto(`${BASE}/login`, { waitUntil: 'load' });
+    await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
     await page.fill('input[name="email"]', as);
     await page.fill('input[name="password"]', 'vestra123');
     await Promise.all([
@@ -104,7 +104,7 @@ for (const { name, width } of WIDTHS) {
     const page = await context.newPage();
 
     try {
-      await page.goto(BASE + route.path, { waitUntil: 'load', timeout: 45000 });
+      await page.goto(BASE + route.path, { waitUntil: 'domcontentloaded', timeout: 45000 });
       await page.waitForTimeout(1600);
 
       const results = await new AxeBuilder({ page })

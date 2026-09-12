@@ -2,20 +2,23 @@ import 'server-only';
 
 import { CATALOG, INVENTORY, RETURNS } from '@/config/business';
 import { attributesForFamily, colorHex, colorLabel, sortSizes } from '@/domain/attributes';
-import type { Media, Product, ProductVariant } from '@/domain/types';
+import { galleryAssets, mediaRole, roleForUpload } from '@/domain/media';
+import type { Media, MediaRole, Product, ProductVariant } from '@/domain/types';
 import { barcode, entityId, skuCode } from '@/lib/ids';
 import { discountPercent } from '@/lib/pricing/calculate';
 import { productSlug } from '@/lib/slug';
 import {
+  publishBlockers,
   readinessBlockers,
   type Blocker,
   type DraftInput,
+  type QuickListingInput,
   type VariantInput,
 } from '@/lib/validation/product';
 
 import { collections, toEntities, toEntity } from '../db/collections';
 import { invalidate } from './cache-invalidation';
-import { productTags } from './cache-tags';
+import { productTags, tags } from './cache-tags';
 import { notifyQuietly } from './notifications';
 
 /**
@@ -345,26 +348,51 @@ export async function setVariants(
 export async function attachMedia(
   sellerId: string,
   productId: string,
-  media: Array<{ url: string; contentType: string; width: number | null; height: number | null }>,
-): Promise<{ ok: boolean; error?: string }> {
+  media: Array<{
+    url: string;
+    contentType: string;
+    width: number | null;
+    height: number | null;
+    /** Left out, the file's shape decides. See `roleForUpload`. */
+    role?: MediaRole;
+  }>,
+): Promise<{ ok: boolean; error?: string; added?: Media[] }> {
   const products = await collections.products();
   const product = toEntity(await products.findOne({ _id: productId, sellerId }));
   if (!product) return { ok: false, error: 'Product not found.' };
 
-  const images = product.media.filter((asset) => asset.kind === 'IMAGE').length;
-  const videos = product.media.filter((asset) => asset.kind === 'VIDEO').length;
+  /*
+   * Each asset knows what it is for before anything is written.
+   *
+   * The caller may say so outright -- the short form has a slot for the
+   * landscape video and a slot for reels -- and otherwise the file's own shape
+   * decides. Limits are then counted PER ROLE: eight photos, one showcase
+   * video, five reels. One shared video pool is what would let a fifth reel
+   * push out the product video.
+   */
+  const incoming = media.map((asset) => ({
+    ...asset,
+    role: asset.role ?? roleForUpload(asset.contentType, asset.width, asset.height),
+  }));
 
-  const incomingImages = media.filter((asset) => !asset.contentType.startsWith('video/')).length;
-  const incomingVideos = media.length - incomingImages;
+  const held = (role: MediaRole) =>
+    product.media.filter((asset) => mediaRole(asset) === role).length;
+  const arriving = (role: MediaRole) => incoming.filter((asset) => asset.role === role).length;
 
-  if (images + incomingImages > CATALOG.maxImagesPerProduct) {
+  if (held('GALLERY') + arriving('GALLERY') > CATALOG.maxImagesPerProduct) {
     return { ok: false, error: `A listing can carry ${CATALOG.maxImagesPerProduct} photos.` };
   }
-  if (videos + incomingVideos > CATALOG.maxVideosPerProduct) {
-    return { ok: false, error: `A listing can carry ${CATALOG.maxVideosPerProduct} videos.` };
+  if (held('SHOWCASE') + arriving('SHOWCASE') > CATALOG.maxShowcaseVideosPerProduct) {
+    return {
+      ok: false,
+      error: 'A listing shows one landscape video. Remove the current one to swap it.',
+    };
+  }
+  if (held('REEL') + arriving('REEL') > CATALOG.maxReelsPerProduct) {
+    return { ok: false, error: `A listing can carry ${CATALOG.maxReelsPerProduct} reels.` };
   }
 
-  const added: Media[] = media.map((asset, index) => ({
+  const added: Media[] = incoming.map((asset, index) => ({
     id: entityId('med'),
     kind: asset.contentType.startsWith('video/') ? 'VIDEO' : 'IMAGE',
     url: asset.url,
@@ -374,6 +402,7 @@ export async function attachMedia(
     height: asset.height ?? 1200,
     position: product.media.length + index,
     variantId: null,
+    role: asset.role,
   }));
 
   await products.updateOne(
@@ -383,7 +412,7 @@ export async function attachMedia(
 
   invalidate(productTags(productId, 'content'));
 
-  return { ok: true };
+  return { ok: true, added };
 }
 
 export async function removeMedia(
@@ -736,4 +765,162 @@ export async function notifyReviewers(productTitle: string, sellerName: string):
       entityId: productTitle,
     });
   }
+}
+
+/* --------------------------------------------------------- the short form */
+
+/** The size a product has when it has no sizes. From the ONE_SIZE scale. */
+const ONE_SIZE = 'Onesize';
+
+/**
+ * A listing for uploads to hang on.
+ *
+ * Files have to belong to something before they can be stored against it, and
+ * the short form asks for photos in the same sitting as the name -- so opening
+ * the form claims an empty draft up front.
+ *
+ * It REUSES the seller's existing blank draft when there is one. Opening the
+ * form, thinking better of it, and opening it again tomorrow would otherwise
+ * leave a ghost listing behind every time.
+ */
+export async function startListing(
+  sellerId: string,
+): Promise<{ ok: boolean; error?: string; productId?: string }> {
+  const products = await collections.products();
+  const blank = toEntity(await products.findOne({ sellerId, status: 'DRAFT', title: '' }));
+  if (blank) return { ok: true, productId: blank.id };
+
+  return createDraft(sellerId, { title: '' });
+}
+
+/**
+ * Fill in the short form and put the listing in the shop.
+ *
+ * NO REVIEW QUEUE. A seller's product goes live the moment it is complete and
+ * staff see it afterwards in the catalogue inbox -- `reviewedAt: null` is what
+ * puts it there. Waiting for approval to sell your own stock is the step that
+ * made a new store useless on its first day.
+ *
+ * The descriptive half goes through `updateDraft` and the prices through
+ * `setVariants`, so the short form gets the same slug history, the same
+ * inventory records and the same SKUs as the long one. Only the gate at the
+ * end differs: `publishBlockers` asks what a listing needs to WORK, not what
+ * it needs to be reviewed.
+ */
+export async function publishListing(
+  sellerId: string,
+  productId: string,
+  input: QuickListingInput,
+): Promise<{ ok: boolean; error?: string; blockers?: Blocker[]; productId?: string }> {
+  const products = await collections.products();
+  const product = toEntity(await products.findOne({ _id: productId, sellerId }));
+  if (!product) return { ok: false, error: 'Product not found.' };
+  if (product.status === 'ARCHIVED') {
+    return { ok: false, error: 'Archived listings cannot be edited. Duplicate it instead.' };
+  }
+
+  const saved = await updateDraft(sellerId, productId, {
+    title: input.title,
+    brandId: input.brandId,
+    categoryId: input.categoryId,
+    gender: input.gender,
+    description: input.description,
+    returnable: input.returnable,
+    codAvailable: input.codAvailable,
+  });
+  if (!saved.ok) return { ok: false, error: saved.error };
+
+  // One row per size, all at the same price and opening stock. A seller who
+  // needs per-size prices edits the matrix on the listing page afterwards.
+  const sizes = input.sizes.length > 0 ? input.sizes : [ONE_SIZE];
+  const priced = await setVariants(
+    sellerId,
+    productId,
+    sizes.map((size) => ({
+      size,
+      color: input.color,
+      mrp: input.mrp,
+      sellingPrice: input.sellingPrice,
+      available: input.stock,
+      isActive: true,
+    })),
+  );
+  if (!priced.ok) return { ok: false, error: priced.error };
+
+  const ready = toEntity(await products.findOne({ _id: productId }));
+  if (!ready) return { ok: false, error: 'Product not found.' };
+
+  const blockers = publishBlockers({
+    title: ready.title,
+    brandId: ready.brandId,
+    categoryId: ready.categoryId,
+    // Photos only: a listing whose gallery is one video shows an empty card.
+    mediaCount: galleryAssets(ready.media).length,
+    variants: ready.variants.map((variant) => ({
+      mrp: variant.mrp,
+      sellingPrice: variant.sellingPrice,
+      available: variant.inventory.available,
+      isActive: variant.isActive,
+    })),
+  });
+  if (blockers.length > 0) return { ok: false, error: 'Almost there.', blockers };
+
+  const iso = new Date().toISOString();
+  const firstPublish = ready.publishedAt === null;
+
+  await products.updateOne(
+    { _id: productId },
+    {
+      $set: {
+        status: 'PUBLISHED',
+        publishedAt: ready.publishedAt ?? iso,
+        submittedAt: ready.submittedAt ?? iso,
+        selfPublished: true,
+        /*
+         * Live and unseen. This is the field the catalogue inbox reads: the
+         * listing is in the shop, and staff have not looked at it yet.
+         */
+        reviewedAt: null,
+        reviewedByUserId: null,
+        rejectionReason: null,
+        updatedAt: iso,
+      },
+    },
+  );
+
+  if (firstPublish) await countTowards(ready, 1);
+
+  invalidate([
+    ...productTags(productId, 'status'),
+    ...ready.categoryPath.map((slug) => tags.category(slug)),
+  ]);
+
+  return { ok: true, productId };
+}
+
+/**
+ * Keep the counts on a brand, a category and a store honest.
+ *
+ * They are denormalised so a brand page can say "42 products" without counting
+ * them, and nothing but the seed maintained them -- so every product published
+ * after a seed left the brand page claiming one fewer than it has.
+ */
+export async function countTowards(product: Product, delta: 1 | -1): Promise<void> {
+  const [brands, categories, sellers] = await Promise.all([
+    collections.brands(),
+    collections.categories(),
+    collections.sellers(),
+  ]);
+
+  await Promise.all([
+    product.brandId
+      ? brands.updateOne({ _id: product.brandId }, { $inc: { productCount: delta } })
+      : Promise.resolve(null),
+    product.categoryId
+      ? categories.updateOne({ _id: product.categoryId }, { $inc: { productCount: delta } })
+      : Promise.resolve(null),
+    sellers.updateOne({ _id: product.sellerId }, { $inc: { 'metrics.productCount': delta } }),
+  ]);
+
+  invalidate([tags.brandList, tags.taxonomy]);
 }

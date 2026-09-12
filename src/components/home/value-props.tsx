@@ -1,6 +1,7 @@
-import { RotateCcw, ShieldCheck, Truck } from 'lucide-react';
-
+import { ContentIcon } from '@/components/ui/content-icon';
 import { Reveal } from '@/components/ui/reveal';
+import type { ValueProp } from '@/domain/site-content';
+import { cn } from '@/lib/cn';
 import { staggerIndex } from '@/lib/motion';
 
 /**
@@ -20,35 +21,37 @@ import { staggerIndex } from '@/lib/motion';
  * carries the meaning. They exist to give the eye an entry point per column,
  * not to convey anything on their own.
  */
-const PROPS = [
-  {
-    icon: Truck,
-    title: 'Free delivery above ₹1,199',
-    body: 'Standard delivery in 3–6 days, 2–4 across metros. Every estimate is calculated from your pincode, never guessed.',
-  },
-  {
-    icon: RotateCcw,
-    title: '14-day returns and exchanges',
-    body: 'Unworn, tags intact. Reverse pickup is free whenever the fault is ours, and refunds land within 5 working days.',
-  },
-  {
-    icon: ShieldCheck,
-    title: 'Every seller reviewed',
-    body: 'Our team approves every store before it can sell, and each store page shows its real record: ratings, dispatch time and returns.',
-  },
-] as const;
+/**
+ * The copy is DATA now.
+ *
+ * It ships with the three promises below as defaults, and an administrator
+ * edits them under Appearance -- because "free delivery above ₹1,199" is a
+ * commercial decision that changes without a deploy, and a number that
+ * disagrees with the shipping rules is worse than no number at all.
+ */
+export function ValueProps({ items }: { items: ValueProp[] }) {
+  const shown = items.filter((item) => item.isActive);
+  if (shown.length === 0) return null;
 
-export function ValueProps() {
   return (
     <Reveal as="section" className="gutter shell-max py-12 sm:py-16">
-      <ul className="border-line bg-raised stagger grid gap-8 rounded-2xl border p-7 sm:grid-cols-3 sm:gap-10 sm:p-10">
-        {PROPS.map(({ icon: Icon, title, body }, index) => (
-          <li key={title} style={staggerIndex(index)}>
+      <ul
+        className={cn(
+          'border-line bg-raised stagger grid gap-8 rounded-2xl border p-7 sm:gap-10 sm:p-10',
+          // The grid follows the count rather than assuming three: two promises
+          // in a three-column grid leaves a hole where the third used to be.
+          shown.length === 1 && 'sm:grid-cols-1',
+          shown.length === 2 && 'sm:grid-cols-2',
+          shown.length >= 3 && 'sm:grid-cols-3',
+        )}
+      >
+        {shown.map(({ id, icon, title, body }, index) => (
+          <li key={id} style={staggerIndex(index)}>
             <span
               className="bg-accent-soft text-accent-ink grid size-11 place-items-center rounded-full"
               aria-hidden
             >
-              <Icon className="size-5" strokeWidth={1.6} />
+              <ContentIcon name={icon} className="size-5" />
             </span>
 
             <h3 className="font-display text-ink mt-4 text-md font-semibold">{title}</h3>

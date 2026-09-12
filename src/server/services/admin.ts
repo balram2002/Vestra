@@ -327,7 +327,14 @@ export async function listAllProducts(
 ): Promise<Paged<Product>> {
   const { page, pageSize, skip } = paging(options);
 
-  const filter: Record<string, unknown> = {};
+  /*
+   * The blank draft the add-product form claims is not a listing yet.
+   *
+   * Uploads need something to belong to, so opening that form creates an
+   * untitled draft up front; showing it here would put a nameless row at the
+   * top of the list every time someone opened the form and changed their mind.
+   */
+  const filter: Record<string, unknown> = { title: { $ne: '' } };
   if (options.status && options.status !== 'ALL') filter.status = options.status;
   if (options.query) filter.title = { $regex: escapeRegex(options.query), $options: 'i' };
 

@@ -19,12 +19,28 @@ import { tags } from './cache-tags';
  */
 
 export async function getHomeSections(): Promise<HomeSection[]> {
+  return getPageSections('home');
+}
+
+/**
+ * The sections of one page, live and in order.
+ *
+ * 'home' also matches sections with no page at all: everything written before
+ * landing pages could be composed belongs to the homepage, and a migration to
+ * stamp them would be a migration to undo the first time one is rolled back.
+ */
+export async function getPageSections(page: string): Promise<HomeSection[]> {
   'use cache';
   cacheTag(tags.content);
   cacheLife('minutes');
 
   const sections = await collections.homeSections();
-  const docs = await sections.find({ isActive: true }).sort({ position: 1 }).toArray();
+  const scope =
+    page === 'home' ? { $or: [{ page }, { page: { $exists: false } }] } : { page };
+  const docs = await sections
+    .find({ ...scope, isActive: true })
+    .sort({ position: 1 })
+    .toArray();
 
   const now = Date.now();
 

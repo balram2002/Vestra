@@ -9,6 +9,7 @@ import {
   isPresenceLive,
   type LiveCandidateState,
 } from '@/domain/live';
+import { galleryAssets, reelAssets } from '@/domain/media';
 import type {
   LiveCandidate,
   LiveMessage,
@@ -999,14 +1000,16 @@ export async function getReels(limit = 15): Promise<ReelView[]> {
     if (!seller) continue;
 
     /*
-     * A video if the listing has one, otherwise the hero shot.
+     * The clips a seller shot FOR this feed, and nothing else.
      *
-     * Nothing in the seed reaches the first branch yet — see the header — but
-     * the shape is already correct, so adding video is an upload feature rather
-     * than a rewrite of this feed.
+     * Sellers upload vertical clips into a reel slot on the listing form, and
+     * each one earns its own entry here. The landscape product video is
+     * deliberately not a fallback: letterboxed 16:9 in a full-screen vertical
+     * feed looks like a mistake, so a listing with no reels appears as its
+     * photograph, exactly as it did before video existed.
      */
-    const clip = product.media.find((item) => item.kind === 'VIDEO');
-    const poster = product.media.find((item) => item.kind === 'IMAGE');
+    const clips = reelAssets(product.media);
+    const poster = galleryAssets(product.media)[0] ?? null;
 
     // No photograph, no reel. A full-screen empty frame is worse than a shorter
     // feed.
@@ -1021,26 +1024,30 @@ export async function getReels(limit = 15): Promise<ReelView[]> {
         ? Math.round(((variant.mrp - variant.sellingPrice) / variant.mrp) * 100)
         : 0;
 
-    reels.push({
-      id: product.id,
-      videoUrl: clip?.url ?? null,
-      posterUrl: poster.url,
-      // The listing's first highlight, which is written as a short selling line
-      // and reads far better over a clip than a truncated description would.
-      caption: product.highlights[0] ?? product.title,
-      sellerName: seller.displayName,
-      sellerSlug: seller.slug,
-      sellerLogoUrl: seller.logoUrl,
-      sellerIsLive: liveSellers.has(seller.id),
-      productId: product.id,
-      productSlug: product.slug,
-      productTitle: product.title,
-      productImage: poster.url,
-      sellingPrice: variant.sellingPrice,
-      mrp: variant.mrp,
-      discountPercent,
-      likes: product.rating.count,
-    });
+    // A listing with several clips earns several entries; one with none
+    // still appears, as its photograph.
+    for (const clip of clips.length > 0 ? clips : [null]) {
+      reels.push({
+        id: clip ? `${product.id}-${clip.id}` : product.id,
+        videoUrl: clip?.url ?? null,
+        posterUrl: poster.url,
+        // The listing's first highlight, which is written as a short selling line
+        // and reads far better over a clip than a truncated description would.
+        caption: product.highlights[0] ?? product.title,
+        sellerName: seller.displayName,
+        sellerSlug: seller.slug,
+        sellerLogoUrl: seller.logoUrl,
+        sellerIsLive: liveSellers.has(seller.id),
+        productId: product.id,
+        productSlug: product.slug,
+        productTitle: product.title,
+        productImage: poster.url,
+        sellingPrice: variant.sellingPrice,
+        mrp: variant.mrp,
+        discountPercent,
+        likes: product.rating.count,
+      });
+    }
   }
 
   // Live shops to the front, order otherwise preserved (already newest first).

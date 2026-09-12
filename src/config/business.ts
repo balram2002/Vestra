@@ -127,6 +127,10 @@ export const CATALOG = {
   trendingViewThreshold: 2500,
   maxImagesPerProduct: 8,
   maxVideosPerProduct: 2,
+  /** One landscape video on the product page. A second is a playlist. */
+  maxShowcaseVideosPerProduct: 1,
+  /** Vertical clips for the reel feed. */
+  maxReelsPerProduct: 5,
   maxImageBytes: 5 * 1024 * 1024,
   maxVideoBytes: 50 * 1024 * 1024,
   acceptedImageTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/avif'],

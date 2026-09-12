@@ -301,7 +301,14 @@ export async function listSellerProducts(
   const page = Math.max(1, options.page ?? 1);
   const pageSize = Math.min(100, options.pageSize ?? 25);
 
-  const filter: Record<string, unknown> = { sellerId };
+  /*
+   * The blank draft the add-product form claims is not a listing yet.
+   *
+   * Uploads need something to belong to, so opening that form creates an
+   * untitled draft up front; showing it here would put a nameless row at the
+   * top of the list every time someone opened the form and changed their mind.
+   */
+  const filter: Record<string, unknown> = { sellerId, title: { $ne: '' } };
   if (options.status && options.status !== 'ALL') filter.status = options.status;
   if (options.query) {
     // Anchored regex so it can still use an index prefix; a leading wildcard

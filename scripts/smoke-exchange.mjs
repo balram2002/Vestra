@@ -119,7 +119,7 @@ const browser = await chromium.launch();
 async function sessionFor(email) {
   const context = await browser.newContext();
   const page = await context.newPage();
-  await page.goto(`${BASE}/login`, { waitUntil: 'load' });
+  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
   await page.fill('input[name="email"]', email);
   await page.fill('input[name="password"]', PASSWORD);
   await Promise.all([
@@ -135,7 +135,7 @@ const availableBefore = await availableOf(candidate.target.id);
 const reservedBefore = await reservedOf(candidate.target.id);
 
 const shopper = await sessionFor(customer.email);
-await shopper.page.goto(`${BASE}/orders/${candidate.order._id}`, { waitUntil: 'load' });
+await shopper.page.goto(`${BASE}/orders/${candidate.order._id}`, { waitUntil: 'domcontentloaded' });
 await shopper.page.waitForTimeout(1500);
 
 const exchangeButton = shopper.page.getByRole('button', { name: 'Exchange size' }).first();
@@ -182,7 +182,7 @@ await shopper.context.close();
 
 if (request) {
   const sellerSession = await sessionFor(sellerUser.email);
-  await sellerSession.page.goto(`${BASE}/seller/returns`, { waitUntil: 'load' });
+  await sellerSession.page.goto(`${BASE}/seller/returns`, { waitUntil: 'domcontentloaded' });
   await sellerSession.page.waitForTimeout(1500);
 
   const queueText = await sellerSession.page.locator('body').innerText();
@@ -212,7 +212,7 @@ if (request) {
 
   /* ---------------------------------------------- quality check passes */
 
-  await sellerSession.page.goto(`${BASE}/seller/returns`, { waitUntil: 'load' });
+  await sellerSession.page.goto(`${BASE}/seller/returns`, { waitUntil: 'domcontentloaded' });
   await sellerSession.page.waitForTimeout(1500);
 
   const qc = sellerSession.page.getByRole('button', { name: /^Passed/ }).first();

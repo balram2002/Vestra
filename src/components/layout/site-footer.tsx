@@ -1,14 +1,11 @@
 import {
   ArrowUpRight,
-  BadgeCheck,
   Facebook,
   Instagram,
   LifeBuoy,
   Linkedin,
   Mail,
   Phone,
-  RotateCcw,
-  ShieldCheck,
   Youtube,
 } from 'lucide-react';
 import { cacheLife, cacheTag } from 'next/cache';
@@ -17,7 +14,9 @@ import Link from 'next/link';
 import { BrandLockup } from '@/components/layout/wordmark';
 import { cn } from '@/lib/cn';
 import { siteConfig } from '@/config/site';
+import { ContentIcon } from '@/components/ui/content-icon';
 import { getDepartments, listBrands } from '@/server/services/catalog';
+import { getSiteContent } from '@/server/services/site-content';
 import { tags } from '@/server/services/cache-tags';
 
 /**
@@ -59,13 +58,6 @@ const PAYMENT_METHODS = [
   'Cash on delivery',
 ] as const;
 
-/** The three promises worth repeating at the point of leaving. */
-const GUARANTEES = [
-  { label: 'Secure checkout', icon: ShieldCheck },
-  { label: '14-day returns', icon: RotateCcw },
-  { label: 'Every seller reviewed', icon: BadgeCheck },
-] as const;
-
 /**
  * Only the accounts that have a glyph worth showing (X has no Lucide icon),
  * and only the ones configured: a link to a handle the shop does not own sends
@@ -90,31 +82,23 @@ export async function SiteFooter() {
   cacheTag(tags.taxonomy, tags.brandList);
   cacheLife('days');
 
-  const [departments, brands] = await Promise.all([getDepartments(), listBrands(16)]);
+  /*
+   * The link columns are DATA.
+   *
+   * Help, Company and Legal used to be three arrays in this file, which meant a
+   * new policy page or a renamed link was a deploy. They are edited under
+   * Appearance now; `domain/site-content` holds what the shop ships with, so a
+   * clean database renders exactly this footer.
+   *
+   * "Shop" stays computed from the taxonomy: it should follow the departments
+   * that actually exist, not a list somebody has to remember to update.
+   */
+  const [departments, brands, content] = await Promise.all([
+    getDepartments(),
+    listBrands(16),
+    getSiteContent(),
+  ]);
   const year = new Date().getFullYear();
-
-  const help = [
-    { href: '/help/contact', label: 'Contact us' },
-    { href: '/help/shipping', label: 'Shipping & delivery' },
-    { href: '/help/returns', label: 'Returns & exchanges' },
-    { href: '/help/refunds', label: 'Refunds' },
-    { href: '/help/size-guide', label: 'Size guide' },
-    { href: '/orders', label: 'Track your order' },
-  ];
-
-  const company = [
-    { href: '/about', label: 'About VestraWAB' },
-    { href: '/sell-with-us', label: 'Sell on VestraWAB' },
-    { href: '/stores', label: 'Our sellers' },
-    { href: '/brands', label: 'All brands' },
-  ];
-
-  const legal = [
-    { href: '/legal/terms', label: 'Terms of use' },
-    { href: '/legal/privacy', label: 'Privacy policy' },
-    { href: '/legal/returns-policy', label: 'Return policy' },
-    { href: '/legal/grievance', label: 'Grievance redressal' },
-  ];
 
   return (
     <footer className="bg-sunken border-line mt-20 border-t">
@@ -164,29 +148,15 @@ export async function SiteFooter() {
             ))}
           </FooterColumn>
 
-          <FooterColumn title="Help">
-            {help.map((link) => (
-              <FooterLink key={link.href} href={link.href}>
-                {link.label}
-              </FooterLink>
-            ))}
-          </FooterColumn>
-
-          <FooterColumn title="Company">
-            {company.map((link) => (
-              <FooterLink key={link.href} href={link.href}>
-                {link.label}
-              </FooterLink>
-            ))}
-          </FooterColumn>
-
-          <FooterColumn title="Legal">
-            {legal.map((link) => (
-              <FooterLink key={link.href} href={link.href}>
-                {link.label}
-              </FooterLink>
-            ))}
-          </FooterColumn>
+          {content.footerColumns.map((column) => (
+            <FooterColumn key={column.id} title={column.title}>
+              {column.links.map((link) => (
+                <FooterLink key={link.id} href={link.href}>
+                  {link.label}
+                </FooterLink>
+              ))}
+            </FooterColumn>
+          ))}
 
           {/*
             The contact card.
@@ -297,10 +267,12 @@ export async function SiteFooter() {
           </div>
 
           <ul className="flex flex-wrap items-center gap-x-5 gap-y-2">
-            {GUARANTEES.map((guarantee) => (
-              <li key={guarantee.label} className="text-muted flex items-center gap-2 text-xs">
-                <guarantee.icon className="text-accent-ink size-4 shrink-0" aria-hidden />
-                {guarantee.label}
+            {/* The promises worth repeating at the point of leaving, edited
+                under Appearance beside the ones in the header. */}
+            {content.footerBadges.map((badge) => (
+              <li key={badge.id} className="text-muted flex items-center gap-2 text-xs">
+                <ContentIcon name={badge.icon} className="text-accent-ink size-4 shrink-0" />
+                {badge.label}
               </li>
             ))}
           </ul>

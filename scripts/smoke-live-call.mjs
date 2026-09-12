@@ -67,14 +67,14 @@ try {
   const shop = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const shopPage = await shop.newPage();
   shopPage.on('pageerror', (error) => pageErrors.push(`shop: ${error.message}`));
-  await shopPage.goto(`${BASE}/login`, { waitUntil: 'load' });
+  await shopPage.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
   await shopPage.fill('input[name="email"]', owner.email);
   await shopPage.fill('input[name="password"]', PASSWORD);
   await Promise.all([
     shopPage.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 30000 }),
     shopPage.click('button[type="submit"]'),
   ]);
-  await shopPage.goto(`${BASE}/seller`, { waitUntil: 'load' });
+  await shopPage.goto(`${BASE}/seller`, { waitUntil: 'domcontentloaded' });
   await shopPage.waitForTimeout(2000);
 
   // Set the switch, never toggle it: a previous run may have left it on.
@@ -87,7 +87,7 @@ try {
   shopper.on('pageerror', (error) => pageErrors.push(`shopper: ${error.message}`));
 
   await step('the shopper starts a live request from the product page', async () => {
-    await shopper.goto(`${BASE}/product/${product.slug}`, { waitUntil: 'load', timeout: 60000 });
+    await shopper.goto(`${BASE}/product/${product.slug}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
     await shopper.waitForTimeout(2000);
     await shopper.locator('button[aria-label="See this product live"]').first().click();
     await shopper.fill('input[name="pincode"]', location.pincode);
@@ -162,7 +162,7 @@ try {
 
   await step('the bag labels it as a live price', async () => {
     const bag = await buyer.newPage();
-    await bag.goto(`${BASE}/bag`, { waitUntil: 'load' });
+    await bag.goto(`${BASE}/bag`, { waitUntil: 'domcontentloaded' });
     await bag.getByText(`Live price from ${seller.displayName}`).waitFor({ timeout: 15000 });
     await bag.close();
     // A page left behind a closed tab can stay "hidden" in headless Chromium.

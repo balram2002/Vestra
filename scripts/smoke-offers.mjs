@@ -47,7 +47,7 @@ await db.collection('carts').deleteMany({ userId: shopper._id });
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1440, height: 1100 } });
 
-await page.goto(`${BASE}/login`, { waitUntil: 'load' });
+await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
 await page.fill('input[name="email"]', EMAIL);
 await page.fill('input[name="password"]', PASSWORD);
 await Promise.all([
@@ -117,7 +117,7 @@ for (const coupon of openCoupons) {
 }
 check('found a product whose sizes are all in stock', Boolean(product), product?.title ?? '');
 
-await page.goto(`${BASE}/product/${product.slug}`, { waitUntil: 'load' });
+await page.goto(`${BASE}/product/${product.slug}`, { waitUntil: 'domcontentloaded' });
 await page.waitForTimeout(1200);
 
 // Scoped to the size control, and skipping sold-out sizes: a disabled size
@@ -138,7 +138,7 @@ check('a size could be selected', picked, `${sizeCount} sizes offered`);
 await page.getByRole('button', { name: /add to bag/i }).first().click();
 await page.waitForTimeout(2500);
 
-await page.goto(`${BASE}/bag`, { waitUntil: 'load' });
+await page.goto(`${BASE}/bag`, { waitUntil: 'domcontentloaded' });
 await page.waitForTimeout(2000);
 
 const bagText = await page.locator('body').innerText();
@@ -286,7 +286,7 @@ if (categoryPromotion) {
       updatedAt: now,
     });
 
-    await page.goto(`${BASE}/bag`, { waitUntil: 'load' });
+    await page.goto(`${BASE}/bag`, { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(2500);
     const promoText = await page.locator('body').innerText();
 

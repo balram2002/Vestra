@@ -84,11 +84,22 @@ export function BottomNavBar({
   pathname,
   bagCount = 0,
   wishlistCount = 0,
+  hide = [],
 }: {
   pathname: string | null;
   bagCount?: number;
   wishlistCount?: number;
+  /**
+   * Destinations an administrator has switched off, by href.
+   *
+   * The bar reflows around what is left rather than leaving a gap: four tabs
+   * on a phone are wider and easier to hit than five, which is the whole
+   * reason turning one off is worth doing.
+   */
+  hide?: string[];
 }) {
+  const shown = DESTINATIONS.filter((destination) => !hide.includes(destination.href));
+
   const isActive = (destination: Destination) => {
     if (!pathname) return false;
     if (destination.href === '/') return pathname === '/';
@@ -140,7 +151,7 @@ export function BottomNavBar({
           />
         ) : null}
 
-        {DESTINATIONS.map((destination) => {
+        {shown.map((destination) => {
           const active = isActive(destination);
           const Icon = destination.icon;
           const count = countFor(destination.href);
@@ -232,7 +243,11 @@ function NavTarget({
  *
  * Kept separate so the layout can render `BottomNavBar` directly as a fallback.
  */
-export function BottomNav(props: { bagCount?: number; wishlistCount?: number }) {
+export function BottomNav(props: {
+  bagCount?: number;
+  wishlistCount?: number;
+  hide?: string[];
+}) {
   const pathname = usePathname();
   return <BottomNavBar pathname={pathname} {...props} />;
 }

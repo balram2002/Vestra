@@ -89,7 +89,7 @@ try {
   page.on('pageerror', (error) => pageErrors.push(error.message));
 
   await step('a new customer can register', async () => {
-    await page.goto(`${BASE}/register`, { waitUntil: 'load' });
+    await page.goto(`${BASE}/register`, { waitUntil: 'domcontentloaded' });
     await page.fill('input[name="fullName"]', 'Smoke Test Shopper');
     await page.fill('input[name="email"]', EMAIL);
     await page.fill('input[name="password"]', PASSWORD);
@@ -102,9 +102,9 @@ try {
   });
 
   await step('an item goes in the bag', async () => {
-    await page.goto(`${BASE}/category/womens-ethnic-wear`, { waitUntil: 'load' });
+    await page.goto(`${BASE}/category/womens-ethnic-wear`, { waitUntil: 'domcontentloaded' });
     const href = await page.locator('a[href^="/product/"]').first().getAttribute('href');
-    await page.goto(BASE + href, { waitUntil: 'load' });
+    await page.goto(BASE + href, { waitUntil: 'domcontentloaded' });
     const sizes = page.locator('#size-options button[aria-pressed]');
     const count = await sizes.count();
     for (let i = 0; i < count; i++) {
@@ -122,7 +122,7 @@ try {
   });
 
   await step('checkout with no saved address adds one in place', async () => {
-    await page.goto(`${BASE}/checkout`, { waitUntil: 'load' });
+    await page.goto(`${BASE}/checkout`, { waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: 'Add an address' }).click();
     const dialog = page.getByRole('dialog');
     await fillAddress(dialog, {
@@ -160,7 +160,7 @@ try {
   /* ---------------------------------------------------------- the book */
 
   await step('the book adds a second address as the default', async () => {
-    await page.goto(`${BASE}/account/addresses`, { waitUntil: 'load' });
+    await page.goto(`${BASE}/account/addresses`, { waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: 'Add address' }).click();
     const dialog = page.getByRole('dialog');
     await fillAddress(dialog, {
@@ -206,7 +206,7 @@ try {
   /* ------------------------------------------------------------ profile */
 
   await step('the profile saves a new name', async () => {
-    await page.goto(`${BASE}/account/profile`, { waitUntil: 'load' });
+    await page.goto(`${BASE}/account/profile`, { waitUntil: 'domcontentloaded' });
     await page.locator('input[name="fullName"]').fill('Smoke Tested Shopper');
     await page.getByRole('button', { name: 'Save details' }).click();
     await poll(async () => (await findUser())?.fullName === 'Smoke Tested Shopper');
@@ -222,7 +222,7 @@ try {
 
     const fresh = await browser.newContext();
     const login = await fresh.newPage();
-    await login.goto(`${BASE}/login`, { waitUntil: 'load' });
+    await login.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
     await login.fill('input[name="email"]', EMAIL);
     await login.fill('input[name="password"]', PASSWORD);
     await login.click('button[type="submit"]');
@@ -244,7 +244,7 @@ try {
   /* ------------------------------------------------------------ support */
 
   await step('a support request opens against the order', async () => {
-    await page.goto(`${BASE}/account/support`, { waitUntil: 'load' });
+    await page.goto(`${BASE}/account/support`, { waitUntil: 'domcontentloaded' });
     await page.getByRole('button', { name: 'New request' }).click();
     const dialog = page.getByRole('dialog');
     await dialog.locator('select[name="category"]').selectOption({ index: 1 });

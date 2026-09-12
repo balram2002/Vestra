@@ -84,7 +84,7 @@ async function signIn(email) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await context.newPage();
   page.on('pageerror', (error) => pageErrors.push(error.message));
-  await page.goto(`${BASE}/login`, { waitUntil: 'load' });
+  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
   await page.fill('input[name="email"]', email);
   await page.fill('input[name="password"]', PASSWORD);
   await Promise.all([
@@ -98,7 +98,7 @@ const ratingOf = async (productId) =>
   (await db.collection('products').findOne({ _id: productId }, { projection: { rating: 1 } })).rating;
 
 async function writeReview(page, item, stars, body) {
-  await page.goto(`${BASE}/orders/${item.orderId}`, { waitUntil: 'load' });
+  await page.goto(`${BASE}/orders/${item.orderId}`, { waitUntil: 'domcontentloaded' });
   const row = page.locator('main li').filter({ hasText: item.productTitle.slice(0, 28) }).first();
   await row.getByRole('button', { name: 'Write a review' }).click();
   const dialog = page.getByRole('dialog');
@@ -139,7 +139,7 @@ try {
   });
 
   await step('a second review is not offered for the same item', async () => {
-    await page.reload({ waitUntil: 'load' });
+    await page.reload({ waitUntil: 'domcontentloaded' });
     const row = page.locator('main li').filter({ hasText: first.productTitle.slice(0, 28) }).first();
     await row.getByText('You rated it 4 of 5').waitFor({ timeout: 15000 });
     if ((await row.getByRole('button', { name: 'Write a review' }).count()) > 0) {
@@ -158,7 +158,7 @@ try {
   const admin = await signIn(ADMIN);
 
   await step('an admin takes the live review down, and the rating moves back', async () => {
-    await admin.goto(`${BASE}/admin/reviews?status=PUBLISHED`, { waitUntil: 'load' });
+    await admin.goto(`${BASE}/admin/reviews?status=PUBLISHED`, { waitUntil: 'domcontentloaded' });
     const row = admin.locator('tr', { hasText: 'Smoke review: the fabric is soft' });
     await row.getByRole('button', { name: 'Take down' }).click();
     const dialog = admin.getByRole('dialog');
@@ -172,7 +172,7 @@ try {
   });
 
   await step('an admin publishes the held review', async () => {
-    await admin.goto(`${BASE}/admin/reviews`, { waitUntil: 'load' });
+    await admin.goto(`${BASE}/admin/reviews`, { waitUntil: 'domcontentloaded' });
     const row = admin.locator('tr', { hasText: 'Smoke review: lovely piece' });
     await row.getByRole('button', { name: 'Publish' }).click();
     await poll(async () => {

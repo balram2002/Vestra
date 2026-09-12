@@ -290,6 +290,13 @@ export type HomeSectionKind =
 export interface HomeSection {
   id: string;
   kind: HomeSectionKind;
+  /**
+   * Which page this sits on: 'home', or a CMS page's slug.
+   *
+   * Absent on sections written before landing pages could be composed, which
+   * is why every read treats "missing" as the homepage.
+   */
+  page?: string;
   title: string | null;
   subtitle: string | null;
   /** Optional "See all" destination. */
@@ -312,6 +319,8 @@ export interface HomeSectionConfig {
   source?: 'MANUAL' | 'NEW_ARRIVALS' | 'BESTSELLERS' | 'TRENDING' | 'DEALS' | 'RECOMMENDED' | 'CATEGORY' | 'BRAND';
   productIds?: string[];
   categoryId?: string;
+  /** Hand-picked categories, in the order they should appear. */
+  categoryIds?: string[];
   brandIds?: string[];
   sellerIds?: string[];
   limit?: number;
@@ -320,7 +329,7 @@ export interface HomeSectionConfig {
   /** For EDITORIAL. */
   body?: string;
   imageUrl?: string;
-  layout?: 'GRID_2' | 'GRID_3' | 'GRID_4' | 'CAROUSEL' | 'SPLIT';
+  layout?: 'GRID_2' | 'GRID_3' | 'GRID_4' | 'CAROUSEL' | 'SPLIT' | 'BANNER';
   theme?: 'light' | 'dark' | 'accent';
 }
 

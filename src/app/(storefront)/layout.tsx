@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 
 import { BottomNav, BottomNavBar } from '@/components/layout/bottom-nav';
+import { getSiteContent } from '@/server/services/site-content';
 import { RouteProgress } from '@/components/layout/route-progress';
 import { SiteFooter } from '@/components/layout/site-footer';
 import { SiteHeader, SiteHeaderFallback } from '@/components/layout/site-header';
@@ -71,10 +72,26 @@ export default function StorefrontLayout({ children }: { children: React.ReactNo
  */
 async function BottomNavWithCounts() {
   const owner = await currentOwner();
-  const [bagCount, wishlistCount] = await Promise.all([
+  const [bagCount, wishlistCount, hide] = await Promise.all([
     getBagCount(owner),
     getWishlistCount(owner),
+    hiddenDestinations(),
   ]);
 
-  return <BottomNav bagCount={bagCount} wishlistCount={wishlistCount} />;
+  return <BottomNav bagCount={bagCount} wishlistCount={wishlistCount} hide={hide} />;
 }
+/**
+ * Destinations an administrator has switched off.
+ *
+ * Read once, next to where the bar is mounted, so "turn off Reels" removes the
+ * tab, the header icon and the menu entry together. A half-hidden action is
+ * worse than either state.
+ */
+async function hiddenDestinations(): Promise<string[]> {
+  const { headerActions } = await getSiteContent();
+  const hidden: string[] = [];
+  if (!headerActions.reels) hidden.push('/reels');
+  if (!headerActions.bag) hidden.push('/bag');
+  return hidden;
+}
+

@@ -2,40 +2,74 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
 import { PageHeader } from '@/components/console/page-header';
-import { ListingForm } from '@/components/seller/listing-form';
+import { QuickListingForm } from '@/components/seller/quick-listing-form';
+import { mediaRole } from '@/domain/media';
 import { requireSeller } from '@/server/auth/session';
-import { authoringOptions } from '@/server/services/authoring';
+import { collections, toEntity } from '@/server/db/collections';
+import { startListing } from '@/server/services/authoring';
+import { listingOptions } from '@/server/services/catalog-authoring';
 
-export const metadata: Metadata = { title: 'New listing' };
+export const metadata: Metadata = { title: 'Add a product' };
 
 /**
- * A new listing starts as a DRAFT and nothing else.
+ * Add a product.
  *
- * Sizes and photography come after the draft exists, because both need
- * something to attach to. Asking for all three at once is how a seller ends up
- * losing twenty minutes of typing to a failed upload.
+ * One screen, ending in something that is in the shop. It used to be a draft,
+ * a separate media step, a separate size grid and then a review queue -- four
+ * stages before a seller's first product could be bought, and three of them
+ * existed because the fourth did.
  */
 export default function NewListingPage() {
   return (
     <>
       <PageHeader
         back={{ href: '/seller/products', label: 'All products' }}
-        title="New listing"
-        description="Start with the details. You can add sizes and photos once it is saved."
+        title="Add a product"
+        description="A name, a price, a photo and it is live. Everything else can follow."
       />
 
-      <div className="mt-6 max-w-3xl">
-        <Suspense fallback={<div className="skeleton h-96 rounded-lg" aria-hidden />}>
-          <NewForm />
-        </Suspense>
-      </div>
+      <Suspense fallback={<div className="skeleton mt-6 h-96 rounded-lg" aria-hidden />}>
+        <Form />
+      </Suspense>
     </>
   );
 }
 
-async function NewForm() {
+async function Form() {
   const user = await requireSeller();
-  const options = await authoringOptions(user.sellerId);
 
-  return <ListingForm product={null} brands={options.brands} categories={options.categories} />;
+  /*
+   * The draft is claimed BEFORE the form renders, because files have to belong
+   * to something to be stored against it -- and `startListing` reuses this
+   * seller's blank draft, so opening the page twice claims the same one.
+   */
+  const [started, options] = await Promise.all([startListing(user.sellerId), listingOptions()]);
+
+  if (!started.ok || !started.productId) {
+    return (
+      <p className="border-line text-muted mt-6 rounded-lg border border-dashed px-4 py-8 text-sm">
+        {started.error ?? 'A listing could not be started. Try again in a moment.'}
+      </p>
+    );
+  }
+
+  // A reused draft may already carry files from the last attempt.
+  const products = await collections.products();
+  const draft = toEntity(await products.findOne({ _id: started.productId }));
+
+  return (
+    <QuickListingForm
+      productId={started.productId}
+      brands={options.brands}
+      categories={options.categories}
+      parents={options.parents}
+      media={(draft?.media ?? []).map((asset) => ({
+        id: asset.id,
+        url: asset.url,
+        kind: asset.kind,
+        role: mediaRole(asset),
+      }))}
+      doneHref="/seller/products"
+    />
+  );
 }

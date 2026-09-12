@@ -19,6 +19,7 @@ import { WishlistButton } from '@/components/commerce/wishlist-button';
 import { Button } from '@/components/ui/button';
 import { ChipButton, ChipSwatch } from '@/components/ui/chip';
 import { INVENTORY } from '@/config/business';
+import { galleryAssets, showcaseVideo } from '@/domain/media';
 import type { Media, ProductVariant } from '@/domain/types';
 import { Carousel, CarouselItem, useSlideParallax } from '@/components/ui/carousel';
 import { cn } from '@/lib/cn';
@@ -235,8 +236,21 @@ export function ProductViewer({
         out.push(item);
       }
     }
-    return out.length > 0 ? out : media.slice(0, 5);
+    // Photographs only. A video in this list would be handed to `ZoomShot`,
+    // which renders an `<img>` — it belongs on its own slide, below.
+    return galleryAssets(out.length > 0 ? out : media).slice(0, 8);
   }, [forColor, media]);
+
+  /*
+   * The product video, as the last slide.
+   *
+   * Last rather than first on purpose: the photographs are what a shopper came
+   * to study, and a video that opens the gallery costs a tap before the
+   * garment is even seen. It is a slide rather than a block further down the
+   * page because that is where people already swipe for more of the product.
+   */
+  const video = useMemo(() => showcaseVideo(media), [media]);
+  const slideCount = gallery.length + (video ? 1 : 0);
 
   // Quote the selected variant, or the cheapest available one before a choice
   // is made — never an average, which matches nothing actually on sale.
@@ -329,7 +343,7 @@ export function ProductViewer({
           label={`${title} photographs`}
           className="min-w-0 flex-1"
           contentClassName="gap-0 rounded-xl"
-          dots={gallery.length > 1}
+          dots={slideCount > 1}
           activeIndex={shot}
           onActiveChange={setShot}
         >
@@ -361,6 +375,35 @@ export function ProductViewer({
               <ZoomShot media={item} priority={index === 0} />
             </CarouselItem>
           ))}
+
+          {video ? (
+            <CarouselItem
+              key={video.id}
+              index={slideCount}
+              total={slideCount}
+              className="w-full"
+              depth
+            >
+              {/*
+                Controls, and no autoplay.
+
+                A clip that starts itself inside a gallery someone is swiping
+                through is noise they did not ask for, and on a phone it is
+                their data. `preload="metadata"` fetches the first frames only,
+                so the poster is real rather than a black rectangle.
+              */}
+              <video
+                src={video.url}
+                poster={video.thumbnailUrl !== video.url ? video.thumbnailUrl : undefined}
+                controls
+                playsInline
+                preload="metadata"
+                className="bg-sunken aspect-4/5 w-full rounded-xl object-cover sm:aspect-3/4"
+              >
+                <track kind="captions" />
+              </video>
+            </CarouselItem>
+          ) : null}
         </Carousel>
       </div>
 

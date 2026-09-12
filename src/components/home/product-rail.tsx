@@ -1,8 +1,22 @@
 import { ProductCard } from '@/components/commerce/product-card';
 import { Carousel, CarouselItem } from '@/components/ui/carousel';
 import type { HomeSection, ProductSummary } from '@/domain/types';
+import { cn } from '@/lib/cn';
 
 import { Section } from './section';
+
+/**
+ * Columns per layout.
+ *
+ * A grid is the right shape when a section is a destination in its own right --
+ * "everything on sale" wants to be read, not swiped. The carousel stays the
+ * default because most rails are a taste of a bigger list.
+ */
+const GRID_COLUMNS: Record<string, string> = {
+  GRID_2: 'grid-cols-2',
+  GRID_3: 'grid-cols-2 sm:grid-cols-3',
+  GRID_4: 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4',
+};
 
 /**
  * Product rail.
@@ -37,6 +51,22 @@ export function ProductRail({
   priority?: boolean;
 }) {
   if (products.length === 0) return null;
+
+  const columns = section.config.layout ? GRID_COLUMNS[section.config.layout] : undefined;
+
+  if (columns) {
+    return (
+      <Section title={section.title} subtitle={section.subtitle} href={section.href}>
+        <ul className={cn('grid gap-3 sm:gap-4', columns)}>
+          {products.map((product, index) => (
+            <li key={product.id}>
+              <ProductCard product={product} priority={priority && index < 2} />
+            </li>
+          ))}
+        </ul>
+      </Section>
+    );
+  }
 
   return (
     <Section

@@ -37,10 +37,13 @@ import { BrandLockup } from './wordmark';
 export function MobileNav({
   menu,
   accountSlot,
+  showWishlist = true,
 }: {
   menu: Array<{ department: Category; groups: Array<{ shelf: Category; leaves: Category[] }> }>;
   /** Streamed from the server: the consoles this person can work in, if any. */
   accountSlot?: React.ReactNode;
+  /** Switched off under Appearance. */
+  showWishlist?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [departmentSlug, setDepartmentSlug] = useState<string | null>(null);
@@ -223,9 +226,13 @@ export function MobileNav({
                     <QuickLink href="/orders" icon={Package}>
                       Your orders
                     </QuickLink>
-                    <QuickLink href="/wishlist" icon={Heart}>
-                      Saved items
-                    </QuickLink>
+                    {/* Off under Appearance means off here too: an action that
+                        survives in one menu is the confusing half-state. */}
+                    {showWishlist ? (
+                      <QuickLink href="/wishlist" icon={Heart}>
+                        Saved items
+                      </QuickLink>
+                    ) : null}
                   </div>
                 </motion.div>
               )}

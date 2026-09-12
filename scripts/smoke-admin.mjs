@@ -42,7 +42,7 @@ const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1440, height: 1100 } });
 
 try {
-  await page.goto(`${BASE}/login`, { waitUntil: 'load' });
+  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
   await page.fill('input[name="email"]', 'superadmin@vestra.test');
   await page.fill('input[name="password"]', 'vestra123');
   await Promise.all([
@@ -50,7 +50,7 @@ try {
     page.click('button[type="submit"]'),
   ]);
 
-  await page.goto(`${BASE}/admin/products?status=PENDING_REVIEW`, { waitUntil: 'load' });
+  await page.goto(`${BASE}/admin/products?status=PENDING_REVIEW`, { waitUntil: 'domcontentloaded' });
 
   /*
    * Wait for the button to EXIST, not for a fixed number of milliseconds.
@@ -112,7 +112,7 @@ try {
   }
 
   // The rejection path must demand a reason before it will fire.
-  await page.goto(`${BASE}/admin/products?status=PENDING_REVIEW`, { waitUntil: 'load' });
+  await page.goto(`${BASE}/admin/products?status=PENDING_REVIEW`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1800);
   const reject = page.getByRole('button', { name: 'Reject' }).first();
   if ((await reject.count()) > 0) {

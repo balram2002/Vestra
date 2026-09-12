@@ -49,14 +49,14 @@ const browser = await chromium.launch();
 
 const shop = await browser.newContext({ viewport: { width: 1280, height: 900 } });
 const shopPage = await shop.newPage();
-await shopPage.goto(BASE + '/login', { waitUntil: 'load' });
+await shopPage.goto(BASE + '/login', { waitUntil: 'domcontentloaded' });
 await shopPage.fill('input[name="email"]', owner.email);
 await shopPage.fill('input[name="password"]', PASSWORD);
 await Promise.all([
   shopPage.waitForURL((u) => !u.pathname.startsWith('/login'), { timeout: 30000 }),
   shopPage.click('button[type="submit"]'),
 ]);
-await shopPage.goto(BASE + '/seller', { waitUntil: 'load' });
+await shopPage.goto(BASE + '/seller', { waitUntil: 'domcontentloaded' });
 await shopPage.waitForTimeout(2000);
 
 /*
@@ -80,7 +80,7 @@ console.log('presence:', presence?.state, '| location matches:', presence?.locat
 
 const buyer = await browser.newContext({ viewport: { width: 390, height: 844 } });
 const buyerPage = await buyer.newPage();
-await buyerPage.goto(BASE + '/product/' + product.slug, { waitUntil: 'load', timeout: 60000 });
+await buyerPage.goto(BASE + '/product/' + product.slug, { waitUntil: 'domcontentloaded', timeout: 60000 });
 await buyerPage.waitForTimeout(2500);
 await buyerPage.locator('button[aria-label="See this product live"]').first().click();
 await buyerPage.waitForTimeout(700);
@@ -126,7 +126,7 @@ if (appeared) {
   console.log('room: url           ', new URL(buyerPage.url()).pathname);
   console.log('after client nav — strip present:', (await buyerPage.content()).includes('Free delivery above'));
 
-  await buyerPage.reload({ waitUntil: 'load' });
+  await buyerPage.reload({ waitUntil: 'domcontentloaded' });
   await buyerPage.waitForTimeout(1500);
   console.log('after hard reload  — strip present:', (await buyerPage.content()).includes('Free delivery above'));
 }
@@ -148,7 +148,7 @@ if (appeared) {
  */
 const cross = await browser.newContext({ viewport: { width: 390, height: 844 } });
 const crossPage = await cross.newPage();
-await crossPage.goto(BASE + '/categories', { waitUntil: 'load' });
+await crossPage.goto(BASE + '/categories', { waitUntil: 'domcontentloaded' });
 await crossPage.waitForTimeout(1500);
 await crossPage.locator('nav[aria-label="Primary"] a', { hasText: 'Reels' }).first().click();
 await crossPage.waitForURL('**/reels', { timeout: 20000 });

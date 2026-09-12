@@ -5,6 +5,22 @@ import type { ProductStatus, StockLevel } from '../enums';
 
 export type MediaKind = 'IMAGE' | 'VIDEO';
 
+/**
+ * What an asset is FOR, which is not the same as what it is.
+ *
+ * A product carries three kinds of media shown in three different places, so
+ * the gallery cannot simply be "everything attached":
+ *
+ *   GALLERY   the photographs, shown in the product gallery
+ *   SHOWCASE  the one landscape video on the product page
+ *   REEL      vertical clips for the reel feed, up to five
+ *
+ * Optional on `Media` because assets written before roles existed carry none.
+ * Read it through `mediaRole` in `domain/media`, which treats a missing role as
+ * a gallery asset.
+ */
+export type MediaRole = 'GALLERY' | 'SHOWCASE' | 'REEL';
+
 export interface Media {
   id: string;
   kind: MediaKind;
@@ -18,6 +34,10 @@ export interface Media {
   position: number;
   /** Variant this asset belongs to, or null when it applies to the whole style. */
   variantId: string | null;
+  /** Where this asset is shown. Absent on assets created before roles existed. */
+  role?: MediaRole;
+  /** Seconds. Video only, and only when the browser reported it. */
+  durationSeconds?: number | null;
 }
 
 /* -------------------------------------------------------------- taxonomy */
@@ -60,6 +80,10 @@ export interface Category {
   createdAt: string;
   /** Drives `lastModified` in the sitemap, so crawlers recrawl on a real edit. */
   updatedAt: string;
+  /** Set when a seller added it themselves, rather than the catalogue team. */
+  createdBySellerId?: string | null;
+  /** When staff last looked at it. Null on something a seller just added. */
+  reviewedAt?: string | null;
 }
 
 export interface Brand {
@@ -83,6 +107,10 @@ export interface Brand {
   metaDescription: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Set when a seller added it themselves, rather than the catalogue team. */
+  createdBySellerId?: string | null;
+  /** When staff last looked at it. Null on something a seller just added. */
+  reviewedAt?: string | null;
 }
 
 /* ----------------------------------------------------------------- product */
@@ -154,6 +182,11 @@ export interface Product {
   warrantyMonths: number | null;
 
   /** Publishing / moderation trail. */
+  /** When staff last reviewed it. Null while it is live but unseen by them. */
+  reviewedAt?: string | null;
+  reviewedByUserId?: string | null;
+  /** True when it went live without review, which is now the normal path. */
+  selfPublished?: boolean;
   submittedAt: string | null;
   approvedAt: string | null;
   approvedByUserId: string | null;

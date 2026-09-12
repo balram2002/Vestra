@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import { BrandToggle } from '@/components/console/admin-actions';
 import { CreateBrandDialog } from '@/components/console/admin-create';
 import { DataTable, TableEmpty, type Column } from '@/components/console/data-table';
+import { EditBrandDialog } from '@/components/console/catalog-edit';
 import { PageHeader } from '@/components/console/page-header';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -111,7 +112,20 @@ async function BrandTable() {
       header: canWrite ? '' : 'State',
       render: (brand) =>
         canWrite ? (
-          <BrandToggle brandId={brand.id} name={brand.name} isActive={brand.isActive} />
+          <div className="flex items-center justify-end gap-1">
+            <EditBrandDialog
+              brand={{
+                id: brand.id,
+                name: brand.name,
+                description: brand.description,
+                logoUrl: brand.logoUrl,
+                bannerUrl: brand.bannerUrl,
+                isPremium: brand.isPremium,
+                isActive: brand.isActive,
+              }}
+            />
+            <BrandToggle brandId={brand.id} name={brand.name} isActive={brand.isActive} />
+          </div>
         ) : (
           <Badge tone={brand.isActive ? 'success' : 'neutral'} size="sm">
             {brand.isActive ? 'Visible' : 'Hidden'}

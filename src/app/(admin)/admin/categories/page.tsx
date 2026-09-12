@@ -5,6 +5,7 @@ import { Suspense } from 'react';
 
 import { CategoryToggle } from '@/components/console/admin-actions';
 import { CreateCategoryDialog } from '@/components/console/admin-create';
+import { EditCategoryDialog } from '@/components/console/catalog-edit';
 import { PageHeader } from '@/components/console/page-header';
 import { Badge } from '@/components/ui/badge';
 import type { Category } from '@/domain/types';
@@ -171,7 +172,24 @@ function CategoryRow({ category, canWrite }: { category: Category; canWrite: boo
         {category.returnable ? 'Returnable' : 'Final sale'}
       </Badge>
       {canWrite ? (
-        <CategoryToggle categoryId={category.id} name={category.name} isActive={category.isActive} />
+        <>
+          <EditCategoryDialog
+            category={{
+              id: category.id,
+              name: category.name,
+              description: category.description,
+              imageUrl: category.imageUrl,
+              bannerUrl: category.bannerUrl,
+              featured: category.featured,
+              isActive: category.isActive,
+            }}
+          />
+          <CategoryToggle
+            categoryId={category.id}
+            name={category.name}
+            isActive={category.isActive}
+          />
+        </>
       ) : null}
     </li>
   );

@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Image from 'next/image';
 import { Suspense } from 'react';
 
-import { SectionToggle } from '@/components/console/admin-actions';
+import { SectionBuilder } from '@/components/console/section-builder';
 import {
   AdoptDefaultSlidesButton,
   BannerDialog,
@@ -12,6 +12,7 @@ import {
 } from '@/components/console/banner-manager';
 import { PageHeader } from '@/components/console/page-header';
 import { DEFAULT_HERO_SLIDES } from '@/config/home';
+import { ADDABLE_SECTION_KINDS } from '@/domain/sections';
 import type { Banner } from '@/domain/types';
 import { formatDateShort } from '@/lib/format';
 import { requirePermission } from '@/server/auth/session';
@@ -60,6 +61,8 @@ async function Composition() {
 
   return (
     <div className="mt-6 space-y-10">
+      <SectionBuilder page="home" sections={sections} addable={ADDABLE_SECTION_KINDS} />
+
       <BannerRow
         title="Hero slides"
         description="The carousel at the top of the homepage. Up to five live slides show, in this order."
@@ -77,49 +80,8 @@ async function Composition() {
         banners={grid}
         emptyText="No tiles yet. The grid stays hidden until you add one."
       />
-
-      <section>
-        <h2 className="text-ink text-md font-semibold">Sections</h2>
-        <p className="text-muted mt-0.5 mb-3 text-xs">
-          The homepage renders these top to bottom. A section with nothing to show, such as a
-          product rail before any products are live, stays out of the way on its own.
-        </p>
-
-        <ol className="space-y-2">
-          {sections.map((section, index) => (
-            <li
-              key={section.id}
-              className="border-line bg-raised flex items-center gap-3 rounded-md border px-4 py-3"
-            >
-              <span className="text-faint tabular w-5 shrink-0 text-xs">{index + 1}</span>
-
-              <div className="min-w-0 flex-1">
-                <p className="text-ink truncate text-xs font-medium">{sectionName(section)}</p>
-                <p className="text-faint truncate text-2xs">
-                  {section.kind}
-                  {section.config.source ? ` - ${section.config.source.toLowerCase()}` : ''}
-                  {section.config.limit ? ` - ${section.config.limit} items` : ''}
-                </p>
-              </div>
-
-              <SectionToggle
-                sectionId={section.id}
-                label={sectionName(section)}
-                isActive={section.isActive}
-              />
-            </li>
-          ))}
-        </ol>
-      </section>
     </div>
   );
-}
-
-/** A section's own title, or its kind as words: `HERO_CAROUSEL` reads "Hero carousel". */
-function sectionName(section: { title?: string | null; kind: string }): string {
-  if (section.title) return section.title;
-  const words = section.kind.replace(/_/g, ' ').toLowerCase();
-  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 function BannerRow({

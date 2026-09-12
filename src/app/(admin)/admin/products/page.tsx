@@ -1,3 +1,4 @@
+import { Plus } from 'lucide-react';
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -9,6 +10,7 @@ import { ConsoleTabs } from '@/components/console/console-tabs';
 import { DataTable, TableEmpty, type Column } from '@/components/console/data-table';
 import { Pager } from '@/components/console/pager';
 import { StatusBadge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { PRODUCT_STATUS_META } from '@/domain/enums';
 import type { Product } from '@/domain/types';
 import { formatDateShort, formatMoney } from '@/lib/format';
@@ -41,7 +43,15 @@ export default function AdminProductsPage({
     <>
       <PageHeader
         title="Products"
-        description="Approve listings before they reach shoppers, and audit what is already live."
+        description="Everything in the catalogue. Sellers publish their own, so this is the record rather than a gate."
+        actions={
+          <Button asChild size="sm">
+            <Link href="/admin/products/new">
+              <Plus className="size-4" aria-hidden />
+              Add a product
+            </Link>
+          </Button>
+        }
       />
 
       <Suspense fallback={<div className="skeleton mt-6 h-96 rounded-lg" aria-hidden />}>

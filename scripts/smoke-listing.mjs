@@ -39,7 +39,7 @@ const browser = await chromium.launch();
 async function sessionFor(email) {
   const context = await browser.newContext();
   const page = await context.newPage();
-  await page.goto(`${BASE}/login`, { waitUntil: 'load' });
+  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
   await page.fill('input[name="email"]', email);
   await page.fill('input[name="password"]', PASSWORD);
   await Promise.all([
@@ -56,12 +56,42 @@ const { context, page } = await sessionFor(SELLER);
 
 /* ------------------------------------------------------------ create */
 
-await page.goto(`${BASE}/seller/products/new`, { waitUntil: 'load' });
-await page.getByRole('textbox').first().waitFor({ state: 'visible', timeout: 20000 });
+/*
+ * The short form claims a blank draft the moment it opens, because uploads
+ * need something to belong to. This suite is about the LISTING PAGE -- what
+ * stops an incomplete listing reaching shoppers, and what a seller is told --
+ * so it takes that draft and completes it there. Creating and publishing
+ * through the short form itself is covered end to end by the catalogue suite.
+ */
+await page.goto(`${BASE}/seller/products/new`, { waitUntil: 'domcontentloaded' });
+await page.getByRole('textbox').first().waitFor({ state: 'visible', timeout: 30000 });
+
+const owner = await db.collection('users').findOne({ email: SELLER });
+let draft = null;
+for (let attempt = 0; attempt < 40 && !draft; attempt += 1) {
+  draft = await db
+    .collection('products')
+    .findOne({ sellerId: owner?.sellerId, status: 'DRAFT', title: '' });
+  if (!draft) await page.waitForTimeout(250);
+}
+check('opening the form claims a draft to upload against', Boolean(draft));
+
+if (!draft) {
+  await context.close();
+  await browser.close();
+  await client.close();
+  console.log(`
+  ${pass} passed, ${fail} failed
+`);
+  process.exit(1);
+}
+
+await page.goto(`${BASE}/seller/products/${draft._id}`, { waitUntil: 'domcontentloaded' });
+await page.getByRole('textbox').first().waitFor({ state: 'visible', timeout: 30000 });
 
 await page.locator('input').first().fill(title);
 
-// Brand and category are the first two selects on the form.
+// Brand and category are the first two selects on the listing form.
 const selects = page.locator('select');
 const brandOptions = await selects.nth(0).locator('option').count();
 const categoryOptions = await selects.nth(1).locator('option').count();
@@ -82,26 +112,27 @@ const categoryValues = (
   await selects.nth(1).locator('option').evaluateAll((options) => options.map((o) => o.value))
 ).filter(Boolean);
 
-// Look up what the form is actually offering: a seller is only approved for
-// some categories, so choosing one from the database and hoping it appears is
-// how this test ended up listing a handloom kurta under Bags & Backpacks.
 const offered = await db
   .collection('categories')
   .find({ _id: { $in: categoryValues }, sizeSystem: 'ALPHA' })
   .toArray();
 
-check('the seller is approved for an alpha-sized category', offered.length > 0,
-  `${categoryValues.length} offered`);
+check('an alpha-sized category is on offer', offered.length > 0, `${categoryValues.length} offered`);
 
 const targetCategory = offered[0]?._id ?? categoryValues[0];
 await selects.nth(1).selectOption(targetCategory);
 
-await page.getByRole('button', { name: 'Create draft' }).click();
-await page.waitForURL(/\/seller\/products\/prd_/, { timeout: 20000 }).catch(() => {});
+await page.getByRole('button', { name: /^Save changes$/ }).click();
+
+for (let attempt = 0; attempt < 40; attempt += 1) {
+  const now = await db.collection('products').findOne({ _id: draft._id });
+  if (now?.title === title) break;
+  await page.waitForTimeout(250);
+}
 
 const created = await db.collection('products').findOne({ title });
-check('a draft was created', Boolean(created), 'no product with that title');
-check('it starts as a draft', created?.status === 'DRAFT', created?.status);
+check('the draft was named and saved', Boolean(created), 'no product with that title');
+check('it is still a draft', created?.status === 'DRAFT', created?.status);
 check('it belongs to the signed-in seller', Boolean(created?.sellerId), created?.sellerId ?? '');
 check(
   'it has a slug carrying its id',
@@ -119,7 +150,7 @@ if (!created) {
 
 /* -------------------------------------------------- submission is gated */
 
-await page.goto(`${BASE}/seller/products/${created._id}`, { waitUntil: 'load' });
+await page.goto(`${BASE}/seller/products/${created._id}`, { waitUntil: 'domcontentloaded' });
 await page.waitForTimeout(1500);
 
 const submitButton = page.getByRole('button', { name: /Submit for review/ });
@@ -231,15 +262,31 @@ const otherUser = await db.collection('users').findOne({ _id: otherSeller?.owner
 if (otherUser) {
   const intruder = await sessionFor(otherUser.email);
   const response = await intruder.page.goto(`${BASE}/seller/products/${created._id}`, {
-    waitUntil: 'load',
+    waitUntil: 'domcontentloaded',
   });
-  await intruder.page.waitForTimeout(600);
+
+  /*
+   * The refusal arrives WITH THE STREAM, not in the status line.
+   *
+   * The page ships its shell immediately and looks the listing up inside a
+   * boundary, so a listing that is not yours becomes "not found" a moment
+   * later rather than a 404 on the first byte. Waiting for the words is what
+   * this check is really about.
+   */
+  await intruder.page
+    .getByText(/could not find|not found/i)
+    .first()
+    .waitFor({ timeout: 30000 })
+    .catch(() => {});
   const body = await intruder.page.locator('body').innerText();
+
   check(
     'another seller cannot open the listing',
-    response?.status() === 404 || /not found|404/i.test(body),
+    response?.status() === 404 || /could not find|not found|404/i.test(body),
     `status ${response?.status()}`,
   );
+  // The stronger half: whatever it shows, it must not be the listing.
+  check('and sees nothing of it', !body.includes(title));
   await intruder.context.close();
 }
 

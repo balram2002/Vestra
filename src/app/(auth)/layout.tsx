@@ -2,6 +2,7 @@ import Link from 'next/link';
 
 import { BrandLockup, BrandMark } from '@/components/layout/wordmark';
 import { siteConfig } from '@/config/site';
+import { getSiteContent } from '@/server/services/site-content';
 
 /**
  * Auth shell.
@@ -21,7 +22,18 @@ import { siteConfig } from '@/config/site';
  * On a phone the keyboard takes half the screen, and anything above the fields
  * pushes them under it.
  */
-export default function AuthLayout({ children }: { children: React.ReactNode }) {
+export default async function AuthLayout({ children }: { children: React.ReactNode }) {
+  /*
+   * The promises come from the same place the homepage and the strip read.
+   *
+   * They were three strings in this file, which is how a shop ends up
+   * promising free delivery above ₹1,199 on the sign-in page and ₹999
+   * everywhere else. The titles alone: this panel is a reminder, not the
+   * explanation.
+   */
+  const { valueProps } = await getSiteContent();
+  const promises = valueProps.filter((prop) => prop.isActive).map((prop) => prop.title);
+
   return (
     <div className="bg-canvas min-h-dvh lg:grid lg:grid-cols-2">
       {/* ------------------------------------------------- the trust panel */}
@@ -95,11 +107,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           <p className="mt-5 text-md text-current/70">{siteConfig.description}</p>
 
           <ul className="mt-9 space-y-3.5">
-            {[
-              'Free delivery above ₹1,199',
-              '14-day returns and exchanges',
-              'Every seller reviewed before they can sell',
-            ].map((promise) => (
+            {promises.map((promise) => (
               <li key={promise} className="flex items-start gap-3 text-sm text-current/80">
                 <span
                   aria-hidden

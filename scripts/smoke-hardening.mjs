@@ -57,7 +57,7 @@ check('live rooms may use the microphone', roomPolicy.includes('microphone=(self
 const email = `ratelimit-${Date.now()}@example.com`;
 const browser = await chromium.launch();
 const page = await browser.newPage();
-await page.goto(`${BASE}/login`, { waitUntil: 'load' });
+await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
 
 let ordinary = 0;
 let limitedAt = 0;
