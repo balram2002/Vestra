@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
 import { LoginForm } from '@/components/auth/login-form';
+import { SignedInRedirect } from '@/components/auth/signed-in-redirect';
 
 export const metadata: Metadata = {
   title: 'Sign in',
@@ -27,7 +28,12 @@ export default function LoginPage({
 
 async function Resolved({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
   const { next } = await searchParams;
-  return <LoginForm next={next} />;
+  return (
+    <>
+      <SignedInRedirect next={next} />
+      <LoginForm next={next} />
+    </>
+  );
 }
 
 function FormSkeleton() {

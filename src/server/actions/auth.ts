@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { defaultNotificationPreferences } from '@/domain/notifications';
 import type { PublicUser, User } from '@/domain/types';
 import { entityId } from '@/lib/ids';
+import { safeNext } from '@/lib/safe-next';
 import {
   loginSchema,
   passwordResetRequestSchema,
@@ -54,13 +55,6 @@ function toPublicUser(user: User): PublicUser {
     emailVerified: user.emailVerified,
     phoneVerified: user.phoneVerified,
   };
-}
-
-/** Only relative, single-slash paths — an open redirect is a phishing vector. */
-function safeNext(next: string | undefined): string | null {
-  if (!next) return null;
-  if (!next.startsWith('/') || next.startsWith('//')) return null;
-  return next;
 }
 
 export async function signIn(input: {

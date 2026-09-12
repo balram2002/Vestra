@@ -1,4 +1,4 @@
-import { Heart, ShoppingBag, User } from 'lucide-react';
+import { Heart, LayoutDashboard, ShoppingBag, Store, User } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense } from 'react';
 
@@ -6,11 +6,13 @@ import { ThemeToggleCompact } from '@/components/theme/theme-toggle';
 import { CountBubble } from '@/components/ui/badge';
 import { Marquee } from '@/components/ui/marquee';
 import { cn } from '@/lib/cn';
-import { currentOwner } from '@/server/auth/session';
+import { currentOwner, getSessionUser } from '@/server/auth/session';
 import { getBagCount } from '@/server/services/cart';
 import { getMegaMenu } from '@/server/services/catalog';
 import { getWishlistCount } from '@/server/services/wishlist';
+import { workspacesFor } from '@/server/services/workspaces';
 
+import { AccountMenu } from './account-menu';
 import { HeaderShell } from './header-shell';
 import { MegaMenu } from './mega-menu';
 import { MobileNav } from './mobile-nav';
@@ -147,7 +149,14 @@ export async function SiteHeader() {
       <AnnouncementStrip />
 
       <HeaderBar>
-        <MobileNav menu={menu} />
+        <MobileNav
+          menu={menu}
+          accountSlot={
+            <Suspense fallback={null}>
+              <MobileWorkspaces />
+            </Suspense>
+          }
+        />
 
         <Link
           href="/"
@@ -177,9 +186,15 @@ export async function SiteHeader() {
           <div className="ml-1 hidden items-center gap-0.5 lg:flex">
             <ThemeToggleCompact />
 
-            <Link href="/account" className={ICON_BUTTON} aria-label="Your account">
-              <User className="size-[1.15rem]" aria-hidden />
-            </Link>
+            <Suspense
+              fallback={
+                <span className={ICON_BUTTON} aria-hidden>
+                  <User className="size-[1.15rem]" />
+                </span>
+              }
+            >
+              <HeaderAccount />
+            </Suspense>
 
             <Suspense fallback={<CountIconFallback label="Wishlist" icon="heart" />}>
               <WishlistIcon />
@@ -235,5 +250,66 @@ async function BagIcon() {
       <ShoppingBag className="size-[1.15rem]" aria-hidden />
       <CountBubble count={count} className="absolute right-1 top-1" aria-hidden />
     </Link>
+  );
+}
+
+/**
+ * The account entry: a sign-in link for a visitor, and for a signed-in person
+ * a menu with their role and the consoles they can work in. Per-visitor, so it
+ * streams like the counts beside it and the header stays in the static shell.
+ */
+async function HeaderAccount() {
+  const user = await getSessionUser();
+  if (!user) {
+    return (
+      <Link href="/login" className={ICON_BUTTON} aria-label="Sign in">
+        <User className="size-[1.15rem]" aria-hidden />
+      </Link>
+    );
+  }
+
+  const { chips, workspaces } = await workspacesFor(user);
+  return (
+    <AccountMenu
+      name={user.fullName}
+      email={user.email}
+      avatarUrl={user.avatarUrl}
+      chips={chips}
+      workspaces={workspaces}
+    />
+  );
+}
+
+/** The same consoles, at the top of the phone menu's account links. */
+async function MobileWorkspaces() {
+  const user = await getSessionUser();
+  if (!user) return null;
+
+  const { workspaces } = await workspacesFor(user);
+  if (workspaces.length === 0) return null;
+
+  return (
+    <div className="border-line mb-1 border-b pb-1">
+      <p className="text-faint px-3 pb-1 pt-1.5 text-2xs font-semibold uppercase tracking-wider">
+        Your workspaces
+      </p>
+      {workspaces.map((workspace) => (
+        <a
+          key={workspace.href}
+          href={workspace.href}
+          className="text-ink active:bg-sunken flex min-h-12 items-center gap-3 rounded-md px-3 text-sm font-medium"
+        >
+          {workspace.kind === 'admin' ? (
+            <LayoutDashboard className="text-accent-ink size-4 shrink-0" aria-hidden />
+          ) : (
+            <Store className="text-accent-ink size-4 shrink-0" aria-hidden />
+          )}
+          <span className="min-w-0 flex-1">
+            <span className="block">{workspace.label}</span>
+            <span className="text-faint block truncate text-2xs font-normal">{workspace.description}</span>
+          </span>
+        </a>
+      ))}
+    </div>
   );
 }

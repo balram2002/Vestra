@@ -65,7 +65,7 @@ for (const [who, cases] of byWho) {
   const page = await context.newPage();
 
   if (cases[0].email) {
-    await page.goto(`${BASE}/login`, { waitUntil: 'load' });
+    await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
     await page.fill('input[name="email"]', cases[0].email);
     await page.fill('input[name="password"]', PASSWORD);
     await Promise.all([
@@ -79,7 +79,7 @@ for (const [who, cases] of byWho) {
     let detail = '';
 
     try {
-      const response = await page.goto(BASE + item.path, { waitUntil: 'load', timeout: 30000 });
+      const response = await page.goto(BASE + item.path, { waitUntil: 'domcontentloaded', timeout: 30000 });
       await page.waitForTimeout(700);
 
       const landed = new URL(page.url()).pathname;

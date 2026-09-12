@@ -94,9 +94,7 @@ async function Composition() {
               <span className="text-faint tabular w-5 shrink-0 text-xs">{index + 1}</span>
 
               <div className="min-w-0 flex-1">
-                <p className="text-ink truncate text-xs font-medium">
-                  {section.title ?? section.kind.replace(/_/g, ' ').toLowerCase()}
-                </p>
+                <p className="text-ink truncate text-xs font-medium">{sectionName(section)}</p>
                 <p className="text-faint truncate text-2xs">
                   {section.kind}
                   {section.config.source ? ` - ${section.config.source.toLowerCase()}` : ''}
@@ -106,7 +104,7 @@ async function Composition() {
 
               <SectionToggle
                 sectionId={section.id}
-                label={section.title ?? section.kind}
+                label={sectionName(section)}
                 isActive={section.isActive}
               />
             </li>
@@ -115,6 +113,13 @@ async function Composition() {
       </section>
     </div>
   );
+}
+
+/** A section's own title, or its kind as words: `HERO_CAROUSEL` reads "Hero carousel". */
+function sectionName(section: { title?: string | null; kind: string }): string {
+  if (section.title) return section.title;
+  const words = section.kind.replace(/_/g, ' ').toLowerCase();
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 function BannerRow({

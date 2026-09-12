@@ -36,8 +36,11 @@ import { BrandLockup } from './wordmark';
  */
 export function MobileNav({
   menu,
+  accountSlot,
 }: {
   menu: Array<{ department: Category; groups: Array<{ shelf: Category; leaves: Category[] }> }>;
+  /** Streamed from the server: the consoles this person can work in, if any. */
+  accountSlot?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [departmentSlug, setDepartmentSlug] = useState<string | null>(null);
@@ -213,6 +216,7 @@ export function MobileNav({
                   </ul>
 
                   <div className="border-line mt-2 space-y-0.5 border-t pt-2">
+                    {accountSlot}
                     <QuickLink href="/account" icon={User}>
                       Your account
                     </QuickLink>

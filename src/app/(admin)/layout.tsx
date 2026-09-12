@@ -28,7 +28,7 @@ import { ConsoleUserMenu } from '@/components/layout/console-user-menu';
 import { BrandMark } from '@/components/layout/wordmark';
 import { USER_ROLE_LABEL } from '@/domain/enums';
 import { requireAnyRole } from '@/server/auth/session';
-import { STAFF_ROLES } from '@/server/auth/rbac';
+import { isSellerRole, STAFF_ROLES } from '@/server/auth/rbac';
 import { collections } from '@/server/db/collections';
 
 export const metadata: Metadata = {
@@ -201,6 +201,11 @@ async function AdminUser() {
       role={USER_ROLE_LABEL[user.activeRole]}
       email={user.email}
       avatarUrl={user.avatarUrl}
+      otherConsoles={
+        user.roles.some(isSellerRole) && user.sellerId
+          ? [{ href: '/seller', label: 'Seller console' }]
+          : undefined
+      }
     />
   );
 }

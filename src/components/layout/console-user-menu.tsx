@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronsUpDown, ExternalLink, LogOut, Store } from 'lucide-react';
+import { ChevronsUpDown, ExternalLink, LayoutDashboard, LogOut, Store } from 'lucide-react';
 import { useTransition } from 'react';
 
 import { useConsoleRail } from '@/components/layout/console-shell';
@@ -36,6 +36,7 @@ export function ConsoleUserMenu({
   email,
   avatarUrl,
   storeHref,
+  otherConsoles,
 }: {
   name: string;
   role: string;
@@ -43,6 +44,8 @@ export function ConsoleUserMenu({
   avatarUrl: string | null;
   /** The seller's public storefront. Admin passes nothing. */
   storeHref?: string;
+  /** The other console, for someone who is both staff and a seller. */
+  otherConsoles?: Array<{ href: string; label: string }>;
 }) {
   const [pending, startTransition] = useTransition();
   /*
@@ -106,6 +109,15 @@ export function ConsoleUserMenu({
             </a>
           </DropdownMenuItem>
         ) : null}
+
+        {otherConsoles?.map((entry) => (
+          <DropdownMenuItem key={entry.href} asChild>
+            <a href={entry.href}>
+              <LayoutDashboard />
+              {entry.label}
+            </a>
+          </DropdownMenuItem>
+        ))}
 
         <DropdownMenuItem asChild>
           {/*

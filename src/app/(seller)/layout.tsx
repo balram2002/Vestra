@@ -20,6 +20,7 @@ import { ConsoleUserMenu } from '@/components/layout/console-user-menu';
 import { Avatar } from '@/components/ui/avatar';
 import { SELLER_ACTIONABLE } from '@/domain/enums';
 import { requireSellerAccount } from '@/server/auth/session';
+import { isStaffRole } from '@/server/auth/rbac';
 import { collections } from '@/server/db/collections';
 
 export const metadata: Metadata = {
@@ -261,6 +262,7 @@ async function SellerUser() {
       email={user.email}
       avatarUrl={user.avatarUrl}
       storeHref={seller?.slug ? `/store/${seller.slug}` : undefined}
+      otherConsoles={user.roles.some(isStaffRole) ? [{ href: '/admin', label: 'Admin console' }] : undefined}
     />
   );
 }

@@ -87,7 +87,7 @@ export function Avatar({
         'border-line border font-semibold',
         square ? 'rounded-md' : 'rounded-full',
         scale.box,
-        src ? 'bg-sunken' : tintFor(name),
+        tintFor(name),
         className,
       )}
       /*
@@ -97,17 +97,21 @@ export function Avatar({
        */
       aria-hidden
     >
+      {/*
+        The initials are always there, under the photo. A photo still loading,
+        or one that never will, then leaves a named tile rather than an empty
+        grey disc that looks like a broken header.
+      */}
+      <span className={scale.text}>{initials(name)}</span>
       {src ? (
         <Image
           src={src}
           alt=""
           width={scale.px}
           height={scale.px}
-          className="size-full object-cover"
+          className="absolute inset-0 size-full object-cover"
         />
-      ) : (
-        <span className={scale.text}>{initials(name)}</span>
-      )}
+      ) : null}
     </span>
   );
 }

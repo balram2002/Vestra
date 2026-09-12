@@ -1,4 +1,4 @@
-import { ArrowRight, MapPin, Package, RotateCcw } from 'lucide-react';
+import { ArrowRight, LayoutDashboard, MapPin, Package, RotateCcw, Store } from 'lucide-react';
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -14,6 +14,7 @@ import { formatDate, formatMoney } from '@/lib/format';
 import { requireUser } from '@/server/auth/session';
 import { collections, toEntities } from '@/server/db/collections';
 import { listOrders } from '@/server/services/orders';
+import { workspacesFor } from '@/server/services/workspaces';
 
 export const metadata: Metadata = {
   title: 'Your account',
@@ -43,10 +44,11 @@ export default function AccountPage() {
 async function Overview() {
   const user = await requireUser();
 
-  const [orders, addressCol, returnCol] = await Promise.all([
+  const [orders, addressCol, returnCol, access] = await Promise.all([
     listOrders(user.id, 3),
     collections.addresses(),
     collections.returns(),
+    workspacesFor(user),
   ]);
 
   const [addressCount, openReturns, allOrders] = await Promise.all([
@@ -74,13 +76,67 @@ async function Overview() {
         <div>
           <h1 className="font-display text-ink text-2xl">{user.fullName}</h1>
           <p className="text-muted mt-1 text-sm">{user.email}</p>
-
+          {access.chips.length > 0 ? (
+            <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Your roles">
+              {access.chips.map((chip) => (
+                <li
+                  key={chip}
+                  className="bg-accent-soft text-accent-ink rounded-full px-2.5 py-0.5 text-2xs font-semibold"
+                >
+                  {chip}
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </div>
 
         <SignOutButton />
       </header>
 
       {!user.emailVerified ? <VerifyEmailNotice email={user.email} /> : null}
+
+      {/*
+        The consoles this account can work in. On a phone the Account tab is
+        where people look for anything about themselves, so this is the most
+        findable place for the way into the admin or seller console.
+      */}
+      {access.workspaces.length > 0 ? (
+        <section
+          aria-labelledby="workspaces"
+          className="border-accent-border bg-accent-soft mt-4 rounded-lg border p-4"
+        >
+          <h2 id="workspaces" className="text-ink text-sm font-semibold">
+            Your workspaces
+          </h2>
+          <p className="text-muted mt-0.5 text-sm">
+            You shop from this account, and you can work in these as well.
+          </p>
+          <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+            {access.workspaces.map((workspace) => (
+              <li key={workspace.href}>
+                <a
+                  href={workspace.href}
+                  className="border-line bg-raised hover:border-accent-control group flex min-h-14 items-center gap-3 rounded-md border p-3 transition-colors"
+                >
+                  {workspace.kind === 'admin' ? (
+                    <LayoutDashboard className="text-accent-ink size-5 shrink-0" aria-hidden />
+                  ) : (
+                    <Store className="text-accent-ink size-5 shrink-0" aria-hidden />
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <span className="text-ink block text-sm font-medium">{workspace.label}</span>
+                    <span className="text-muted block truncate text-xs">{workspace.description}</span>
+                  </span>
+                  <ArrowRight
+                    className="text-faint size-4 shrink-0 transition-transform group-hover:translate-x-0.5"
+                    aria-hidden
+                  />
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {/*
         Appearance.
