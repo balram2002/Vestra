@@ -29,6 +29,12 @@ const INDEXES: Partial<Record<CollectionName, IndexDescription[]>> = {
     // Each window document carries its own end, and Mongo deletes it then.
     { key: { expiresAt: 1 }, expireAfterSeconds: 0, name: 'ttl_window' },
   ],
+  [COLLECTIONS.authChallenges]: [
+    { key: { userId: 1, purpose: 1, consumedAt: 1, createdAt: -1 }, name: 'by_user_purpose' },
+    // A day after its code expires the record goes: long enough to look at
+    // during an incident, short enough that codes never accumulate.
+    { key: { purgeAt: 1 }, expireAfterSeconds: 0, name: 'ttl_purge' },
+  ],
 
   [COLLECTIONS.users]: [
     { key: { email: 1 }, unique: true, name: 'uniq_email' },
@@ -299,6 +305,20 @@ export interface IndexFailure {
   message: string;
 }
 
+async function reconcileUsersIndexes(db: Awaited<ReturnType<typeof getDb>>): Promise<void> {
+  const users = db.collection(COLLECTIONS.users);
+  const indexes = await users.listIndexes().toArray();
+
+  for (const index of indexes) {
+    if (index.name === '_id_' || index.key?.phone !== 1 || index.unique !== true) continue;
+
+    const phoneType = (index.partialFilterExpression as { phone?: { $type?: string } } | undefined)?.phone?.$type;
+    if (index.name !== 'uniq_phone' || phoneType !== 'string') {
+      await users.dropIndex(index.name);
+    }
+  }
+}
+
 let ensured: Promise<IndexFailure[]> | null = null;
 
 /**
@@ -323,6 +343,7 @@ export async function ensureIndexes(): Promise<IndexFailure[]> {
       Object.entries(INDEXES).map(async ([name, specs]) => {
         if (!specs?.length) return;
         try {
+          if (name === COLLECTIONS.users) await reconcileUsersIndexes(db);
           await db.collection(name).createIndexes(specs);
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);

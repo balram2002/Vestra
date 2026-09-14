@@ -28,15 +28,13 @@ export async function register() {
     console.warn(`[vestrawab:env] configuration problems:\n${list}`);
   }
 
-  if (process.env.NODE_ENV === 'production') {
-    // Not awaited: on serverless hosts every cold start runs this, and the
-    // first request must not wait for twenty-odd createIndexes round trips.
-    // The calls are idempotent, so repeating them costs nothing but time.
-    void import('./server/db/indexes')
-      .then(({ ensureIndexes }) => ensureIndexes())
-      .then((failures) => {
-        if (failures.length > 0) console.warn('[vestrawab:db] some indexes could not be created', failures);
-      })
-      .catch((error: unknown) => console.error('[vestrawab:db] index check failed at startup', error));
-  }
+  // Not awaited: on serverless hosts every cold start runs this, and the
+  // first request must not wait for twenty-odd createIndexes round trips.
+  // The calls are idempotent, so repeating them costs nothing but time.
+  void import('./server/db/indexes')
+    .then(({ ensureIndexes }) => ensureIndexes())
+    .then((failures) => {
+      if (failures.length > 0) console.warn('[vestrawab:db] some indexes could not be created', failures);
+    })
+    .catch((error: unknown) => console.error('[vestrawab:db] index check failed at startup', error));
 }

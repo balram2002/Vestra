@@ -3,9 +3,8 @@
 import { redirect } from 'next/navigation';
 
 import { defaultNotificationPreferences } from '@/domain/notifications';
-import type { PublicUser, User } from '@/domain/types';
+import type { User } from '@/domain/types';
 import { entityId } from '@/lib/ids';
-import { safeNext } from '@/lib/safe-next';
 import {
   loginSchema,
   passwordResetRequestSchema,
@@ -13,17 +12,11 @@ import {
   registerSchema,
 } from '@/lib/validation/auth';
 
+import { completeSignIn } from '../auth/complete-sign-in';
 import { hashPassword, needsRehash, verifyPassword } from '../auth/password';
-import { landingPathFor } from '../auth/rbac';
-import {
-  clearGuestToken,
-  endSession,
-  getGuestToken,
-  startSession,
-} from '../auth/session';
+import { endSession } from '../auth/session';
+import { startSignInChallenge } from '../auth/two-factor';
 import { collections, toEntity } from '../db/collections';
-import { mergeGuestCart } from '../services/cart';
-import { mergeGuestWishlist } from '../services/wishlist';
 import { LIMITS, clientIp, hitAll, peekAll, retryMessage } from '../security/rate-limit';
 
 /**
@@ -40,21 +33,19 @@ export interface AuthResult {
   fieldErrors?: Record<string, string>;
 }
 
-/** A safe projection. The password hash must never leave this module. */
-function toPublicUser(user: User): PublicUser {
-  return {
-    id: user.id,
-    fullName: user.fullName,
-    email: user.email,
-    phone: user.phone,
-    roles: user.roles,
-    status: user.status,
-    avatarUrl: user.avatarUrl,
-    sellerId: user.sellerId,
-    creditBalance: user.creditBalance,
-    emailVerified: user.emailVerified,
-    phoneVerified: user.phoneVerified,
-  };
+function duplicateKeyField(error: unknown): 'email' | 'phone' | null {
+  if (!error || typeof error !== 'object' || (error as { code?: number }).code !== 11000) {
+    return null;
+  }
+
+  const keyPattern = (error as { keyPattern?: Record<string, unknown> }).keyPattern;
+  if (keyPattern?.email || keyPattern?.email === 1) return 'email';
+  if (keyPattern?.phone || keyPattern?.phone === 1) return 'phone';
+
+  const message = error instanceof Error ? error.message : '';
+  if (message.includes('uniq_email') || message.includes('email_1')) return 'email';
+  if (message.includes('uniq_phone') || message.includes('phone_1')) return 'phone';
+  return null;
 }
 
 export async function signIn(input: {
@@ -117,24 +108,20 @@ export async function signIn(input: {
     await users.updateOne({ _id: user.id }, { $set: { passwordHash: upgraded } });
   }
 
-  await users.updateOne(
-    { _id: user.id },
-    { $set: { lastLoginAt: new Date().toISOString() } },
-  );
-
-  // Carry the guest bag and wishlist across, BEFORE the session starts, so the
-  // merge is attributable to the right owner. Losing either at sign-in is one
-  // of the most common ways an e-commerce funnel leaks.
-  const guestToken = await getGuestToken();
-  if (guestToken) {
-    await mergeGuestCart(guestToken, user.id);
-    await mergeGuestWishlist(guestToken, user.id);
-    await clearGuestToken();
+  /*
+   * Two-step verification.
+   *
+   * A correct password earns the second question and nothing more. No session,
+   * no last-login stamp, no guest bag merged: all of that waits for the code,
+   * on the page this redirects to. See `auth/two-factor`.
+   */
+  if (user.twoFactor?.enabled) {
+    const started = await startSignInChallenge(user, parsed.data.next ?? null);
+    if (!started.ok) return { ok: false, error: started.error };
+    redirect('/login/verify');
   }
 
-  await startSession(toPublicUser(user));
-
-  redirect(safeNext(parsed.data.next) ?? landingPathFor(user.roles));
+  redirect(await completeSignIn(user, parsed.data.next));
 }
 
 export async function register(input: {
@@ -203,24 +190,31 @@ export async function register(input: {
 
   try {
     await users.insertOne({ ...user, _id: user.id });
-  } catch {
-    // The unique index is the real guard: two simultaneous signups with the
-    // same email both pass the check above, and only one can pass this.
-    return {
-      ok: false,
-      fieldErrors: { email: 'An account with this email already exists.' },
-      error: 'An account with this email already exists.',
-    };
+  } catch (error) {
+    // The unique indexes are the real guard against concurrent signups. Only
+    // report an existing account when Mongo confirms which unique key collided.
+    const field = duplicateKeyField(error);
+    if (field === 'email') {
+      return {
+        ok: false,
+        fieldErrors: { email: 'An account with this email already exists.' },
+        error: 'An account with this email already exists.',
+      };
+    }
+    if (field === 'phone') {
+      return {
+        ok: false,
+        fieldErrors: { phone: 'An account with this phone number already exists.' },
+        error: 'An account with this phone number already exists.',
+      };
+    }
+
+    console.error('[vestrawab:auth] could not create account', error);
+    return { ok: false, error: 'We could not create your account right now. Please try again.' };
   }
 
-  const guestToken = await getGuestToken();
-  if (guestToken) {
-    await mergeGuestCart(guestToken, user.id);
-    await mergeGuestWishlist(guestToken, user.id);
-    await clearGuestToken();
-  }
-
-  await startSession(toPublicUser(user));
+  // The same last step as every sign-in, so a new account keeps its guest bag.
+  const destination = await completeSignIn(user);
 
   /*
    * Send the confirmation, but do not make signup wait on it. A mail server
@@ -230,7 +224,7 @@ export async function register(input: {
    */
   void issueAndSendVerification(user.id, user.email, user.fullName);
 
-  redirect('/');
+  redirect(destination);
 }
 
 
