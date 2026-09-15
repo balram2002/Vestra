@@ -11,9 +11,14 @@ export interface User {
   fullName: string;
   /** Stored as a hash. The plaintext never leaves the sign-in Server Action. */
   passwordHash: string;
+  googleSubject?: string;
   roles: UserRole[];
   status: AccountStatus;
   avatarUrl: string | null;
+  /** The stored file behind `avatarUrl`, so replacing a photo can delete the old one. */
+  avatarMediaId?: string | null;
+  /** Absent on every account created before two-step verification existed: off. */
+  twoFactor?: TwoFactorSettings;
   gender: 'MALE' | 'FEMALE' | 'OTHER' | 'UNDISCLOSED' | null;
   dateOfBirth: string | null;
   /** Seller staff and sellers are scoped to exactly one store. */
@@ -300,5 +305,42 @@ export interface AuthToken {
   hash: string;
   expiresAt: string;
   consumedAt: string | null;
+  createdAt: string;
+}
+
+/**
+ * Two-step verification on an account.
+ *
+ * Email is the only method, and it is named anyway: the day an authenticator
+ * app is offered, accounts that chose email must go on receiving codes by email.
+ */
+export interface TwoFactorSettings {
+  enabled: boolean;
+  method: 'EMAIL';
+  enabledAt: string | null;
+}
+
+/**
+ * A one-time code in flight: the second step of a sign-in, or the proof of a
+ * mailbox behind switching two-step verification on or off.
+ *
+ * Only a keyed hash of the code is stored. See `server/auth/one-time-code`.
+ */
+export interface AuthChallenge {
+  id: string;
+  userId: string;
+  purpose: 'SIGN_IN' | 'ENABLE_TWO_FACTOR' | 'DISABLE_TWO_FACTOR';
+  codeHash: string;
+  /** Wrong answers so far. The challenge is spent at five. */
+  attempts: number;
+  /** When the code stops working. */
+  expiresAt: string;
+  /** When the record itself is swept by the TTL index, a day after it expires. */
+  purgeAt: Date;
+  consumedAt: string | null;
+  /** When the current code was sent, for the resend throttle. */
+  sentAt: string;
+  /** Where a completed sign-in goes. Null for the other purposes. */
+  next: string | null;
   createdAt: string;
 }

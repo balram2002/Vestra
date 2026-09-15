@@ -279,6 +279,7 @@ export type HomeSectionKind =
   | 'DEAL_COUNTDOWN'
   | 'EDITORIAL'
   | 'SELLER_SPOTLIGHT'
+  | 'REELS_STRIP'
   | 'TESTIMONIALS'
   | 'VALUE_PROPS'
   | 'NEWSLETTER';
@@ -297,6 +298,13 @@ export interface HomeSection {
    * is why every read treats "missing" as the homepage.
    */
   page?: string;
+  /**
+   * The shipped section this one is, if it is one: 'home:PRODUCT_RAIL:4'.
+   *
+   * What lets "reset" put a renamed rail back to what it was. Stamped the first
+   * time a section is reset; before that the shipped title identifies it.
+   */
+  defaultKey?: string;
   title: string | null;
   subtitle: string | null;
   /** Optional "See all" destination. */

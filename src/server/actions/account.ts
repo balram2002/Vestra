@@ -3,15 +3,17 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
-import type { Address, SupportCategory } from '@/domain/types';
+import type { Address, SupportCategory, User } from '@/domain/types';
 import { SUPPORT_CATEGORY_LABEL } from '@/domain/types';
 import { entityId } from '@/lib/ids';
 import { addressSchema, type AddressInput } from '@/lib/validation/address';
 import { passwordSchema } from '@/lib/validation/auth';
+import { preferencesSchema, profileSchema } from '@/lib/validation/profile';
 
 import { hashPassword, verifyPassword } from '../auth/password';
 import { refreshSession, requireUser } from '../auth/session';
 import { collections, toDoc, toEntities, toEntity } from '../db/collections';
+import { mediaStore } from '../media/store';
 import { markAllRead, markRead } from '../services/notifications';
 import { createTicket } from '../services/support';
 import { LIMITS, hit, peek, retryMessage } from '../security/rate-limit';
@@ -184,26 +186,21 @@ export async function setDefaultAddress(addressId: string): Promise<ActionResult
 
 /* ---------------------------------------------------------------- profile */
 
-const profileSchema = z.object({
-  fullName: z.string().trim().min(2, 'Enter your name').max(80, 'That name is too long'),
-  phone: z
-    .string()
-    .trim()
-    .regex(/^[6-9]\d{9}$/, 'Enter a 10-digit Indian mobile number, or leave it blank')
-    .optional()
-    .or(z.literal('')),
-});
-
 /**
- * Name and phone.
+ * Name, phone, gender and birthday.
  *
  * The email is not editable here: it is the sign-in and where order updates
  * go, and changing it needs a verification round trip of its own. A changed
  * phone is marked unverified rather than carrying the old number's status.
+ *
+ * Gender and birthday are written only when the form sent them, so a caller
+ * that knows nothing of them cannot blank them by leaving them out.
  */
 export async function updateProfile(input: {
   fullName: string;
   phone: string;
+  gender?: string;
+  dateOfBirth?: string;
 }): Promise<ActionResult> {
   const user = await requireUser();
 
@@ -217,19 +214,153 @@ export async function updateProfile(input: {
   if (!current) return { ok: false, error: 'Your account could not be found.' };
 
   const phone = parsed.data.phone || null;
+  const taken: ActionResult = {
+    ok: false,
+    error: 'Another account already uses this number.',
+    field: 'phone',
+  };
+
+  /*
+   * A number belongs to one account. The unique index is the real guard --
+   * two people saving the same number at once both pass this check -- so its
+   * duplicate-key error is answered the same way instead of failing the request.
+   */
+  if (phone && phone !== current.phone) {
+    if ((await users.countDocuments({ phone, _id: { $ne: user.id } })) > 0) return taken;
+  }
+
+  try {
+    await users.updateOne(
+      { _id: user.id },
+      {
+        $set: {
+          fullName: parsed.data.fullName,
+          phone,
+          ...(parsed.data.gender !== undefined
+            ? { gender: (parsed.data.gender || null) as User['gender'] }
+            : {}),
+          ...(parsed.data.dateOfBirth !== undefined
+            ? { dateOfBirth: parsed.data.dateOfBirth || null }
+            : {}),
+          updatedAt: new Date().toISOString(),
+          ...(phone !== current.phone ? { phoneVerified: false } : {}),
+        },
+      },
+    );
+  } catch (error) {
+    if ((error as { code?: number }).code === 11000) return taken;
+    throw error;
+  }
+
+  await refreshSession();
+  revalidatePath('/account', 'layout');
+  return { ok: true };
+}
+
+/**
+ * Marketing email and usual sizes.
+ *
+ * Written as two fields inside `preferences`, never as the whole object, so
+ * the notification settings kept beside them are not overwritten by a form
+ * that does not show them.
+ */
+export async function updatePreferences(input: {
+  marketingOptIn: boolean;
+  preferredSizes: Record<string, string>;
+}): Promise<ActionResult<{ preferredSizes: Record<string, string> }>> {
+  const user = await requireUser();
+
+  const parsed = preferencesSchema.safeParse(input);
+  if (!parsed.success) return firstIssue(parsed.error);
+
+  const users = await collections.users();
   await users.updateOne(
     { _id: user.id },
     {
       $set: {
-        fullName: parsed.data.fullName,
-        phone,
+        'preferences.marketingOptIn': parsed.data.marketingOptIn,
+        'preferences.preferredSizes': parsed.data.preferredSizes,
         updatedAt: new Date().toISOString(),
-        ...(phone !== current.phone ? { phoneVerified: false } : {}),
       },
     },
   );
 
-  await refreshSession();
+  revalidatePath('/account/profile');
+  return { ok: true, data: { preferredSizes: parsed.data.preferredSizes } };
+}
+
+/* ----------------------------------------------------------- profile photo */
+
+const PHOTO_TYPES = 'Choose a photo: JPEG, PNG, WebP or AVIF.';
+
+/**
+ * Replace the profile photo.
+ *
+ * The browser crops and shrinks the photo before sending it, but nothing here
+ * relies on that. The store reads the BYTES, and a file whose bytes are not an
+ * image is removed again and refused, whatever it claimed to be.
+ *
+ * The previous photo is deleted once the new one is saved -- not before -- so
+ * a failed upload never leaves someone with no photo at all.
+ */
+export async function uploadAvatar(
+  formData: FormData,
+): Promise<ActionResult<{ avatarUrl: string }>> {
+  const user = await requireUser();
+
+  const file = formData.get('file');
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, error: 'Choose a photo to upload.' };
+  }
+  if (!file.type.startsWith('image/')) return { ok: false, error: PHOTO_TYPES };
+
+  const limited = await hit(LIMITS.avatar, user.id);
+  if (!limited.allowed) return { ok: false, error: retryMessage(limited) };
+
+  const store = mediaStore();
+  const stored = await store.put(file, { scope: `avatar-${user.id}` });
+  if (!stored.ok) return { ok: false, error: stored.error };
+
+  if (!stored.media.contentType.startsWith('image/')) {
+    await store.remove(stored.media.id);
+    return { ok: false, error: PHOTO_TYPES };
+  }
+
+  const users = await collections.users();
+  const previous = await users.findOne({ _id: user.id }, { projection: { avatarMediaId: 1 } });
+
+  await users.updateOne(
+    { _id: user.id },
+    {
+      $set: {
+        avatarUrl: stored.media.url,
+        avatarMediaId: stored.media.id,
+        updatedAt: new Date().toISOString(),
+      },
+    },
+  );
+
+  if (previous?.avatarMediaId && previous.avatarMediaId !== stored.media.id) {
+    await store.remove(previous.avatarMediaId);
+  }
+
+  revalidatePath('/account', 'layout');
+  return { ok: true, data: { avatarUrl: stored.media.url } };
+}
+
+/** Back to initials. The stored file goes too: nothing else points at it. */
+export async function removeAvatar(): Promise<ActionResult> {
+  const user = await requireUser();
+
+  const users = await collections.users();
+  const previous = await users.findOne({ _id: user.id }, { projection: { avatarMediaId: 1 } });
+
+  await users.updateOne(
+    { _id: user.id },
+    { $set: { avatarUrl: null, avatarMediaId: null, updatedAt: new Date().toISOString() } },
+  );
+  if (previous?.avatarMediaId) await mediaStore().remove(previous.avatarMediaId);
+
   revalidatePath('/account', 'layout');
   return { ok: true };
 }

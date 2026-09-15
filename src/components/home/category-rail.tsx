@@ -1,5 +1,6 @@
-import Image from 'next/image';
 import Link from 'next/link';
+
+import { Picture } from '@/components/ui/picture';
 
 import type { Category, HomeSection } from '@/domain/types';
 import { cn } from '@/lib/cn';
@@ -41,7 +42,7 @@ export function CategoryRail({
       title={section.title}
       subtitle={section.subtitle}
       href={section.href}
-      ctaLabel="All categories"
+      ctaLabel={section.ctaLabel ?? 'All categories'}
       flush
     >
       {/*
@@ -62,6 +63,7 @@ export function CategoryRail({
           'no-scrollbar stagger gutter shell-max flex snap-x snap-mandatory gap-3 overflow-x-auto',
           // Tablet up: a plain grid. Nothing to scroll, so nothing scrolls.
           'sm:grid sm:grid-cols-4 sm:overflow-visible lg:grid-cols-6',
+          section.page === 'categories' && 'grid grid-cols-2 overflow-visible',
         )}
         // No `scrollPaddingInline` here: `.gutter` now sets it alongside its
         // padding, responsively. An inline value would pin the snapport inset
@@ -70,7 +72,7 @@ export function CategoryRail({
         {categories.map((category, index) => (
           <li
             key={category.id}
-            className="w-32 shrink-0 snap-start sm:w-auto sm:shrink"
+            className={cn('w-32 shrink-0 snap-start sm:w-auto sm:shrink', section.page === 'categories' && 'w-auto')}
             style={staggerIndex(index)}
           >
             <Link href={`/category/${category.slug}`} className="group block">
@@ -81,19 +83,26 @@ export function CategoryRail({
                 half-millimetre inconsistency nobody can name and everybody
                 sees.
               */}
-              <div className="bg-sunken relative aspect-4/5 overflow-hidden rounded-xl ring-1 ring-inset ring-black/[0.07]">
-                <Image
-                  src={category.imageUrl}
-                  alt=""
-                  fill
-                  loading="lazy"
-                  sizes="(max-width: 40rem) 8rem, (max-width: 64rem) 25vw, 16vw"
-                  className={cn(
-                    'object-cover transition-transform duration-(--duration-hero) ease-out',
-                    'motion-safe:group-hover:scale-[1.06]',
-                  )}
-                />
-              </div>
+              {/*
+                A shelf with no photograph is a shelf, not a hole.
+
+                Categories are created by sellers now, and a new one inherits
+                its parent's picture or has none at all -- which rendered a row
+                of empty grey boxes and made the whole section look broken.
+                `Picture` falls back to a monogram on a tint taken from the
+                name, so the row always reads as a considered set of tiles.
+              */}
+              <Picture
+                src={category.imageUrl}
+                priority={section.page === 'categories' && section.position === 0 && index < 2}
+                name={category.name}
+                sizes="(max-width: 40rem) 8rem, (max-width: 64rem) 25vw, 16vw"
+                className="aspect-4/5 rounded-xl ring-1 ring-inset ring-black/[0.07]"
+                imageClassName={cn(
+                  'transition-transform duration-(--duration-hero) ease-out',
+                  'motion-safe:group-hover:scale-[1.06]',
+                )}
+              />
 
               <p className="text-ink mt-2.5 text-sm font-medium leading-tight group-hover:underline">
                 {category.name}

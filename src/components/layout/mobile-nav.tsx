@@ -6,6 +6,8 @@ import { ChevronLeft, ChevronRight, Heart, Menu, Package, User, X } from 'lucide
 import Link from 'next/link';
 import { useState } from 'react';
 
+import { useEdgeSwipe } from '@/hooks/use-edge-swipe';
+
 import { ThemeToggle } from '@/components/theme/theme-toggle';
 import { CLOSE_BUTTON, OVERLAY } from '@/components/ui/dialog';
 import type { Category } from '@/domain/types';
@@ -47,6 +49,15 @@ export function MobileNav({
 }) {
   const [open, setOpen] = useState(false);
   const [departmentSlug, setDepartmentSlug] = useState<string | null>(null);
+
+  // A thumb from the left edge opens the menu, and a thumb back closes it.
+  // The hook refuses to fire inside anything that scrolls sideways, so the
+  // product rails and the hero keep their own swipes.
+  useEdgeSwipe({
+    isOpen: open,
+    onOpen: () => setOpen(true),
+    onClose: () => setOpen(false),
+  });
   const reduced = useReducedMotion() ?? false;
 
   const active = menu.find((entry) => entry.department.slug === departmentSlug) ?? null;

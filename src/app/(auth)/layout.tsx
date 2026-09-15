@@ -139,7 +139,7 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
         </header>
 
         <main className="flex flex-1 items-start justify-center px-5 py-6 sm:items-center sm:py-10">
-          <div className="w-full max-w-sm">{children}</div>
+          <div className="bg-raised border-line w-full max-w-md rounded-2xl border p-5 shadow-sm sm:p-8">{children}</div>
         </main>
 
         <footer className="gutter pb-8 pt-4">

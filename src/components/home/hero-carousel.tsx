@@ -104,7 +104,6 @@ function Hero({ shown, count }: { shown: Banner[]; count: number }) {
   const [settled, setSettled] = useState(0);
 
   const [playing, setPlaying] = useState(true);
-  const [hovering, setHovering] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [focused, setFocused] = useState(false);
   const [awake, setAwake] = useState(true);
@@ -198,7 +197,19 @@ function Hero({ shown, count }: { shown: Banner[]; count: number }) {
 
   /* ------------------------------------------------------------ autoplay */
 
-  const paused = hovering || dragging || focused || !awake || !playing || reduced || count < 2;
+  /*
+   * NOT paused by a resting pointer.
+   *
+   * Hover-to-pause is the textbook rule and it was wrong here: on a desktop the
+   * pointer sits over the middle of the window, which is exactly where the hero
+   * is, so autoplay never ran at all. Everything that indicates real intent
+   * still stops it -- a finger on the panel, focus inside it, a hidden tab, the
+   * hero scrolled out of view -- and there is a visible pause control for
+   * anyone who wants it off. Reading is not interrupted either way: a slide
+   * being read is a slide being hovered, and the copy stays put for its full
+   * three seconds regardless.
+   */
+  const paused = dragging || focused || !awake || !playing || reduced || count < 2;
 
   /*
    * `page` is in the dependencies, and that is the whole reset.
@@ -266,22 +277,20 @@ function Hero({ shown, count }: { shown: Banner[]; count: number }) {
       <div
         ref={viewport}
         className="relative overflow-hidden"
-        /*
-         * Hover is a MOUSE idea. On a touch screen `pointerenter` fires on a
-         * tap and there is no matching leave, so treating it as hover would
-         * stop autoplay for good the first time anyone touched the hero.
-         */
-        onPointerEnter={(event) => {
-          if (event.pointerType === 'mouse') setHovering(true);
-        }}
-        onPointerLeave={(event) => {
-          if (event.pointerType === 'mouse') setHovering(false);
-        }}
         onFocusCapture={() => setFocused(true)}
         onBlurCapture={() => setFocused(false)}
       >
         <motion.div
           ref={track}
+          /*
+           * The edge swipe must not fire here.
+           *
+           * This track handles its own horizontal gesture in JavaScript, so it
+           * declares `pan-y` to the browser -- which looks like a vertical-only
+           * surface to anything walking the DOM. The marker says outright that
+           * sideways belongs to the hero.
+           */
+          data-no-swipe
           className="relative touch-pan-y"
           style={{ x }}
           drag={count > 1 ? 'x' : false}
@@ -315,16 +324,21 @@ function Hero({ shown, count }: { shown: Banner[]; count: number }) {
           ))}
         </motion.div>
 
-        {count > 1 ? (
-          <>
-            <Arrow side="left" onClick={() => step1(-1)} />
-            <Arrow side="right" onClick={() => step1(1)} />
-          </>
-        ) : null}
       </div>
 
       {count > 1 ? (
         <div className="mt-3 flex items-center justify-center gap-3">
+          {/*
+            The arrows sit WITH the other controls rather than over the panel.
+
+            Floating them at the panel's edges put a glass disc on top of the
+            headline at every width where the copy reached the left gutter --
+            and a control that covers the words it is meant to reveal is worse
+            than one further away. Here they are grouped with the pause and the
+            dots, which is also where a hand already is once it has used either.
+          */}
+          <Arrow side="left" onClick={() => step1(-1)} />
+
           <button
             type="button"
             onClick={() => setPlaying((value) => !value)}
@@ -356,6 +370,8 @@ function Hero({ shown, count }: { shown: Banner[]; count: number }) {
             ))}
           </ol>
 
+          <Arrow side="right" onClick={() => step1(1)} />
+
           <p className="text-faint tabular shrink-0 text-2xs" aria-hidden>
             {String(current + 1).padStart(2, '0')} / {String(count).padStart(2, '0')}
           </p>
@@ -381,16 +397,13 @@ function Arrow({ side, onClick }: { side: 'left' | 'right'; onClick: () => void 
       onClick={onClick}
       aria-label={side === 'left' ? 'Previous slide' : 'Next slide'}
       className={cn(
-        'absolute top-1/2 hidden -translate-y-1/2 lg:grid',
-        'size-10 place-items-center rounded-full',
-        'bg-raised/85 text-ink border-line border shadow-sm backdrop-blur-sm',
-        'transition-[background-color,transform] duration-(--duration-base)',
-        'hover:bg-raised hover:scale-105',
+        // Pointer devices only: a thumb has the whole panel to swipe.
+        'text-muted hover:text-ink hidden size-8 shrink-0 place-items-center rounded-full lg:grid',
+        'hover:bg-sunken transition-colors duration-(--duration-base)',
         'focus-visible:outline-accent focus-visible:outline-2 focus-visible:outline-offset-2',
-        side === 'left' ? 'left-3' : 'right-3',
       )}
     >
-      <Icon className="size-5" aria-hidden />
+      <Icon className="size-4" aria-hidden />
     </button>
   );
 }
@@ -476,6 +489,16 @@ function Slide({
         className={cn(
           'group relative isolate flex overflow-hidden rounded-xl sm:rounded-2xl',
           'aspect-4/5 sm:aspect-16/10 lg:aspect-21/9',
+          /*
+           * A ceiling on a wide screen.
+           *
+           * 21:9 across a 1600px window is 685px of hero before the header,
+           * which is the whole fold -- a shopper scrolls past a shop that has
+           * shown them nothing to buy. The cap crops the photograph instead
+           * (it is `object-cover`), and leaves the next section peeking, which
+           * is what tells someone there is more.
+           */
+          'lg:max-h-[min(70vh,620px)]',
           'focus-visible:outline-accent focus-visible:outline-2 focus-visible:outline-offset-2',
         )}
       >
@@ -596,7 +619,8 @@ function Slide({
 export function HeroSkeleton() {
   return (
     <section className="gutter shell-max pt-3 sm:pt-4" aria-hidden>
-      <div className="skeleton aspect-4/5 rounded-xl sm:aspect-16/10 sm:rounded-2xl lg:aspect-21/9" />
+      {/* The same ceiling as the real panel, or the page jumps when it lands. */}
+      <div className="skeleton aspect-4/5 rounded-xl sm:aspect-16/10 sm:rounded-2xl lg:aspect-21/9 lg:max-h-[min(70vh,620px)]" />
     </section>
   );
 }

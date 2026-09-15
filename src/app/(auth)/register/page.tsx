@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
 import { RegisterForm } from '@/components/auth/register-form';
+import { GoogleSignIn } from '@/components/auth/google-sign-in';
 import { SignedInRedirect } from '@/components/auth/signed-in-redirect';
 
 export const metadata: Metadata = {
@@ -19,6 +20,7 @@ export default function RegisterPage() {
       <Suspense fallback={null}>
         <SignedInRedirect />
       </Suspense>
+      <GoogleSignIn />
       <RegisterForm />
     </>
   );

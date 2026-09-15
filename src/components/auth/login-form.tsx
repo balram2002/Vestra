@@ -6,6 +6,7 @@ import { useState, useTransition } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from './password-input';
 import { signIn } from '@/server/actions/auth';
 
 /**
@@ -37,7 +38,7 @@ export function LoginForm({ next }: { next?: string }) {
   };
 
   return (
-    <form action={onSubmit} className="space-y-4" noValidate>
+    <form action={onSubmit} className="space-y-5">
       <div>
         <h1 className="font-display text-ink text-2xl">Sign in</h1>
         <p className="text-muted mt-1 text-sm">
@@ -68,7 +69,7 @@ export function LoginForm({ next }: { next?: string }) {
       />
 
       <div>
-        <Input
+        <PasswordInput
           label="Password"
           name="password"
           type="password"

@@ -130,6 +130,7 @@ export default async function ProductPage({ params }: PageProps) {
           variants={product.variants}
           media={product.media}
           sizeOptions={product.sizeOptions}
+          sizeSystem={product.sizeSystem}
           colorOptions={colorOptions}
           header={
             <div className="mb-7">

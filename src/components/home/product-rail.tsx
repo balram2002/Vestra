@@ -45,10 +45,13 @@ export function ProductRail({
   products,
   /** Set on the first rail above the fold so its images are not lazy-loaded. */
   priority = false,
+  badge,
 }: {
   section: HomeSection;
   products: ProductSummary[];
   priority?: boolean;
+  /** Shown beside the heading. A countdown, on a rail that ends. */
+  badge?: React.ReactNode;
 }) {
   if (products.length === 0) return null;
 
@@ -56,7 +59,7 @@ export function ProductRail({
 
   if (columns) {
     return (
-      <Section title={section.title} subtitle={section.subtitle} href={section.href}>
+      <Section title={section.title} subtitle={section.subtitle} href={section.href} badge={badge}>
         <ul className={cn('grid gap-3 sm:gap-4', columns)}>
           {products.map((product, index) => (
             <li key={product.id}>
@@ -73,6 +76,7 @@ export function ProductRail({
       title={section.title}
       subtitle={section.subtitle}
       href={section.href}
+      badge={badge}
       flush
     >
       <Carousel

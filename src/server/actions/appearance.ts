@@ -79,6 +79,12 @@ const schemas = {
     wishlist: z.boolean(),
     bag: z.boolean(),
   }),
+  visibility: z.object({
+    announcements: z.boolean(),
+    valueProps: z.boolean(),
+    footerBadges: z.boolean(),
+    footerColumns: z.boolean(),
+  }),
   valueProps: z.array(valuePropSchema).max(6),
   valuePropsTitle: z.string().trim().max(80).nullable(),
   footerColumns: z.array(footerColumnSchema).max(6),

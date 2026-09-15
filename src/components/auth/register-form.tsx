@@ -7,6 +7,7 @@ import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/choice';
 import { Input } from '@/components/ui/input';
+import { PasswordInput } from './password-input';
 import { ACCOUNTS } from '@/config/business';
 import { register } from '@/server/actions/auth';
 
@@ -47,7 +48,7 @@ export function RegisterForm() {
   };
 
   return (
-    <form action={onSubmit} className="space-y-4" noValidate>
+    <form action={onSubmit} className="space-y-5">
       <div>
         <h1 className="font-display text-ink text-2xl">Create your account</h1>
         <p className="text-muted mt-1 text-sm">
@@ -87,7 +88,7 @@ export function RegisterForm() {
         placeholder="you@example.com"
       />
 
-      <Input
+      <PasswordInput strength
         label="Password"
         name="password"
         type="password"

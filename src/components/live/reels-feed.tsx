@@ -1,7 +1,7 @@
 'use client';
 
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Heart, MessageCircle, Radio, Share2, ShoppingBag, Volume2, VolumeX } from 'lucide-react';
+import { ArrowDown, ArrowUp, Heart, Pause, Play, Radio, Share2, ShoppingBag, Volume2, VolumeX } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -10,57 +10,13 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/cn';
 import { formatCompactNumber, formatMoney } from '@/lib/format';
 import { spring, tween } from '@/lib/motion';
+import { useReelSpring } from '@/hooks/use-reel-spring';
+import { toggleWishlistItem } from '@/server/actions/wishlist';
 
-/**
- * Commerce reels.
- *
- * A full-screen vertical feed of short clips from local shops, each pinned to
- * one product with a Buy button. Screen five of the brief.
- *
- * ---------------------------------------------------------------------------
- * WHY THIS IS SCROLL-SNAP AND NOT A CAROUSEL
- * ---------------------------------------------------------------------------
- * The obvious move is to reuse `ui/carousel` rotated ninety degrees, and it is
- * the wrong tool. That component is built around a spring writing `scrollLeft`
- * for arrows, dots and a countdown — chrome that a reel feed must not have.
- * Here the ONLY input is a thumb flick, and the platform's own vertical
- * scroll-snap is better at that than anything written in JavaScript: it runs on
- * the compositor, it has real momentum, and it already behaves correctly when a
- * notification bar appears mid-swipe.
- *
- * So the feed is a plain snapping scroller and the work is in what rides on
- * top: knowing which reel is on screen, and playing only that one.
- *
- * ---------------------------------------------------------------------------
- * ONE VIDEO PLAYS AT A TIME, AND IT IS NOT NEGOTIABLE
- * ---------------------------------------------------------------------------
- * Twelve `<video>` elements all playing is twelve decoders, and a mid-range
- * phone drops to single-digit frame rates or simply refuses to start the
- * thirteenth. An IntersectionObserver plays the visible reel and pauses every
- * other one; going off screen also RESETS the clip, so coming back starts it
- * again rather than resuming something half-watched.
- *
- * `preload="none"` on everything but the first: preloading a dozen clips on a
- * metered connection is a bill the shopper did not agree to.
- *
- * ---------------------------------------------------------------------------
- * MUTED BY DEFAULT, AND HONEST ABOUT IT
- * ---------------------------------------------------------------------------
- * Autoplay with sound is blocked by every mobile browser, so a feed that
- * assumes audio simply does not start. Muted autoplay is the only thing that
- * works, and the unmute control is placed where a thumb already is rather than
- * in a corner — a muted video with no obvious way to hear it is the most common
- * complaint about feeds like this.
- *
- * ---------------------------------------------------------------------------
- * EVERY LINK OUT IS AN ANCHOR, NOT `<Link>`
- * ---------------------------------------------------------------------------
- * Every destination from this feed — a product, a shop — is in the storefront
- * group, and a soft navigation across that boundary leaves the immersive layout
- * mounted around the storefront one. See `lib/immersive` for the measurement.
- */
+/** Commerce reels with custom spring navigation and one active video decoder. */
 
 export interface Reel {
+  saved?: boolean;
   id: string;
   /** The clip. Null renders the poster alone, which is a valid reel. */
   videoUrl: string | null;
@@ -84,6 +40,8 @@ export interface Reel {
 export function ReelsFeed({ reels }: { reels: Reel[] }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [muted, setMuted] = useState(true);
+  const reduced = useReducedMotion() ?? false;
+  const { viewport, goTo } = useReelSpring(reels.length, reduced);
 
   if (reels.length === 0) {
     return (
@@ -111,8 +69,14 @@ export function ReelsFeed({ reels }: { reels: Reel[] }) {
 
   return (
     <div
+      ref={viewport}
+      tabIndex={0}
+      role="region"
+      aria-label="Shopping reels. Use up and down arrow keys to browse."
+      data-no-swipe
       className={cn(
-        'h-dvh snap-y snap-mandatory overflow-y-auto overscroll-y-contain bg-slate-950',
+        // A full-screen feed owns every gesture inside it, sideways included.
+        'h-dvh overflow-hidden overscroll-y-contain bg-slate-950 touch-pan-x',
         // The scrollbar is noise over full-bleed video, and the feed is driven
         // by a thumb rather than by a bar.
         'no-scrollbar',
@@ -129,6 +93,11 @@ export function ReelsFeed({ reels }: { reels: Reel[] }) {
           onToggleMute={() => setMuted((value) => !value)}
         />
       ))}
+      <div className="fixed right-4 top-1/2 z-20 hidden -translate-y-1/2 flex-col gap-3 sm:flex">
+        <button type="button" aria-label="Previous reel" disabled={activeIndex === 0} onClick={() => goTo(activeIndex - 1)} className="grid size-11 place-items-center rounded-full bg-black/50 text-white disabled:opacity-30"><ArrowUp className="size-5" /></button>
+        <button type="button" aria-label="Next reel" disabled={activeIndex === reels.length - 1} onClick={() => goTo(activeIndex + 1)} className="grid size-11 place-items-center rounded-full bg-black/50 text-white disabled:opacity-30"><ArrowDown className="size-5" /></button>
+      </div>
+      <p className="sr-only" aria-live="polite">Reel {activeIndex + 1} of {reels.length}</p>
     </div>
   );
 }
@@ -150,7 +119,10 @@ function ReelSlide({
 }) {
   const slide = useRef<HTMLElement>(null);
   const video = useRef<HTMLVideoElement>(null);
-  const [liked, setLiked] = useState(false);
+  const [liked, setLiked] = useState(reel.saved ?? false);
+  const [saving, setSaving] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [failed, setFailed] = useState(false);
   const reduced = useReducedMotion() ?? false;
 
   /*
@@ -188,27 +160,34 @@ function ReelSlide({
     const node = video.current;
     if (!node) return;
 
-    if (active) {
+    if (active && !paused && !document.hidden) {
       void node.play().catch(() => {});
     } else {
       node.pause();
       // Reset, so returning to a reel starts it rather than resuming a clip
       // that is already half over.
-      node.currentTime = 0;
+      if (!active) node.currentTime = 0;
     }
-  }, [active]);
+    const visibility = () => {
+      if (document.hidden) node.pause();
+      else if (active && !paused) void node.play().catch(() => {});
+    };
+    document.addEventListener('visibilitychange', visibility);
+    return () => document.removeEventListener('visibilitychange', visibility);
+  }, [active, paused]);
 
   const price = reel.sellingPrice;
 
   return (
     <section
       ref={slide}
+      inert={!active}
       className="relative h-dvh w-full snap-start snap-always overflow-hidden"
       aria-label={`${reel.productTitle} from ${reel.sellerName}`}
     >
       {/* ------------------------------------------------------------ media */}
 
-      {reel.videoUrl ? (
+      {reel.videoUrl && !failed ? (
         <video
           ref={video}
           src={reel.videoUrl}
@@ -217,6 +196,7 @@ function ReelSlide({
           playsInline
           loop
           muted={muted}
+          onError={() => setFailed(true)}
           // Only the first reel is worth fetching before anybody has swiped.
           preload={index === 0 ? 'auto' : 'none'}
         />
@@ -243,6 +223,10 @@ function ReelSlide({
         className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/55 to-transparent"
       />
       <div aria-hidden className="scrim absolute inset-x-0 bottom-0 h-2/3" />
+      {reel.videoUrl && !failed ? <button type="button" aria-label={paused ? 'Play reel' : 'Pause reel'} onClick={() => setPaused(!paused)} className="absolute left-4 top-20 grid size-11 place-items-center rounded-full bg-black/40 text-white">
+        {paused ? <Play className="size-5" /> : <Pause className="size-5" />}
+      </button> : null}
+      {failed ? <p role="status" className="absolute left-4 top-20 rounded-lg bg-black/50 p-2 text-xs text-white">Video unavailable. You can still shop this look.</p> : null}
 
       {/* ------------------------------------------------------------- shop */}
 
@@ -288,9 +272,15 @@ function ReelSlide({
       */}
       <div className="absolute bottom-[calc(var(--spacing-bottom-nav)+7.5rem)] right-3 flex flex-col items-center gap-4">
         <RailButton
-          label={liked ? 'Remove like' : 'Like'}
-          onClick={() => setLiked((value) => !value)}
-          count={reel.likes + (liked ? 1 : 0)}
+          label={liked ? 'Remove from wishlist' : 'Save to wishlist'}
+          onClick={() => {
+            if (saving) return;
+            setSaving(true);
+            void toggleWishlistItem({ productId: reel.productId }).then((result) => {
+              if (result.ok) { setLiked(result.saved ?? false); toast.success(result.saved ? 'Saved to wishlist' : 'Removed from wishlist'); }
+              else toast.error(result.error ?? 'Could not save this item');
+            }).catch(() => toast.error('Could not save this item')).finally(() => setSaving(false));
+          }}
         >
           <motion.span
             // A like is small and immediate, so a visible overshoot reads as
@@ -306,20 +296,15 @@ function ReelSlide({
         </RailButton>
 
         <RailButton
-          label="Comment"
-          onClick={() => toast.info('Comments open with the shop after you buy.')}
-        >
-          <MessageCircle className="size-6 text-white" />
-        </RailButton>
-
-        <RailButton
           label="Share"
-          onClick={() => {
-            void navigator.clipboard?.writeText(
-              `${window.location.origin}/product/${reel.productSlug}`,
-            );
-            toast.success('Link copied.');
-          }}
+          onClick={() => { void (async () => {
+            const url = `${window.location.origin}/product/${reel.productSlug}`;
+            try {
+              if (navigator.share) await navigator.share({ title: reel.productTitle, url });
+              else if (navigator.clipboard) { await navigator.clipboard.writeText(url); toast.success('Link copied.'); }
+              else toast.error('Sharing is unavailable in this browser.');
+            } catch (error) { if (!(error instanceof DOMException && error.name === 'AbortError')) toast.error('Could not share this item.'); }
+          })(); }}
         >
           <Share2 className="size-6 text-white" />
         </RailButton>

@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  ChevronDown,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
@@ -22,6 +23,7 @@ import {
 } from 'react';
 
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { useEdgeSwipe } from '@/hooks/use-edge-swipe';
 import { cn } from '@/lib/cn';
 
 /**
@@ -58,6 +60,17 @@ import { cn } from '@/lib/cn';
  * letters of it.
  */
 
+export interface ConsoleNavGroupOptions {
+  /**
+   * Open before anybody has expressed a preference.
+   *
+   * Exactly the groups somebody uses every day should be on: a console that
+   * opens with sixteen destinations showing is a console nobody scans, and one
+   * that opens with all of them folded is a console nobody can navigate.
+   */
+  defaultOpen?: boolean;
+}
+
 export interface ConsoleNavItem {
   href: string;
   label: string;
@@ -71,7 +84,7 @@ export interface ConsoleNavItem {
   badge?: React.ReactNode;
 }
 
-export interface ConsoleNavGroup {
+export interface ConsoleNavGroup extends ConsoleNavGroupOptions {
   label: string;
   items: ConsoleNavItem[];
 }
@@ -116,6 +129,50 @@ function writeRail(collapsed: boolean): void {
     // Not persisted, but the listeners still fire so this session updates.
   }
   for (const listener of railListeners) listener();
+}
+
+/**
+ * Which groups are folded away, remembered per browser.
+ *
+ * The same external-store shape as the rail, and for the same reason: this
+ * value belongs to the browser, not to React, and reading it during render
+ * would disagree with the server's HTML. The server snapshot is "nothing
+ * folded", so the prerender shows the full list and the reader's own choice is
+ * applied on hydration -- the safe direction, because it never hides a
+ * destination somebody cannot then find.
+ */
+const FOLDED_KEY = 'console-folded';
+const foldListeners = new Set<() => void>();
+
+function subscribeFolded(listener: () => void): () => void {
+  foldListeners.add(listener);
+  window.addEventListener('storage', listener);
+  return () => {
+    foldListeners.delete(listener);
+    window.removeEventListener('storage', listener);
+  };
+}
+
+const NONE_FOLDED = '';
+
+/** A stored preference that happens to fold nothing. See `expressed`. */
+const ALL_OPEN = '__all__';
+
+function readFolded(): string {
+  try {
+    return window.localStorage.getItem(FOLDED_KEY) ?? NONE_FOLDED;
+  } catch {
+    return NONE_FOLDED;
+  }
+}
+
+function writeFolded(value: string): void {
+  try {
+    window.localStorage.setItem(FOLDED_KEY, value);
+  } catch {
+    // Not persisted, but the listeners still fire so this session updates.
+  }
+  for (const listener of foldListeners) listener();
 }
 
 const RailContext = createContext<{ collapsed: boolean }>({ collapsed: false });
@@ -182,24 +239,79 @@ function NavGroups({
   const flat = useMemo(() => flatten(groups), [groups]);
   const current = pathname ? matchItem(flat, pathname, homeHref) : null;
 
+  const folded = useSyncExternalStore(subscribeFolded, readFolded, () => NONE_FOLDED);
+  /*
+   * "Nothing stored" and "nothing folded" are different states.
+   *
+   * Without the distinction, opening every group would look identical to never
+   * having touched the rail, and the defaults would fold them all again on the
+   * next page. `ALL_OPEN` is the preference for "I want them all".
+   */
+  const expressed = folded !== NONE_FOLDED;
+  const foldedSet = useMemo(
+    () => new Set(folded.split(',').filter((label) => label && label !== ALL_OPEN)),
+    [folded],
+  );
+
+  const toggle = (label: string, open: boolean) => {
+    const next = new Set(foldedSet);
+    if (open) next.delete(label);
+    else next.add(label);
+    writeFolded([...next].join(',') || ALL_OPEN);
+  };
+
   return (
     <>
-      {groups.map((group, index) => (
+      {groups.map((group, index) => {
+        /*
+         * Three things decide whether a group is open, in this order:
+         *
+         *  1. the group holding the page you are ON is always open -- folding
+         *     away the thing you are looking at is disorienting, and it would
+         *     also hide the active marker;
+         *  2. what this browser last chose;
+         *  3. the group's own default.
+         *
+         * On the icon rail there is nothing to fold: the labels are gone and
+         * the icons are the navigation.
+         */
+        const holdsCurrent = group.items.some((item) => item.href === current?.href);
+        const open =
+          collapsed ||
+          holdsCurrent ||
+          (expressed ? !foldedSet.has(group.label) : (group.defaultOpen ?? false));
+        const groupId = `nav-group-${index}`;
+
+        return (
         <div key={group.label} className={cn(index > 0 && 'mt-5')}>
-          <p
+          <button
+            type="button"
+            onClick={() => toggle(group.label, !open)}
+            aria-expanded={open}
+            aria-controls={groupId}
+            disabled={holdsCurrent && open}
             className={cn(
-              'text-faint mb-1.5 px-2.5 text-2xs font-semibold uppercase tracking-[0.12em]',
+              'text-faint mb-1.5 flex w-full items-center gap-1 rounded px-2.5 text-2xs font-semibold uppercase tracking-[0.12em]',
+              'hover:text-muted transition-colors disabled:cursor-default',
+              'focus-visible:outline-accent focus-visible:outline-2 focus-visible:outline-offset-1',
               collapsed && 'lg:hidden',
             )}
           >
-            {group.label}
-          </p>
+            <span className="flex-1 text-left">{group.label}</span>
+            <ChevronDown
+              aria-hidden
+              className={cn(
+                'size-3 transition-transform duration-(--duration-fast)',
+                open ? 'rotate-0' : '-rotate-90',
+              )}
+            />
+          </button>
           {/* A hairline stands in for the group label on the icon rail. */}
           {collapsed && index > 0 ? (
             <div aria-hidden className="bg-line mx-3 mb-2 hidden h-px lg:block" />
           ) : null}
 
-          <ul className="space-y-0.5">
+          <ul id={groupId} className="space-y-0.5" hidden={!open}>
             {group.items.map((item) => {
               const active = current?.href === item.href;
 
@@ -264,7 +376,8 @@ function NavGroups({
             })}
           </ul>
         </div>
-      ))}
+        );
+      })}
     </>
   );
 }
@@ -471,6 +584,14 @@ export function ConsoleShell({
 }) {
   const [open, setOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+
+  // The same edge swipe the storefront uses, so one gesture opens the
+  // navigation everywhere in the product.
+  useEdgeSwipe({
+    isOpen: open,
+    onOpen: () => setOpen(true),
+    onClose: () => setOpen(false),
+  });
   /*
    * Bumped on every open so the palette remounts with an empty query. Resetting
    * its state in an effect would be a setState during commit; a new key is a

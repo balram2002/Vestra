@@ -55,6 +55,7 @@ async function Editor({ params }: { params: Promise<{ id: string }> }) {
       {contact ? <ContactSettings kind={contact} /> : null}
 
       <CmsPageForm
+        key={page.updatedAt}
         page={{
           id: page.id,
           slug: page.slug,

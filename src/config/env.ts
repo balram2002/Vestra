@@ -33,6 +33,8 @@ const schema = z.object({
   SHIPPING_PROVIDER: text,
   ESHOPBOX_MODE: text,
   SMTP_HOST: text,
+  GOOGLE_CLIENT_ID: text,
+  GOOGLE_CLIENT_SECRET: text,
 });
 
 export interface EnvReport {
@@ -57,6 +59,10 @@ export function checkEnv(env: Record<string, string | undefined> = process.env):
   const errors: string[] = [];
   const warnings: string[] = [];
   const strict = stage !== 'development';
+
+  if (Boolean(e.GOOGLE_CLIENT_ID) !== Boolean(e.GOOGLE_CLIENT_SECRET)) {
+    errors.push('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be configured together');
+  }
 
   const requireAll = (when: boolean, keys: string[], why: string) => {
     if (!when) return;

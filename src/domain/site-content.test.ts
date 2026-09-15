@@ -35,4 +35,22 @@ describe('withDefaults', () => {
     expect(merged.headerActions.search).toBe(false);
     expect(merged.headerActions.reels).toBe(DEFAULT_SITE_CONTENT.headerActions.reels);
   });
+
+  it('shows every block for a record saved before blocks could be hidden', () => {
+    const stored = { announcements: [] };
+    const merged = withDefaults(stored as Parameters<typeof withDefaults>[0]);
+
+    expect(merged.visibility).toEqual(DEFAULT_SITE_CONTENT.visibility);
+    expect(Object.values(merged.visibility).every(Boolean)).toBe(true);
+  });
+
+  it('keeps a hidden block hidden without touching its content', () => {
+    const merged = withDefaults({
+      visibility: { ...DEFAULT_SITE_CONTENT.visibility, announcements: false },
+    });
+
+    expect(merged.visibility.announcements).toBe(false);
+    expect(merged.announcements).toEqual(DEFAULT_SITE_CONTENT.announcements);
+    expect(merged.visibility.footerColumns).toBe(true);
+  });
 });

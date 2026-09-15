@@ -204,8 +204,16 @@
    */
   .glass {
     background-color: var(--surface-veil);
-    backdrop-filter: blur(20px) saturate(1.9);
-    -webkit-backdrop-filter: blur(20px) saturate(1.9);
+    /*
+     * 14px rather than 20px, and the saturation eased back with it.
+     *
+     * The cost of a backdrop blur rises with the radius, and this one is on a
+     * sticky element that moves on every scroll. At 14px over the veil the
+     * difference is invisible side by side; the difference in frame time on a
+     * mid-range phone is not.
+     */
+    backdrop-filter: blur(14px) saturate(1.6);
+    -webkit-backdrop-filter: blur(14px) saturate(1.6);
   }
   /*
    * Where backdrop-filter is unavailable the veil alone is far too sheer to

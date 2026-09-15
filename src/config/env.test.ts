@@ -64,6 +64,19 @@ describe('checkEnv', () => {
     expect(report.errors).toContain('RAZORPAY_KEY_SECRET is required when PAYMENT_PROVIDER=razorpay');
   });
 
+  it('requires both Google OAuth credentials when either is configured', () => {
+    const report = checkEnv({ ...complete, APP_ENV: 'production', GOOGLE_CLIENT_ID: 'client-id' });
+    expect(report.errors).toContain('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be configured together');
+    expect(
+      checkEnv({
+        ...complete,
+        APP_ENV: 'production',
+        GOOGLE_CLIENT_ID: 'client-id',
+        GOOGLE_CLIENT_SECRET: 'client-secret',
+      }).errors,
+    ).toEqual([]);
+  });
+
   it('requires Eshopbox credentials for live shipping outside development', () => {
     const report = checkEnv({ ...complete, APP_ENV: 'production', ESHOPBOX_MODE: '' });
     expect(report.errors.some((error) => error.startsWith('ESHOPBOX_CLIENT_ID'))).toBe(true);

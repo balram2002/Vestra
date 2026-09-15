@@ -7,6 +7,7 @@ import type { Banner, CmsPage, HomeSection } from '@/domain/types';
 
 import { collections, toEntities, toEntity } from '../db/collections';
 import { tags } from './cache-tags';
+import { categoryPageDefaults } from './category-page';
 
 /**
  * CMS content.
@@ -43,6 +44,8 @@ export async function getPageSections(page: string): Promise<HomeSection[]> {
     .toArray();
 
   const now = Date.now();
+
+  if (page === 'categories' && !(await sections.countDocuments({ page }))) return categoryPageDefaults();
 
   // Scheduling is applied here rather than in the query so a section whose
   // window has just opened does not need a separate cache key per minute.

@@ -112,3 +112,52 @@ export function cookieOptions(maxAgeSeconds: number) {
     maxAge: maxAgeSeconds,
   };
 }
+
+/* ------------------------------------------------------- two-step sign-in */
+
+/**
+ * The half-finished sign-in between a correct password and a correct code.
+ *
+ * Its own cookie and its own audience, so it can never pass for a session: a
+ * token that proves only "the password was right" must not open a single page
+ * a session opens, and a session token must not stand in for it either. It
+ * names the challenge and the account, and lives exactly as long as the code.
+ */
+export const TWO_FACTOR_COOKIE = 'vestra_2fa';
+const TWO_FACTOR_AUDIENCE = 'vestra:2fa';
+
+export interface TwoFactorPending {
+  challengeId: string;
+  userId: string;
+}
+
+export async function signTwoFactorPending(
+  pending: TwoFactorPending,
+  ttlSeconds: number,
+): Promise<string> {
+  return new SignJWT({ cid: pending.challengeId })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setSubject(pending.userId)
+    .setIssuer(ISSUER)
+    .setAudience(TWO_FACTOR_AUDIENCE)
+    .setIssuedAt()
+    .setExpirationTime(`${ttlSeconds}s`)
+    .sign(secret());
+}
+
+export async function verifyTwoFactorPending(
+  token: string | undefined,
+): Promise<TwoFactorPending | null> {
+  if (!token) return null;
+
+  try {
+    const { payload } = await jwtVerify(token, secret(), {
+      issuer: ISSUER,
+      audience: TWO_FACTOR_AUDIENCE,
+    });
+    if (!payload.sub || typeof payload.cid !== 'string') return null;
+    return { challengeId: payload.cid, userId: payload.sub };
+  } catch {
+    return null;
+  }
+}

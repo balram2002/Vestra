@@ -94,7 +94,7 @@ function AnnouncementStrip({ items }: { items: string[] }) {
         'dark:bg-sunken dark:text-muted dark:border-line dark:border-b',
       )}
     >
-      <Marquee items={items} speed={46} staticFrom="md" />
+      <Marquee items={items} pixelsPerSecond={72} />
     </div>
   );
 }
@@ -160,7 +160,11 @@ export async function SiteHeader() {
   return (
     <HeaderShell>
       <AnnouncementStrip
-        items={content.announcements.filter((item) => item.isActive).map((item) => item.text)}
+        items={
+          content.visibility.announcements
+            ? content.announcements.filter((item) => item.isActive).map((item) => item.text)
+            : []
+        }
       />
 
       <HeaderBar>

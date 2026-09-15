@@ -37,6 +37,7 @@ const INDEXES: Partial<Record<CollectionName, IndexDescription[]>> = {
   ],
 
   [COLLECTIONS.users]: [
+    { key: { googleSubject: 1 }, unique: true, name: 'uniq_google_subject', partialFilterExpression: { googleSubject: { $type: 'string' } } },
     { key: { email: 1 }, unique: true, name: 'uniq_email' },
     {
       key: { phone: 1 },

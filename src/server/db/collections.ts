@@ -24,6 +24,7 @@ import type {
   Manifest,
   NavigationNode,
   AuthToken,
+  AuthChallenge,
   Notification,
   Order,
   OrderItem,
@@ -95,6 +96,8 @@ export const COLLECTIONS = {
   sessions: 'sessions',
   /** Single-use, expiring tokens behind email verification and password reset. */
   authTokens: 'authTokens',
+  /** One-time codes behind two-step sign-in. Swept by a TTL index. */
+  authChallenges: 'authChallenges',
   /** Fixed-window counters behind rate limits. Expired by a TTL index. */
   rateLimits: 'rateLimits',
 
@@ -183,6 +186,7 @@ async function typed<T extends Document>(name: CollectionName): Promise<Collecti
 export const collections = {
   users: () => typed<User>(COLLECTIONS.users),
   authTokens: () => typed<AuthToken>(COLLECTIONS.authTokens),
+  authChallenges: () => typed<AuthChallenge>(COLLECTIONS.authChallenges),
   addresses: () => typed<Address>(COLLECTIONS.addresses),
   roles: () => typed<Role>(COLLECTIONS.roles),
 

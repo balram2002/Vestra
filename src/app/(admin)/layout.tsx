@@ -67,6 +67,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       groups={[
         {
           label: 'Overview',
+          defaultOpen: true,
           items: [
             { href: '/admin', label: 'Dashboard', icon: <LayoutDashboard aria-hidden /> },
             { href: '/admin/analytics', label: 'Analytics', icon: <BarChart3 aria-hidden /> },
@@ -74,6 +75,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         },
         {
           label: 'Commerce',
+          defaultOpen: true,
           items: [
             { href: '/admin/orders', label: 'Orders', icon: <ShoppingCart aria-hidden /> },
             {
@@ -102,6 +104,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         },
         {
           label: 'Catalogue',
+          defaultOpen: true,
           items: [
             {
               /*
@@ -155,6 +158,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             { href: '/admin/coupons', label: 'Coupons', icon: <Ticket aria-hidden /> },
             { href: '/admin/promotions', label: 'Promotions', icon: <BadgePercent aria-hidden /> },
             { href: '/admin/cms', label: 'Homepage', icon: <LayoutTemplate aria-hidden /> },
+            { href: '/admin/categories-page', label: 'Shop page', icon: <LayoutTemplate aria-hidden /> },
             { href: '/admin/pages', label: 'Pages', icon: <FileText aria-hidden /> },
             { href: '/admin/appearance', label: 'Appearance', icon: <Palette aria-hidden /> },
           ],

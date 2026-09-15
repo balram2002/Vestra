@@ -1,11 +1,15 @@
 'use client';
 
 import * as RadixDialog from '@radix-ui/react-dialog';
-import { ArrowUpRight, Clock, Search, X } from 'lucide-react';
+import { ArrowUpRight, Clock, CornerDownLeft, Search, X } from 'lucide-react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { cn } from '@/lib/cn';
+import { formatMoney } from '@/lib/format';
+import { suggest } from '@/server/actions/search';
+import type { SearchHit, SearchResults } from '@/server/services/search';
 
 /**
  * Search.
@@ -16,15 +20,21 @@ import { cn } from '@/lib/cn';
  * so it loses the page the shopper was on, and coming back means a history
  * entry that does nothing.
  *
- * What is here and what deliberately is not:
+ * LIVE RESULTS, FROM THE SERVER. This panel used to offer only recent searches
+ * and a few departments, on the honest grounds that client-side substring
+ * matching over a partial catalogue is worse than nothing. It now asks the
+ * server, which searches products, brands, categories and stores together.
  *
- *   here      the query, recent searches, and a short list of departments to
- *             fall into when someone opens search without a word in mind
- *   not here  live suggestions. There is no suggestion endpoint in this
- *             codebase, and a panel that fakes them with client-side substring
- *             matching over a partial catalogue is worse than none: it
- *             confidently shows three results and hides the four hundred the
- *             real search would have found.
+ * THE GROUPS ARE THE POINT. A brand is not a product and a store is not a
+ * category: each goes somewhere different, so each is shown under its own
+ * heading with its own kind of subtitle -- a price for a product, a product
+ * count for a brand, its parent for a category. One undifferentiated list is
+ * what produces a tap that lands somewhere the shopper did not mean.
+ *
+ * Typing stays responsive because the request is debounced, every reply is
+ * matched against the query that asked for it, and the panel keeps showing the
+ * last good results while the next ones are in flight -- a panel that empties
+ * on every keystroke reads as broken.
  *
  * Recent searches live in `localStorage` and nowhere else. They are a
  * convenience for one person on one device, they are not worth a round trip,
@@ -144,7 +154,43 @@ export function SearchOverlay({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [recent, setRecent] = useState<string[]>([]);
+  const [results, setResults] = useState<{ query: string; data: SearchResults } | null>(null);
+  const [active, setActive] = useState(-1);
   const input = useRef<HTMLInputElement>(null);
+
+  const term = query.trim();
+
+  /*
+   * Ask the server, 180ms after the typing stops.
+   *
+   * The reply carries the query it answered, so a slow response for "sh" can
+   * never overwrite the results for "shirt" -- the classic race in every
+   * type-ahead. The previous results stay on screen until the new ones arrive.
+   */
+  useEffect(() => {
+    if (term.length < 2) return;
+
+    const timer = window.setTimeout(async () => {
+      const data = await suggest({ query: term });
+      setResults({ query: term, data });
+    }, 180);
+
+    return () => window.clearTimeout(timer);
+  }, [term]);
+
+  const showing = term.length >= 2 && results?.query === term ? results.data : null;
+  const searching = term.length >= 2 && results?.query !== term;
+
+  /*
+   * One flat list behind the groups, for the arrow keys.
+   *
+   * The visible order is products, brands, categories, stores, and this
+   * mirrors it exactly -- a keyboard user moving down the panel must land on
+   * the same row an eye would.
+   */
+  const flat: SearchHit[] = showing
+    ? [...showing.products, ...showing.brands, ...showing.categories, ...showing.sellers]
+    : [];
 
   /**
    * Open, and read the history at the same moment.
@@ -183,6 +229,18 @@ export function SearchOverlay({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [changeOpen]);
+
+  /** Follow a result. The term is remembered: it is what led there. */
+  const go = useCallback(
+    (href: string) => {
+      if (term) pushRecent(term);
+      setOpen(false);
+      setQuery('');
+      setActive(-1);
+      router.push(href);
+    },
+    [router, term],
+  );
 
   const submit = useCallback(
     (term: string) => {
@@ -260,9 +318,30 @@ export function SearchOverlay({
                   name="q"
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search for kurtas, sneakers, brands…"
-                  aria-label="Search products"
+                  placeholder="Search products, brands, stores…"
+                  aria-label="Search products, brands, categories and stores"
                   autoComplete="off"
+                  role="combobox"
+                  aria-expanded={flat.length > 0}
+                  aria-controls="search-results"
+                  aria-activedescendant={active >= 0 ? `search-hit-${active}` : undefined}
+                  onKeyDown={(event) => {
+                    if (flat.length === 0) return;
+                    if (event.key === 'ArrowDown') {
+                      event.preventDefault();
+                      setActive((index) => (index + 1) % flat.length);
+                    }
+                    if (event.key === 'ArrowUp') {
+                      event.preventDefault();
+                      setActive((index) => (index <= 0 ? flat.length - 1 : index - 1));
+                    }
+                    if (event.key === 'Enter' && active >= 0) {
+                      // A highlighted row wins over the plain search the form
+                      // would otherwise run.
+                      event.preventDefault();
+                      go(flat[active].href);
+                    }
+                  }}
                   className={cn(
                     'bg-sunken border-line-control text-ink placeholder:text-faint',
                     'h-12 w-full rounded-full border pl-12 pr-4 text-md',
@@ -285,14 +364,99 @@ export function SearchOverlay({
             </form>
 
             {/*
-              The panel below the field.
+              Results, once there is something to search for.
 
-              Hidden entirely once there is a query, because everything in it
-              is about NOT having one. Leaving it up under a half-typed word is
-              how a search panel ends up showing "recent: shoes" while someone
-              is typing "shirt".
+              Everything below the fold of this panel is about NOT having a
+              query -- recent searches, departments to fall into -- so the two
+              states are mutually exclusive. Leaving the idle panel up under a
+              half-typed word is how a search box ends up showing "recent:
+              shoes" while somebody types "shirt".
             */}
-            {query.trim() ? null : (
+            {term.length >= 2 ? (
+              /*
+                A listbox, because the field above is a combobox: that pairing
+                is what lets a screen reader announce "3 of 14" as the arrows
+                move, and it is why each row is an option rather than a plain
+                link. They are still anchors underneath, so a middle-click
+                opens a tab like any other result.
+              */
+              <div
+                id="search-results"
+                role="listbox"
+                aria-label={`Results for ${term}`}
+                className="mt-3 max-h-[70vh] overflow-y-auto pb-4"
+              >
+                {showing && showing.total > 0 ? (
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    <HitGroup
+                      heading="Products"
+                      hits={showing.products}
+                      offset={0}
+                      active={active}
+                      onPick={go}
+                      onHover={setActive}
+                      shape="square"
+                    />
+                    <div className="grid gap-5">
+                      <HitGroup
+                        heading="Brands"
+                        hits={showing.brands}
+                        offset={showing.products.length}
+                        active={active}
+                        onPick={go}
+                        onHover={setActive}
+                        shape="contain"
+                      />
+                      <HitGroup
+                        heading="Categories"
+                        hits={showing.categories}
+                        offset={showing.products.length + showing.brands.length}
+                        active={active}
+                        onPick={go}
+                        onHover={setActive}
+                        shape="square"
+                      />
+                      <HitGroup
+                        heading="Stores"
+                        hits={showing.sellers}
+                        offset={
+                          showing.products.length +
+                          showing.brands.length +
+                          showing.categories.length
+                        }
+                        active={active}
+                        onPick={go}
+                        onHover={setActive}
+                        shape="round"
+                      />
+                    </div>
+                  </div>
+                ) : searching ? (
+                  <ResultsSkeleton />
+                ) : (
+                  <p className="text-muted px-3 py-6 text-sm">
+                    Nothing matches <span className="text-ink font-medium">{term}</span> yet. Try
+                    fewer words, or search the whole catalogue below.
+                  </p>
+                )}
+
+                {/* Always available: the panel shows a handful, the page shows
+                    everything, and a shopper must be able to get there. */}
+                <button
+                  type="button"
+                  onClick={() => submit(term)}
+                  className={cn(
+                    'border-line text-ink hover:bg-sunken mt-3 flex min-h-12 w-full items-center',
+                    'justify-between gap-3 rounded-md border px-3 text-sm transition-colors',
+                  )}
+                >
+                  <span className="truncate">
+                    Search everything for <span className="font-medium">{term}</span>
+                  </span>
+                  <CornerDownLeft className="text-faint size-4 shrink-0" aria-hidden />
+                </button>
+              </div>
+            ) : (
               <div className="mt-4 grid gap-6 pb-4 sm:grid-cols-2">
                 {recent.length > 0 ? (
                   <section>
@@ -349,5 +513,125 @@ export function SearchOverlay({
         </RadixDialog.Content>
       </RadixDialog.Portal>
     </RadixDialog.Root>
+  );
+}
+
+
+/* --------------------------------------------------------------- results */
+
+/**
+ * One kind of result.
+ *
+ * `offset` is where this group starts in the flat keyboard list, so the arrow
+ * keys and the eye agree about which row is highlighted. Rows are anchors, not
+ * buttons: a result is a destination, and a shopper who middle-clicks or
+ * long-presses one expects a link.
+ */
+function HitGroup({
+  heading,
+  hits,
+  offset,
+  active,
+  onPick,
+  onHover,
+  shape,
+}: {
+  heading: string;
+  hits: SearchHit[];
+  offset: number;
+  active: number;
+  onPick: (href: string) => void;
+  onHover: (index: number) => void;
+  shape: 'square' | 'round' | 'contain';
+}) {
+  if (hits.length === 0) return null;
+
+  return (
+    <section role="group" aria-label={heading}>
+      <h2 className="eyebrow mb-1.5">{heading}</h2>
+      <ul>
+        {hits.map((hit, index) => {
+          const position = offset + index;
+          const highlighted = position === active;
+
+          return (
+            <li key={hit.id}>
+              <a
+                id={`search-hit-${position}`}
+                role="option"
+                href={hit.href}
+                onClick={(event) => {
+                  // Plain clicks route in the app; modified clicks are the
+                  // browser's to handle, and it does it better.
+                  if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+                  event.preventDefault();
+                  onPick(hit.href);
+                }}
+                onMouseMove={() => onHover(position)}
+                aria-selected={highlighted}
+                className={cn(
+                  'flex min-h-12 items-center gap-3 rounded-md px-2 py-1.5 transition-colors',
+                  highlighted ? 'bg-sunken' : 'hover:bg-sunken',
+                )}
+              >
+                <span
+                  className={cn(
+                    'bg-sunken relative size-10 shrink-0 overflow-hidden',
+                    shape === 'round' ? 'rounded-full' : 'rounded-md',
+                  )}
+                >
+                  {hit.imageUrl ? (
+                    <Image
+                      src={hit.imageUrl}
+                      alt=""
+                      fill
+                      sizes="40px"
+                      className={shape === 'contain' ? 'object-contain p-1' : 'object-cover'}
+                    />
+                  ) : null}
+                </span>
+
+                <span className="min-w-0 flex-1">
+                  <span className="text-ink block truncate text-sm">{hit.label}</span>
+                  {hit.hint ? (
+                    <span className="text-faint block truncate text-2xs capitalize">{hit.hint}</span>
+                  ) : null}
+                </span>
+
+                {hit.price ? (
+                  <span className="text-ink shrink-0 text-xs font-medium">
+                    {formatMoney(hit.price)}
+                  </span>
+                ) : (
+                  <ArrowUpRight className="text-faint size-4 shrink-0" aria-hidden />
+                )}
+              </a>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+/** The shape of a result list, while the first one is being fetched. */
+function ResultsSkeleton() {
+  return (
+    <div className="grid gap-5 sm:grid-cols-2" aria-hidden>
+      {[0, 1].map((column) => (
+        <div key={column} className="space-y-2">
+          <div className="skeleton h-3 w-20 rounded" />
+          {[0, 1, 2].map((row) => (
+            <div key={row} className="flex items-center gap-3">
+              <div className="skeleton size-10 shrink-0 rounded-md" />
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <div className="skeleton h-3.5 w-2/3 rounded" />
+                <div className="skeleton h-2.5 w-1/3 rounded" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
   );
 }

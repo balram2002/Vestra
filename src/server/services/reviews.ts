@@ -2,6 +2,7 @@ import 'server-only';
 
 import { cacheLife, cacheTag } from 'next/cache';
 
+import { galleryAssets } from '@/domain/media';
 import type { ProductRating, Review } from '@/domain/types';
 
 import { collections, toEntities } from '../db/collections';
@@ -138,4 +139,70 @@ export async function applyRating(
       },
     },
   );
+}
+
+export interface Testimonial {
+  id: string;
+  authorName: string;
+  rating: number;
+  title: string | null;
+  body: string;
+  productTitle: string;
+  productSlug: string;
+  productImageUrl: string | null;
+  verifiedPurchase: boolean;
+}
+
+/**
+ * What shoppers actually said, for the homepage.
+ *
+ * REAL REVIEWS ONLY, and only ones tied to a delivered order. A testimonial
+ * band is the single easiest thing on a shop to fake, and a fabricated one is
+ * worth less than nothing: it is the section shoppers have learned to
+ * disbelieve. These are the same reviews on the product pages, chosen for being
+ * recent, five-star and long enough to say something.
+ */
+export async function topTestimonials(limit = 6): Promise<Testimonial[]> {
+  'use cache';
+  cacheTag(tags.productList);
+  cacheLife('hours');
+
+  const [reviewCol, productCol] = await Promise.all([
+    collections.reviews(),
+    collections.products(),
+  ]);
+
+  const reviews = await reviewCol
+    .find({ status: 'PUBLISHED', rating: { $gte: 4 }, verifiedPurchase: true })
+    .sort({ helpfulCount: -1, createdAt: -1 })
+    .limit(limit * 3)
+    .toArray();
+
+  // A one-word review is not a testimonial, however many stars it carries.
+  const usable = reviews.filter((review) => review.body.trim().length >= 40).slice(0, limit);
+  if (usable.length === 0) return [];
+
+  const products = await productCol
+    .find({ _id: { $in: usable.map((review) => review.productId) } })
+    .toArray();
+  const byId = new Map(products.map((product) => [product._id, product]));
+
+  return usable.flatMap((review) => {
+    const product = byId.get(review.productId);
+    if (!product || product.status !== 'PUBLISHED') return [];
+
+    return [
+      {
+        id: review._id,
+        authorName: review.authorName,
+        rating: review.rating,
+        title: review.title,
+        body: review.body,
+        productTitle: product.title,
+        productSlug: product.slug,
+        productImageUrl: galleryAssets(product.media ?? [])[0]?.url ?? null,
+        verifiedPurchase: review.verifiedPurchase,
+      },
+    ];
+  });
 }

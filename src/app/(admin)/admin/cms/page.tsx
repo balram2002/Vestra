@@ -7,9 +7,9 @@ import {
   AdoptDefaultSlidesButton,
   BannerDialog,
   BannerToggle,
-  DeleteBannerButton,
   MoveBannerButtons,
 } from '@/components/console/banner-manager';
+import { ResetPlacementButton } from '@/components/console/banner-placement-reset';
 import { PageHeader } from '@/components/console/page-header';
 import { DEFAULT_HERO_SLIDES } from '@/config/home';
 import { ADDABLE_SECTION_KINDS } from '@/domain/sections';
@@ -51,7 +51,7 @@ async function Composition() {
   ]);
 
   const [sections, banners] = await Promise.all([
-    sectionCol.find({}).sort({ position: 1 }).toArray().then(toEntities),
+    sectionCol.find({ $or: [{ page: 'home' }, { page: { $exists: false } }] }).sort({ position: 1 }).toArray().then(toEntities),
     bannerCol.find({}).sort({ position: 1, createdAt: 1 }).toArray().then(toEntities),
   ]);
 
@@ -106,7 +106,13 @@ function BannerRow({
           <h2 className="text-ink text-md font-semibold">{title}</h2>
           <p className="text-muted mt-0.5 text-xs">{description}</p>
         </div>
-        <BannerDialog placement={placement} />
+        <div className="flex flex-wrap items-center gap-2">
+          <ResetPlacementButton
+            placement={placement}
+            liveCount={banners.filter((banner) => banner.isActive).length}
+          />
+          <BannerDialog placement={placement} />
+        </div>
       </div>
 
       {banners.length === 0 ? (
@@ -157,8 +163,9 @@ function BannerRow({
                       first={index === 0}
                       last={index === banners.length - 1}
                     />
+                    {/* No delete here, on purpose: a slide that should come down
+                        is set to Hidden, and stays in this list ready to return. */}
                     <BannerDialog banner={banner} />
-                    <DeleteBannerButton bannerId={banner.id} name={banner.name} />
                   </div>
                 </div>
               </div>

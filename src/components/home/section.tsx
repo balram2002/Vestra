@@ -32,6 +32,7 @@ export function Section({
   subtitle,
   eyebrow,
   href,
+  badge,
   ctaLabel = 'See all',
   children,
   className,
@@ -44,6 +45,8 @@ export function Section({
   subtitle?: string | null;
   eyebrow?: string | null;
   href?: string | null;
+  /** Sits beside the heading: a countdown, a count, a state. */
+  badge?: React.ReactNode;
   ctaLabel?: string | null;
   children: React.ReactNode;
   className?: string;
@@ -61,7 +64,10 @@ export function Section({
         >
           <div className="min-w-0">
             {eyebrow ? <p className="eyebrow mb-2">{eyebrow}</p> : null}
-            <h2 className="headline text-ink text-2xl sm:text-3xl">{title}</h2>
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 className="headline text-ink text-2xl sm:text-3xl">{title}</h2>
+              {badge}
+            </div>
             {subtitle ? (
               <p className="text-muted mt-2 max-w-xl text-sm">{subtitle}</p>
             ) : null}

@@ -4,6 +4,7 @@ import { LogOut } from 'lucide-react';
 import { useTransition } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { clearPreferredSizes } from '@/hooks/use-preferred-size';
 
 import { signOut } from '@/server/actions/auth';
 
@@ -21,7 +22,14 @@ export function SignOutButton() {
     <Button
       type="button"
       disabled={pending}
-      onClick={() => startTransition(async () => { await signOut(); })}
+      onClick={() =>
+        startTransition(async () => {
+          // The size hint on product pages belongs to the account, not to this
+          // browser, so it leaves with the session.
+          clearPreferredSizes();
+          await signOut();
+        })
+      }
       variant="secondary"
       size="sm"
       className="shrink-0"

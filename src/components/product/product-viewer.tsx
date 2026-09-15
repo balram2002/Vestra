@@ -19,9 +19,11 @@ import { WishlistButton } from '@/components/commerce/wishlist-button';
 import { Button } from '@/components/ui/button';
 import { ChipButton, ChipSwatch } from '@/components/ui/chip';
 import { INVENTORY } from '@/config/business';
+import type { SizeSystem } from '@/domain/attributes';
 import { galleryAssets, showcaseVideo } from '@/domain/media';
 import type { Media, ProductVariant } from '@/domain/types';
 import { Carousel, CarouselItem, useSlideParallax } from '@/components/ui/carousel';
+import { usePreferredSize } from '@/hooks/use-preferred-size';
 import { cn } from '@/lib/cn';
 import { spring } from '@/lib/motion';
 import { addToBag } from '@/server/actions/cart';
@@ -192,6 +194,7 @@ export function ProductViewer({
   variants,
   media,
   sizeOptions,
+  sizeSystem,
   colorOptions,
   header,
   footer,
@@ -202,6 +205,8 @@ export function ProductViewer({
   /** Style-level media, used when a colour has none of its own. */
   media: Media[];
   sizeOptions: string[];
+  /** The scale the sizes are on, so the shopper's usual size can be pointed out. */
+  sizeSystem?: SizeSystem;
   colorOptions: Array<{ value: string; label: string; hex: string }>;
   /**
    * Server-rendered slots for the buy column. Brand, title, rating, seller and
@@ -216,6 +221,11 @@ export function ProductViewer({
   const [shot, setShot] = useState(0);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
+
+  // The shopper's usual size on this product's scale, when they have told us
+  // one and this product is made in it. A hint only: see `usePreferredSize`.
+  const preferred = usePreferredSize(sizeSystem);
+  const usualSize = preferred && sizeOptions.includes(preferred) ? preferred : null;
 
   const forColor = useMemo(
     () => variants.filter((v) => v.color === color && v.isActive),
@@ -492,13 +502,54 @@ export function ProductViewer({
                     active={option === size}
                     unavailable={soldOut}
                     onClick={() => !soldOut && setSize(option)}
-                    title={soldOut ? `${option} — sold out` : option}
+                    title={
+                      option === usualSize
+                        ? `${option} — your usual size${soldOut ? ', sold out' : ''}`
+                        : soldOut
+                          ? `${option} — sold out`
+                          : option
+                    }
                   >
                     {option}
+                    {option === usualSize ? (
+                      <>
+                        <span
+                          aria-hidden
+                          className="bg-accent ml-1.5 inline-block size-1.5 rounded-full align-middle"
+                        />
+                        <span className="sr-only">, your usual size</span>
+                      </>
+                    ) : null}
                   </ChipButton>
                 );
               })}
             </div>
+
+            {/*
+              The usual size, offered rather than chosen.
+
+              Selecting it for them would be quicker and wrong: a copy of the
+              preference left on a shared device must never be able to put
+              somebody else's size in the bag. One tap is the whole cost.
+            */}
+            {usualSize && usualSize !== size ? (
+              (bySize.get(usualSize)?.inventory.available ?? 0) > 0 ? (
+                <button
+                  type="button"
+                  data-usual-size={usualSize}
+                  onClick={() => setSize(usualSize)}
+                  className="text-accent-ink mt-2.5 inline-flex min-h-11 items-center gap-1.5 text-xs font-medium underline-offset-4 hover:underline lg:min-h-0"
+                >
+                  <span aria-hidden className="bg-accent size-1.5 rounded-full" />
+                  Your usual size, {usualSize}, is in stock. Select it
+                </button>
+              ) : (
+                <p data-usual-size={usualSize} className="text-muted mt-2.5 flex items-center gap-1.5 text-xs">
+                  <span aria-hidden className="border-line-strong size-1.5 rounded-full border" />
+                  Your usual size, {usualSize}, is sold out in this colour
+                </p>
+              )
+            ) : null}
 
             {selected && selected.inventory.available <= INVENTORY.urgencyThreshold ? (
               <p className="text-danger-600 mt-2.5 text-xs font-medium">

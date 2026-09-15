@@ -22,14 +22,14 @@ import { cn } from '@/lib/cn';
  */
 
 const TINTS = [
-  'bg-chart-1/12 text-chart-1',
-  'bg-chart-2/12 text-chart-2',
-  'bg-chart-3/12 text-chart-3',
-  'bg-chart-4/12 text-chart-4',
-  'bg-chart-5/12 text-chart-5',
-  'bg-chart-6/12 text-chart-6',
-  'bg-chart-7/12 text-chart-7',
-  'bg-chart-8/12 text-chart-8',
+  'bg-chart-1/12 text-ink',
+  'bg-chart-2/12 text-ink',
+  'bg-chart-3/12 text-ink',
+  'bg-chart-4/12 text-ink',
+  'bg-chart-5/12 text-ink',
+  'bg-chart-6/12 text-ink',
+  'bg-chart-7/12 text-ink',
+  'bg-chart-8/12 text-ink',
 ] as const;
 
 /** A small, stable, order-independent string hash. Not cryptographic; not meant to be. */

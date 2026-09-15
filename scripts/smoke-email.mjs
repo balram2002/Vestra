@@ -79,7 +79,7 @@ try {
    */
   await page.getByRole('textbox', { name: /full name/i }).fill('Smoke Tester');
   await page.getByRole('textbox', { name: 'Email', exact: true }).fill(address);
-  await page.locator('input[name="password"]').fill('vestra123');
+  await page.locator('input[name="password"]').fill('Copper-Kettle-River-27');
   await Promise.all([
     page.waitForURL((url) => !url.pathname.startsWith('/register'), { timeout: 30000 }),
     page.getByRole('button', { name: /create|register|sign up/i }).first().click(),
@@ -157,8 +157,8 @@ try {
 
     await page.goto(`${BASE}/reset-password?token=${resetToken}`, { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(1200);
-    await page.locator('input[name="password"]').fill('vestra456');
-    await page.locator('input[name="confirm"]').fill('vestra456');
+    await page.locator('input[name="password"]').fill('Harbour-Glass-Cedar-48');
+    await page.locator('input[name="confirm"]').fill('Harbour-Glass-Cedar-48');
     await page.getByRole('button', { name: /change my password/i }).click();
     await page.waitForTimeout(2500);
 
@@ -167,6 +167,21 @@ try {
 
     const notice = await waitForMail(/your-password-was-changed/);
     check('a password-changed warning is sent', Boolean(notice));
+
+    const fresh = await browser.newContext();
+    const login = await fresh.newPage();
+    await login.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
+    await login.locator('input[name="email"]').fill(address);
+    await login.locator('input[name="password"]').fill('Copper-Kettle-River-27');
+    await login.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await login.getByText('That email and password do not match.').waitFor({ timeout: 15000 });
+    check('the old password stops working after reset', new URL(login.url()).pathname === '/login');
+    await login.locator('input[name="email"]').fill(address);
+    await login.locator('input[name="password"]').fill('Harbour-Glass-Cedar-48');
+    await login.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await login.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 30000 });
+    check('the new password signs in after reset', !new URL(login.url()).pathname.startsWith('/login'));
+    await fresh.close();
 
     /* --------------------------------- an unknown address reveals nothing */
 

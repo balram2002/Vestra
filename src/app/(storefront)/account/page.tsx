@@ -8,6 +8,7 @@ import { AccountNav } from '@/components/account/account-nav';
 import { VerifyEmailNotice } from '@/components/account/verify-email-notice';
 import { ThemeToggle } from '@/components/theme/theme-toggle';
 import { SignOutButton } from '@/components/account/sign-out-button';
+import { Avatar } from '@/components/ui/avatar';
 import { StatusBadge } from '@/components/ui/badge';
 import { FULFILLMENT_STATUS_META } from '@/domain/enums';
 import { formatDate, formatMoney } from '@/lib/format';
@@ -73,21 +74,31 @@ async function Overview() {
   return (
     <>
       <header className="mt-6 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="font-display text-ink text-2xl">{user.fullName}</h1>
-          <p className="text-muted mt-1 text-sm">{user.email}</p>
-          {access.chips.length > 0 ? (
-            <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Your roles">
-              {access.chips.map((chip) => (
-                <li
-                  key={chip}
-                  className="bg-accent-soft text-accent-ink rounded-full px-2.5 py-0.5 text-2xs font-semibold"
-                >
-                  {chip}
-                </li>
-              ))}
-            </ul>
-          ) : null}
+        <div className="flex min-w-0 items-start gap-3.5">
+          {/* The photo is the way into the profile: it is what people tap to change it. */}
+          <Link
+            href="/account/profile"
+            aria-label="Edit your profile and photo"
+            className="focus-visible:outline-accent shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2"
+          >
+            <Avatar name={user.fullName} src={user.avatarUrl} size="lg" />
+          </Link>
+          <div className="min-w-0">
+            <h1 className="font-display text-ink text-2xl">{user.fullName}</h1>
+            <p className="text-muted mt-1 truncate text-sm">{user.email}</p>
+            {access.chips.length > 0 ? (
+              <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Your roles">
+                {access.chips.map((chip) => (
+                  <li
+                    key={chip}
+                    className="bg-accent-soft text-accent-ink rounded-full px-2.5 py-0.5 text-2xs font-semibold"
+                  >
+                    {chip}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
         </div>
 
         <SignOutButton />

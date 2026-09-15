@@ -1,18 +1,21 @@
 'use client';
 
-import { ChevronDown, ChevronUp, Plus, RotateCcw, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Eye, EyeOff, Plus, RotateCcw, Trash2 } from 'lucide-react';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
 
 import { ICON_LABELS } from '@/components/ui/content-icon';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/choice';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import {
   CONTENT_ICONS,
+  DEFAULT_SITE_CONTENT,
   type AnnouncementItem,
+  type BlockVisibility,
   type ContentIcon as IconKey,
   type FooterBadge,
   type FooterColumn,
@@ -44,16 +47,48 @@ import {
  * until Save is pressed -- and the card says when it is holding unsaved work.
  */
 export function AppearanceEditor({ content }: { content: SiteContent }) {
+  const shown = useVisibility(content.visibility);
+
   return (
     <div className="mt-6 space-y-6">
-      <AnnouncementsBlock initial={content.announcements} />
+      <AnnouncementsBlock initial={content.announcements} shown={shown} />
       <HeaderActionsBlock initial={content.headerActions} />
-      <ValuePropsBlock initial={content.valueProps} />
-      <FooterBadgesBlock initial={content.footerBadges} />
-      <FooterColumnsBlock initial={content.footerColumns} />
+      <ValuePropsBlock initial={content.valueProps} shown={shown} />
+      <FooterBadgesBlock initial={content.footerBadges} shown={shown} />
+      <FooterColumnsBlock initial={content.footerColumns} shown={shown} />
     </div>
   );
 }
+
+/**
+ * Whether each block shows at all, saved the moment it is switched.
+ *
+ * A switch, not a draft: there is nothing to type, and a block that only
+ * disappears after a separate Save is a switch that looks broken. It still
+ * asks first -- see `Block` -- because it is the whole strip, or the whole
+ * footer, leaving every page at once.
+ */
+function useVisibility(initial: BlockVisibility) {
+  const [visibility, setVisibility] = useState(initial);
+  const [pending, startTransition] = useTransition();
+
+  const set = (key: keyof BlockVisibility, value: boolean) => {
+    const next = { ...visibility, [key]: value };
+    startTransition(async () => {
+      const result = await saveAppearance({ block: 'visibility', value: next });
+      if (!result.ok) {
+        toast.error(result.error ?? 'That did not save.');
+        return;
+      }
+      setVisibility(next);
+      toast.success(value ? 'Showing on the shop' : 'Hidden from the shop — its content is kept');
+    });
+  };
+
+  return { visibility, set, pending };
+}
+
+type Shown = ReturnType<typeof useVisibility>;
 
 /* ------------------------------------------------------------- the shell */
 
@@ -83,7 +118,11 @@ function useBlock<T>(block: AppearanceBlock, initial: T) {
         toast.error(result.error ?? 'That did not reset.');
         return;
       }
-      toast.success('Back to the original. Reload to see it here.');
+      // The card shows what the shop now shows, straight away.
+      const shipped = DEFAULT_SITE_CONTENT[block] as T;
+      setDraft(shipped);
+      setSaved(shipped);
+      toast.success('Back to how the shop shipped');
     });
   };
 
@@ -97,6 +136,8 @@ function Block({
   pending,
   onSave,
   onReset,
+  shown,
+  visibilityKey,
   children,
 }: {
   title: string;
@@ -105,27 +146,95 @@ function Block({
   pending: boolean;
   onSave: () => void;
   onReset: () => void;
+  /** Blocks that can be switched off as a whole pass these. */
+  shown?: Shown;
+  visibilityKey?: keyof BlockVisibility;
   children: React.ReactNode;
 }) {
+  const visible = shown && visibilityKey ? shown.visibility[visibilityKey] : true;
+
   return (
-    <section className="border-line bg-raised rounded-lg border">
+    <section
+      className={cn('border-line bg-raised rounded-lg border', !visible && 'border-dashed')}
+      aria-label={title}
+    >
       <header className="border-line flex flex-wrap items-start justify-between gap-3 border-b px-4 py-3 sm:px-5">
         <div className="min-w-0">
-          <h2 className="text-ink text-sm font-semibold">{title}</h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-ink text-sm font-semibold">{title}</h2>
+            {shown && visibilityKey ? (
+              <span
+                className={cn(
+                  'rounded-full px-2 py-0.5 text-2xs font-medium',
+                  visible ? 'bg-success-50 text-success-700' : 'bg-sunken text-muted',
+                )}
+              >
+                {visible ? 'Showing' : 'Hidden'}
+              </span>
+            ) : null}
+          </div>
           <p className="text-muted mt-0.5 text-xs">{description}</p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
           {dirty ? <span className="text-warning-700 text-2xs font-medium">Unsaved</span> : null}
-          <Button type="button" size="xs" variant="ghost" onClick={onReset} disabled={pending}>
-            <RotateCcw className="size-3.5" aria-hidden />
-            Reset
-          </Button>
+
+          {shown && visibilityKey ? (
+            <ConfirmDialog
+              trigger={
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="ghost"
+                  disabled={shown.pending}
+                  aria-label={visible ? `Hide the ${title.toLowerCase()}` : `Show the ${title.toLowerCase()}`}
+                >
+                  {visible ? (
+                    <EyeOff className="size-3.5" aria-hidden />
+                  ) : (
+                    <Eye className="size-3.5" aria-hidden />
+                  )}
+                  {visible ? 'Hide' : 'Show'}
+                </Button>
+              }
+              title={visible ? `Hide the ${title.toLowerCase()}?` : `Show the ${title.toLowerCase()}?`}
+              description={
+                visible
+                  ? 'It disappears from every page of the shop straight away. Everything written in it is kept, ready for when it comes back.'
+                  : 'It returns to every page of the shop straight away, with the content below.'
+              }
+              confirmLabel={visible ? 'Hide it' : 'Show it'}
+              tone={visible ? 'danger' : 'default'}
+              onConfirm={() => shown.set(visibilityKey, !visible)}
+            />
+          ) : null}
+
+          <ConfirmDialog
+            trigger={
+              <Button type="button" size="xs" variant="ghost" disabled={pending}>
+                <RotateCcw className="size-3.5" aria-hidden />
+                Reset
+              </Button>
+            }
+            title={`Reset the ${title.toLowerCase()}?`}
+            description="Everything in it goes back to how the shop shipped, on every page, straight away. What you wrote here is replaced."
+            confirmLabel="Reset"
+            tone="danger"
+            requireText="RESET"
+            onConfirm={onReset}
+          />
+
           <Button type="button" size="xs" onClick={onSave} disabled={pending || !dirty}>
             {pending ? 'Saving…' : 'Save'}
           </Button>
         </div>
       </header>
+
+      {!visible ? (
+        <p className="bg-sunken text-muted border-line border-b px-4 py-2 text-2xs sm:px-5">
+          Hidden from the shop. You can still edit it; nothing shows until it is switched back on.
+        </p>
+      ) : null}
 
       <div className="space-y-3 p-4 sm:p-5">{children}</div>
     </section>
@@ -264,7 +373,7 @@ function IconSelect({
 
 /* ------------------------------------------------------- announcements */
 
-function AnnouncementsBlock({ initial }: { initial: AnnouncementItem[] }) {
+function AnnouncementsBlock({ initial, shown }: { initial: AnnouncementItem[]; shown: Shown }) {
   const { draft, setDraft, dirty, pending, save, reset } = useBlock('announcements', initial);
 
   const update = (index: number, patch: Partial<AnnouncementItem>) =>
@@ -273,7 +382,9 @@ function AnnouncementsBlock({ initial }: { initial: AnnouncementItem[] }) {
   return (
     <Block
       title="Announcement strip"
-      description="The band above the header. It scrolls on a phone and sits still on a desktop."
+      description="The band above the header. It sits still and centred when it fits, and scrolls when it does not."
+      shown={shown}
+      visibilityKey="announcements"
       dirty={dirty}
       pending={pending}
       onSave={save}
@@ -366,7 +477,7 @@ function HeaderActionsBlock({ initial }: { initial: HeaderActions }) {
 
 /* ------------------------------------------------------------ promises */
 
-function ValuePropsBlock({ initial }: { initial: ValueProp[] }) {
+function ValuePropsBlock({ initial, shown }: { initial: ValueProp[]; shown: Shown }) {
   const { draft, setDraft, dirty, pending, save, reset } = useBlock('valueProps', initial);
 
   const update = (index: number, patch: Partial<ValueProp>) =>
@@ -376,6 +487,8 @@ function ValuePropsBlock({ initial }: { initial: ValueProp[] }) {
     <Block
       title="Promises"
       description="The band near the foot of the homepage. Each one should state a number rather than a claim."
+      shown={shown}
+      visibilityKey="valueProps"
       dirty={dirty}
       pending={pending}
       onSave={save}
@@ -444,7 +557,7 @@ function ValuePropsBlock({ initial }: { initial: ValueProp[] }) {
 
 /* -------------------------------------------------------------- footer */
 
-function FooterBadgesBlock({ initial }: { initial: FooterBadge[] }) {
+function FooterBadgesBlock({ initial, shown }: { initial: FooterBadge[]; shown: Shown }) {
   const { draft, setDraft, dirty, pending, save, reset } = useBlock('footerBadges', initial);
 
   const update = (index: number, patch: Partial<FooterBadge>) =>
@@ -454,6 +567,8 @@ function FooterBadgesBlock({ initial }: { initial: FooterBadge[] }) {
     <Block
       title="Footer badges"
       description="The short reassurances at the point of leaving."
+      shown={shown}
+      visibilityKey="footerBadges"
       dirty={dirty}
       pending={pending}
       onSave={save}
@@ -491,7 +606,7 @@ function FooterBadgesBlock({ initial }: { initial: FooterBadge[] }) {
   );
 }
 
-function FooterColumnsBlock({ initial }: { initial: FooterColumn[] }) {
+function FooterColumnsBlock({ initial, shown }: { initial: FooterColumn[]; shown: Shown }) {
   const { draft, setDraft, dirty, pending, save, reset } = useBlock('footerColumns', initial);
 
   const updateColumn = (index: number, patch: Partial<FooterColumn>) =>
@@ -501,6 +616,8 @@ function FooterColumnsBlock({ initial }: { initial: FooterColumn[] }) {
     <Block
       title="Footer columns"
       description="Everything but Shop, which follows the departments that actually exist."
+      shown={shown}
+      visibilityKey="footerColumns"
       dirty={dirty}
       pending={pending}
       onSave={save}

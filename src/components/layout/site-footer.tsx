@@ -148,7 +148,7 @@ export async function SiteFooter() {
             ))}
           </FooterColumn>
 
-          {content.footerColumns.map((column) => (
+          {(content.visibility.footerColumns ? content.footerColumns : []).map((column) => (
             <FooterColumn key={column.id} title={column.title}>
               {column.links.map((link) => (
                 <FooterLink key={link.id} href={link.href}>
@@ -269,7 +269,7 @@ export async function SiteFooter() {
           <ul className="flex flex-wrap items-center gap-x-5 gap-y-2">
             {/* The promises worth repeating at the point of leaving, edited
                 under Appearance beside the ones in the header. */}
-            {content.footerBadges.map((badge) => (
+            {(content.visibility.footerBadges ? content.footerBadges : []).map((badge) => (
               <li key={badge.id} className="text-muted flex items-center gap-2 text-xs">
                 <ContentIcon name={badge.icon} className="text-accent-ink size-4 shrink-0" />
                 {badge.label}

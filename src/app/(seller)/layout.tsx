@@ -79,6 +79,7 @@ export default function SellerLayout({ children }: { children: React.ReactNode }
       groups={[
         {
           label: 'Trade',
+          defaultOpen: true,
           items: [
             { href: '/seller', label: 'Dashboard', icon: <LayoutDashboard aria-hidden /> },
             {
@@ -115,6 +116,7 @@ export default function SellerLayout({ children }: { children: React.ReactNode }
         },
         {
           label: 'Catalogue',
+          defaultOpen: true,
           items: [
             { href: '/seller/products', label: 'Products', icon: <Package aria-hidden /> },
             { href: '/seller/inventory', label: 'Inventory', icon: <Boxes aria-hidden /> },

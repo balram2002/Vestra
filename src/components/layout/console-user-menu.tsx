@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/cn';
+import { clearPreferredSizes } from '@/hooks/use-preferred-size';
 import { signOut } from '@/server/actions/auth';
 
 /**
@@ -143,6 +144,7 @@ export function ConsoleUserMenu({
           onSelect={(event) => {
             event.preventDefault();
             startTransition(async () => {
+              clearPreferredSizes();
               await signOut();
             });
           }}

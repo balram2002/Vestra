@@ -42,6 +42,12 @@ export const LIMITS = {
   passwordResetByIp: { name: 'reset:ip', max: 20, windowSeconds: 60 * 60 },
   /** Wrong current passwords, per account. */
   passwordChange: { name: 'password:user', max: 5, windowSeconds: 15 * 60 },
+  /** Profile photos, per account: every one is a file written to storage. */
+  avatar: { name: 'avatar:user', max: 10, windowSeconds: 60 * 60 },
+  /** One-time codes sent, per account: each one is an email. */
+  twoFactorSend: { name: '2fa:send', max: 5, windowSeconds: 15 * 60 },
+  /** Wrong codes, per account, across every challenge it has been sent. */
+  twoFactorVerify: { name: '2fa:verify', max: 10, windowSeconds: 60 * 60 },
   /** Codes that did not work, per bag. */
   coupon: { name: 'coupon:owner', max: 15, windowSeconds: 10 * 60 },
   ticket: { name: 'ticket:user', max: 6, windowSeconds: 60 * 60 },

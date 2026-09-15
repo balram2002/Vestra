@@ -83,9 +83,25 @@ export interface HeaderActions {
   bag: boolean;
 }
 
+/**
+ * Whether a whole block appears at all.
+ *
+ * Separate from the rows inside it, on purpose. Switching the strip off must
+ * not throw away the four promises written for it: the day it comes back, it
+ * comes back with its words. Emptying a list is a different decision, and the
+ * editor still allows that too.
+ */
+export interface BlockVisibility {
+  announcements: boolean;
+  valueProps: boolean;
+  footerBadges: boolean;
+  footerColumns: boolean;
+}
+
 export interface SiteContent {
   announcements: AnnouncementItem[];
   headerActions: HeaderActions;
+  visibility: BlockVisibility;
   valueProps: ValueProp[];
   valuePropsTitle: string | null;
   footerColumns: FooterColumn[];
@@ -107,6 +123,8 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
   ],
 
   headerActions: { search: true, reels: true, wishlist: true, bag: true },
+
+  visibility: { announcements: true, valueProps: true, footerBadges: true, footerColumns: true },
 
   valuePropsTitle: null,
   valueProps: [
@@ -190,6 +208,9 @@ export function withDefaults(stored: Partial<SiteContent> | null | undefined): S
   return {
     announcements: stored.announcements ?? DEFAULT_SITE_CONTENT.announcements,
     headerActions: { ...DEFAULT_SITE_CONTENT.headerActions, ...stored.headerActions },
+    // Merged like the actions, so a record saved before blocks could be hidden
+    // reads as every block showing rather than as every block switched off.
+    visibility: { ...DEFAULT_SITE_CONTENT.visibility, ...stored.visibility },
     valueProps: stored.valueProps ?? DEFAULT_SITE_CONTENT.valueProps,
     valuePropsTitle: stored.valuePropsTitle ?? DEFAULT_SITE_CONTENT.valuePropsTitle,
     footerColumns: stored.footerColumns ?? DEFAULT_SITE_CONTENT.footerColumns,

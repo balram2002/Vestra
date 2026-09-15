@@ -66,7 +66,7 @@ function InputControl({
       {control}
 
       {trailing ? (
-        <span className="text-faint absolute right-3 top-1/2 grid size-4 -translate-y-1/2 place-items-center">
+        <span className="text-faint absolute right-1 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center">
           {trailing}
         </span>
       ) : null}

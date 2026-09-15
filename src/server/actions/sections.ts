@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
+import { ADDABLE_SECTION_KINDS } from '@/domain/sections';
+import { planHomeReset } from '@/domain/section-reset';
 import type { HomeSection, HomeSectionKind } from '@/domain/types';
 import { entityId } from '@/lib/ids';
 
@@ -11,6 +13,18 @@ import { collections, toDoc, toEntities, toEntity } from '../db/collections';
 import * as audit from '../services/audit';
 import { invalidate } from '../services/cache-invalidation';
 import { tags } from '../services/cache-tags';
+import { categoryPageDefaults } from '../services/category-page';
+
+export async function initializeCategoryPage(): Promise<SectionResult> {
+  const actor = await requirePermission('cms:write');
+  const col = await collections.homeSections();
+  for (const section of await categoryPageDefaults()) {
+    await col.updateOne({ _id: section.id }, { $setOnInsert: toDoc({ ...section, updatedByUserId: actor.id }) }, { upsert: true });
+  }
+  invalidate([tags.content]);
+  revalidatePath('/admin/categories-page');
+  return { ok: true };
+}
 
 /**
  * Composing a page.
@@ -34,15 +48,7 @@ export interface SectionResult {
 }
 
 /** Kinds an editor may add. The hero is excluded: a page has one, and it exists. */
-const ADDABLE_KINDS: HomeSectionKind[] = [
-  'PRODUCT_RAIL',
-  'CATEGORY_STRIP',
-  'BANNER_GRID',
-  'BRAND_STRIP',
-  'SELLER_SPOTLIGHT',
-  'EDITORIAL',
-  'VALUE_PROPS',
-];
+const ADDABLE_KINDS: HomeSectionKind[] = [...ADDABLE_SECTION_KINDS];
 
 const KIND_DEFAULTS: Partial<Record<HomeSectionKind, Partial<HomeSection>>> = {
   PRODUCT_RAIL: {
@@ -58,6 +64,13 @@ const KIND_DEFAULTS: Partial<Record<HomeSectionKind, Partial<HomeSection>>> = {
     title: 'A headline',
     config: { body: '', layout: 'SPLIT', theme: 'light' },
   },
+  DEAL_COUNTDOWN: {
+    title: 'Ends soon',
+    subtitle: 'Set an end date below and the countdown appears beside the heading.',
+    config: { source: 'DEALS', limit: 12, layout: 'CAROUSEL' },
+  },
+  REELS_STRIP: { title: 'Watch and shop', config: { limit: 10 } },
+  TESTIMONIALS: { title: 'What shoppers say', config: { limit: 6 } },
   VALUE_PROPS: { title: null, config: {} },
 };
 
@@ -80,12 +93,12 @@ const configSchema = z.object({
 const patchSchema = z.object({
   title: z.string().trim().max(80).nullable().optional(),
   subtitle: z.string().trim().max(200).nullable().optional(),
-  href: z.string().trim().max(300).nullable().optional(),
+  href: z.string().trim().max(300).refine((value) => !value || /^\/(?![\/\\])[^\\]*$/.test(value) || /^https:\/\//i.test(value), 'Use a local path or an HTTPS link').nullable().optional(),
   ctaLabel: z.string().trim().max(40).nullable().optional(),
   isActive: z.boolean().optional(),
   visibleOn: z.enum(['ALL', 'DESKTOP', 'MOBILE']).optional(),
-  startsAt: z.string().max(40).nullable().optional(),
-  endsAt: z.string().max(40).nullable().optional(),
+  startsAt: z.string().max(40).refine((value) => Number.isFinite(Date.parse(value)), 'Choose a valid start date').nullable().optional(),
+  endsAt: z.string().max(40).refine((value) => Number.isFinite(Date.parse(value)), 'Choose a valid end date').nullable().optional(),
   config: configSchema.optional(),
 });
 
@@ -146,6 +159,10 @@ export async function updateSection(input: {
   const sections = await collections.homeSections();
   const section = toEntity(await sections.findOne({ _id: input.sectionId }));
   if (!section) return { ok: false, error: 'Section not found.' };
+
+  const startsAt = parsed.data.startsAt === undefined ? section.startsAt : parsed.data.startsAt;
+  const endsAt = parsed.data.endsAt === undefined ? section.endsAt : parsed.data.endsAt;
+  if (startsAt && endsAt && Date.parse(endsAt) <= Date.parse(startsAt)) return { ok: false, error: 'The end must be after the start.' };
 
   const { config, ...rest } = parsed.data;
   await sections.updateOne(
@@ -361,4 +378,178 @@ async function after(
 
   revalidatePath('/admin/cms');
   revalidatePath(page === 'home' ? '/' : `/${page}`);
+}
+
+/* ------------------------------------------------------------------ resets */
+
+interface DefaultSection extends HomeSection {
+  defaultKey: string;
+}
+
+/**
+ * The homepage as it ships.
+ *
+ * The same generator the reference seed runs on a clean database, so "reset"
+ * means exactly the page a new shop starts with -- not a second copy of that
+ * layout kept here, free to drift from the first.
+ */
+async function homeDefaults(): Promise<DefaultSection[]> {
+  const { generateHomeSections } = await import('../seed/generate');
+  return generateHomeSections(new Date()).map((section) => ({
+    ...section,
+    defaultKey: 'home:' + section.kind + ':' + section.position,
+  }));
+}
+
+/** The shipped section a stored one came from, if it came from one. */
+function defaultFor(section: HomeSection, defaults: DefaultSection[]): DefaultSection | null {
+  if (section.defaultKey) {
+    return defaults.find((entry) => entry.defaultKey === section.defaultKey) ?? null;
+  }
+  return (
+    defaults.find(
+      (entry) => entry.kind === section.kind && (entry.title ?? null) === (section.title ?? null),
+    ) ?? null
+  );
+}
+
+/**
+ * Put one section back.
+ *
+ * A shipped section goes back to exactly what it shipped as -- "Bestsellers"
+ * returns as Bestsellers, however it was renamed. A section somebody added
+ * goes back to the defaults a fresh one of its kind is given. Its place on the
+ * page and whether it is live are left alone: a reset is about what a section
+ * SAYS, and moving or hiding it as a side effect would be a surprise.
+ */
+export async function resetSection(input: { sectionId: string }): Promise<SectionResult> {
+  const actor = await requirePermission('cms:write');
+
+  const sections = await collections.homeSections();
+  const section = toEntity(await sections.findOne({ _id: input.sectionId }));
+  if (!section) return { ok: false, error: 'Section not found.' };
+
+  const page = section.page ?? 'home';
+  const shipped = page === 'home' ? defaultFor(section, await homeDefaults()) : page === 'categories' ? (await categoryPageDefaults()).find((entry) => entry.defaultKey === section.defaultKey) : null;
+  const fresh = KIND_DEFAULTS[section.kind] ?? {};
+
+  await sections.updateOne(
+    { _id: section.id },
+    {
+      $set: {
+        title: shipped ? shipped.title : (fresh.title ?? null),
+        subtitle: shipped ? shipped.subtitle : (fresh.subtitle ?? null),
+        href: shipped ? shipped.href : null,
+        ctaLabel: shipped ? shipped.ctaLabel : null,
+        config: shipped ? shipped.config : (fresh.config ?? {}),
+        visibleOn: 'ALL' as const,
+        startsAt: null,
+        endsAt: null,
+        ...(shipped ? { defaultKey: shipped.defaultKey } : {}),
+        updatedAt: new Date().toISOString(),
+        updatedByUserId: actor.id,
+      },
+    },
+  );
+
+  await after(actor, 'content.section.reset', section, page);
+  return { ok: true, sectionId: section.id };
+}
+
+/**
+ * Put a whole page back.
+ *
+ * NOTHING IS DELETED. The homepage gets its shipped sections back -- live, in
+ * their shipped order, with their shipped settings -- and anything somebody
+ * added is HIDDEN and moved to the foot of the list, where it can be brought
+ * back with one click. A landing page ships with nothing composed on it, so
+ * its reset hides every section and keeps them all.
+ *
+ * Matching is by the stamped `defaultKey`, then by the shipped title, and a
+ * shipped section that cannot be found is recreated. That order is what stops
+ * a second reset from adding a second "Bestsellers".
+ */
+export async function resetPageSections(input: { page: string }): Promise<SectionResult> {
+  const actor = await requirePermission('cms:write');
+
+  const page = input.page?.trim() || 'home';
+  const sections = await collections.homeSections();
+  const current = await sectionsFor(page);
+  const now = new Date().toISOString();
+  const writes: Array<Promise<unknown>> = [];
+
+  if (page === 'home' || page === 'categories') {
+    const defaults = page === 'home' ? await homeDefaults() : await categoryPageDefaults() as DefaultSection[];
+    // Which stored section is which shipped one is decided by a pure, tested
+    // planner -- see `domain/section-reset` -- and this only applies its answer.
+    const plan = planHomeReset(current, defaults);
+
+    for (const { id, entry, position } of plan.restore) {
+      writes.push(
+        sections.updateOne({ _id: id }, { $set: shippedFields(entry, position, now, actor.id) }),
+      );
+    }
+    for (const { entry, position } of plan.create) {
+      writes.push(
+        sections.insertOne(
+          toDoc({ ...shippedFields(entry, position, now, actor.id), id: entityId('sec') } as HomeSection),
+        ),
+      );
+    }
+    for (const { id, position } of plan.hide) {
+      writes.push(
+        sections.updateOne(
+          { _id: id },
+          { $set: { isActive: false, position, updatedAt: now, updatedByUserId: actor.id } },
+        ),
+      );
+    }
+  } else {
+    for (const section of current) {
+      writes.push(
+        sections.updateOne(
+          { _id: section.id },
+          { $set: { isActive: false, updatedAt: now, updatedByUserId: actor.id } },
+        ),
+      );
+    }
+  }
+
+  await Promise.all(writes);
+
+  await audit.record({
+    actor,
+    action: 'content.page.reset',
+    entityType: 'page',
+    entityId: page,
+    entityLabel: page === 'home' ? 'Homepage' : page,
+    severity: 'NOTICE',
+  });
+
+  invalidate([tags.content]);
+  revalidatePath('/admin/cms');
+  revalidatePath(page === 'home' ? '/' : '/' + page);
+
+  return { ok: true };
+}
+
+/** A stored section, set back to exactly what shipped. */
+function shippedFields(entry: DefaultSection, position: number, now: string, userId: string) {
+  return {
+    kind: entry.kind,
+    title: entry.title,
+    subtitle: entry.subtitle,
+    href: entry.href,
+    ctaLabel: entry.ctaLabel,
+    config: entry.config,
+    visibleOn: entry.visibleOn,
+    startsAt: null,
+    endsAt: null,
+    position,
+    isActive: true,
+    page: entry.page ?? 'home',
+    defaultKey: entry.defaultKey,
+    updatedAt: now,
+    updatedByUserId: userId,
+  };
 }

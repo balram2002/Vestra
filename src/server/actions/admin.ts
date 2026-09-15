@@ -1495,3 +1495,53 @@ export async function updateCmsPage(input: UpdatePageInput): Promise<ActionResul
   revalidatePath(`/${page.slug}`);
   return { ok: true };
 }
+
+export async function resetCmsPage(input: { pageId: string }): Promise<ActionResult> {
+  const actor = await requirePermission('cms:write');
+  const page = await (await collections.cmsPages()).findOne({ _id: input.pageId });
+  if (!page) return { ok: false, error: 'Page not found.' };
+  const { generateCmsPages } = await import('../seed/pages');
+  const defaults = generateCmsPages(actor.id, new Date()).find((entry) => entry.slug === page.slug);
+  return updateCmsPage({ pageId: page.id, title: defaults?.title ?? page.title,
+    body: defaults?.body ?? page.body, metaDescription: defaults?.metaDescription ?? page.metaDescription ?? '',
+    isPublished: Boolean(defaults) });
+}
+
+/**
+ * Put a banner placement back to how the shop ships.
+ *
+ * NOTHING IS DELETED: every banner in the placement is hidden. For the hero
+ * that means the homepage falls back to its built-in slides; for the tile grid
+ * it means the grid steps out of the page, which is how a new shop starts.
+ * Every banner stays in the list, one click from being live again.
+ */
+export async function resetBannerPlacement(input: {
+  placement: 'HOME_HERO' | 'HOME_GRID';
+}): Promise<ActionResult> {
+  const actor = await requirePermission('cms:write');
+  if (input.placement !== 'HOME_HERO' && input.placement !== 'HOME_GRID') {
+    return { ok: false, error: 'Unknown placement.' };
+  }
+
+  const banners = await collections.banners();
+  const result = await banners.updateMany(
+    { placement: input.placement, isActive: true },
+    { $set: { isActive: false, updatedAt: new Date().toISOString() } },
+  );
+
+  invalidate([tags.content]);
+
+  await audit.record({
+    actor,
+    action: 'content.banners.reset',
+    entityType: 'banner',
+    entityId: input.placement,
+    entityLabel: input.placement === 'HOME_HERO' ? 'Hero slides' : 'Tile grid',
+    note: result.modifiedCount + ' hidden',
+    severity: 'NOTICE',
+  });
+
+  revalidatePath('/admin/cms');
+  revalidatePath('/');
+  return { ok: true };
+}

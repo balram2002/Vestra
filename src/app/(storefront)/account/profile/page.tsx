@@ -1,9 +1,16 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
-import { PasswordForm, ProfileForm } from '@/components/account/profile-forms';
+import {
+  AvatarEditor,
+  PasswordForm,
+  PreferencesForm,
+  ProfileForm,
+} from '@/components/account/profile-forms';
+import { TwoFactorSettings } from '@/components/account/two-factor-settings';
 import { Breadcrumbs } from '@/components/commerce/breadcrumbs';
 import { requireUser } from '@/server/auth/session';
+import { collections, toEntity } from '@/server/db/collections';
 
 export const metadata: Metadata = {
   title: 'Profile and security',
@@ -13,9 +20,10 @@ export const metadata: Metadata = {
 /**
  * Profile and security.
  *
- * The account could be read but not changed: no way to fix a misspelt name,
- * add a phone number or change a password without going through "forgot
- * password" and pretending to have lost it.
+ * Everything a person can change about their own account, in the order they
+ * come looking for it: who they are, what they want from the shop, and how
+ * they sign in. Each card saves on its own, so fixing a typo in a name never
+ * asks for a password and changing a password never resubmits a phone number.
  */
 export default function ProfilePage() {
   return (
@@ -28,7 +36,7 @@ export default function ProfilePage() {
       />
       <h1 className="font-display text-ink mt-3 text-2xl">Profile and security</h1>
 
-      <Suspense fallback={<div className="skeleton mt-6 h-96 max-w-3xl rounded-xl" aria-hidden />}>
+      <Suspense fallback={<ProfileSkeleton />}>
         <Sections />
       </Suspense>
     </div>
@@ -36,34 +44,94 @@ export default function ProfilePage() {
 }
 
 async function Sections() {
-  const user = await requireUser();
+  const session = await requireUser();
+
+  // The session carries identity only; birthday, gender, preferences and the
+  // two-step setting live on the account record.
+  const users = await collections.users();
+  const record = toEntity(await users.findOne({ _id: session.id }, { projection: { passwordHash: 0 } }));
 
   return (
     <div className="mt-6 grid max-w-3xl gap-5">
-      <section className="border-line bg-raised rounded-xl border p-5 sm:p-6" aria-labelledby="details-title">
-        <h2 id="details-title" className="text-ink text-md font-semibold">
-          Your details
-        </h2>
-        <p className="text-muted mt-1 text-sm">
-          How we address you, and a number support can reach you on.
-        </p>
+      <Card
+        id="details"
+        title="Your details"
+        description="Your photo, how we address you, and a number support can reach you on."
+      >
+        <AvatarEditor name={session.fullName} avatarUrl={session.avatarUrl} />
+        <div className="border-line my-5 border-t" />
         <ProfileForm
-          fullName={user.fullName}
-          email={user.email}
-          phone={user.phone ?? ''}
-          emailVerified={user.emailVerified}
+          fullName={session.fullName}
+          email={session.email}
+          phone={session.phone ?? ''}
+          emailVerified={session.emailVerified}
+          gender={record?.gender ?? ''}
+          dateOfBirth={record?.dateOfBirth ?? ''}
         />
-      </section>
+      </Card>
 
-      <section className="border-line bg-raised rounded-xl border p-5 sm:p-6" aria-labelledby="password-title">
-        <h2 id="password-title" className="text-ink text-md font-semibold">
-          Password
-        </h2>
-        <p className="text-muted mt-1 text-sm">
-          You need your current password to set a new one.
-        </p>
-        <PasswordForm email={user.email} />
-      </section>
+      <Card
+        id="preferences"
+        title="Preferences"
+        description="What we send you, and the sizes you usually wear."
+      >
+        <PreferencesForm
+          marketingOptIn={record?.preferences?.marketingOptIn ?? false}
+          preferredSizes={record?.preferences?.preferredSizes ?? {}}
+        />
+      </Card>
+
+      <Card
+        id="security"
+        title="Sign-in and security"
+        description="How you prove it is you: your password, and an optional code by email."
+      >
+        <TwoFactorSettings
+          key={record?.twoFactor?.enabled ? 'two-factor-on' : 'two-factor-off'}
+          enabled={Boolean(record?.twoFactor?.enabled)}
+          email={session.email}
+        />
+        <div className="border-line my-5 border-t" />
+        <h3 className="text-ink text-sm font-medium">Change your password</h3>
+        <p className="text-muted mt-0.5 text-xs">You need your current password to set a new one.</p>
+        <PasswordForm email={session.email} />
+      </Card>
+    </div>
+  );
+}
+
+function Card({
+  id,
+  title,
+  description,
+  children,
+}: {
+  id: string;
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section
+      id={id}
+      aria-labelledby={`${id}-title`}
+      className="border-line bg-raised scroll-mt-24 rounded-xl border p-5 sm:p-6"
+    >
+      <h2 id={`${id}-title`} className="text-ink text-md font-semibold">
+        {title}
+      </h2>
+      <p className="text-muted mt-1 mb-5 text-sm">{description}</p>
+      {children}
+    </section>
+  );
+}
+
+function ProfileSkeleton() {
+  return (
+    <div className="mt-6 grid max-w-3xl gap-5" aria-hidden>
+      <div className="skeleton h-96 rounded-xl" />
+      <div className="skeleton h-72 rounded-xl" />
+      <div className="skeleton h-80 rounded-xl" />
     </div>
   );
 }

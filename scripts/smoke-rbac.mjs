@@ -23,7 +23,8 @@ const PASSWORD = 'vestra123';
 const CASES = [
   { who: 'anonymous', email: null, path: '/admin', allow: false },
   { who: 'anonymous', email: null, path: '/seller', allow: false },
-  { who: 'anonymous', email: null, path: '/orders', allow: false },
+  // Guests may look up an order with its number and email address.
+  { who: 'anonymous', email: null, path: '/orders', allow: true },
   { who: 'anonymous', email: null, path: '/', allow: true },
   { who: 'anonymous', email: null, path: '/category/womens-ethnic-wear', allow: true },
 

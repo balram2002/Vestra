@@ -1,11 +1,12 @@
 'use client';
 
-import { ArrowDown, ArrowUp, Pencil, Plus, Sparkles } from 'lucide-react';
+import { ArrowDown, ArrowUp, Eye, EyeOff, Pencil, Plus, Sparkles } from 'lucide-react';
 import Image from 'next/image';
 import { useId, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Dialog, DialogClose, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { FileUpload } from '@/components/ui/file-upload';
 import { Input } from '@/components/ui/input';
@@ -15,7 +16,6 @@ import { cn } from '@/lib/cn';
 import {
   adoptDefaultHeroSlides,
   createBanner,
-  deleteBanner,
   moveBanner,
   setBannerActive,
   updateBanner,
@@ -27,7 +27,7 @@ import {
  *
  * Everything an administrator does to the hero and the tile grid: add a slide,
  * edit its picture, words and link, move it earlier or later, take it down for
- * a while, or delete it. The form is REMOUNTED on every open, so a second
+ * a while and bring it back -- nothing here deletes. The form is REMOUNTED on every open, so a second
  * banner never starts with the first one's fields or errors, and the server
  * action is the validator: it names the field an error belongs to.
  */
@@ -294,27 +294,55 @@ export function BannerToggle({
 }) {
   const { pending, run } = useRun();
 
+  /*
+   * The state, and the eye that changes it -- asking first.
+   *
+   * A slide going live or coming down changes the first thing every shopper
+   * sees, so it is one click and a confirmation rather than one click. The pill
+   * stays as plain status: a switch that opens a dialog is a switch that lies
+   * about what pressing it does.
+   */
   return (
-    <Button
-      type="button"
-      role="switch"
-      aria-checked={isActive}
-      aria-label={`${name}: ${isActive ? 'live' : 'hidden'}`}
-      disabled={pending}
-      onClick={() =>
-        run(
-          () => setBannerActive({ bannerId, isActive: !isActive }),
-          isActive ? `${name} hidden from the homepage` : `${name} is live`,
-        )
-      }
-      className={cn(
-        'inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-1 text-2xs font-medium transition-colors disabled:opacity-50',
-        isActive ? 'bg-success-50 text-success-700' : 'bg-sunken text-muted',
-      )}
-    >
-      <span aria-hidden className={cn('size-1.5 rounded-full', isActive ? 'bg-success-500' : 'bg-line-bold')} />
-      {isActive ? 'Live' : 'Hidden'}
-    </Button>
+    <div className="flex shrink-0 items-center gap-1.5">
+      <span
+        className={cn(
+          'inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-2xs font-medium',
+          isActive ? 'bg-success-50 text-success-700' : 'bg-sunken text-muted',
+        )}
+      >
+        <span aria-hidden className={cn('size-1.5 rounded-full', isActive ? 'bg-success-500' : 'bg-line-bold')} />
+        {isActive ? 'Live' : 'Hidden'}
+      </span>
+
+      <ConfirmDialog
+        trigger={
+          <Button
+            type="button"
+            size="xs"
+            variant="ghost"
+            disabled={pending}
+            aria-label={isActive ? `Hide ${name}` : `Show ${name}`}
+            title={isActive ? 'Hide from the homepage' : 'Show on the homepage'}
+          >
+            {isActive ? <EyeOff className="size-3.5" aria-hidden /> : <Eye className="size-3.5" aria-hidden />}
+          </Button>
+        }
+        title={isActive ? `Hide “${name}”?` : `Show “${name}”?`}
+        description={
+          isActive
+            ? 'It comes off the homepage straight away and stays in this list, ready to return. Nothing is deleted.'
+            : 'It joins the homepage straight away, in its place in this list.'
+        }
+        confirmLabel={isActive ? 'Hide it' : 'Show it'}
+        tone={isActive ? 'danger' : 'default'}
+        onConfirm={() =>
+          run(
+            () => setBannerActive({ bannerId, isActive: !isActive }),
+            isActive ? `${name} hidden from the homepage` : `${name} is live`,
+          )
+        }
+      />
+    </div>
   );
 }
 
@@ -356,48 +384,6 @@ export function MoveBannerButtons({
         <ArrowDown className="size-3.5" aria-hidden />
       </Button>
     </div>
-  );
-}
-
-export function DeleteBannerButton({ bannerId, name }: { bannerId: string; name: string }) {
-  const [open, setOpen] = useState(false);
-  const { pending, run } = useRun();
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button type="button" size="xs" variant="ghost" className="text-danger-600 hover:text-danger-700">
-          Delete
-        </Button>
-      </DialogTrigger>
-      <DialogContent
-        title={`Delete ${name}?`}
-        size="sm"
-        footer={
-          <>
-            <DialogClose asChild>
-              <Button type="button" variant="ghost" size="sm" disabled={pending}>
-                Keep it
-              </Button>
-            </DialogClose>
-            <Button
-              type="button"
-              variant="danger"
-              size="sm"
-              loading={pending}
-              onClick={() => run(() => deleteBanner({ bannerId }), `${name} deleted`, () => setOpen(false))}
-            >
-              Delete banner
-            </Button>
-          </>
-        }
-      >
-        <p className="text-muted text-sm">
-          It comes off the homepage and out of this list for good. To take it down for a while
-          instead, set it to Hidden.
-        </p>
-      </DialogContent>
-    </Dialog>
   );
 }
 

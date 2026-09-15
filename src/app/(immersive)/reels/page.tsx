@@ -6,7 +6,7 @@ import { ReelsFeed } from '@/components/live/reels-feed';
 import { currentOwner } from '@/server/auth/session';
 import { getBagCount } from '@/server/services/cart';
 import { getReels } from '@/server/services/live';
-import { getWishlistCount } from '@/server/services/wishlist';
+import { findWishlist, getWishlistCount } from '@/server/services/wishlist';
 
 /**
  * The reel feed.
@@ -50,7 +50,9 @@ export default function ReelsPage() {
 
 async function Feed() {
   const reels = await getReels();
-  return <ReelsFeed reels={reels} />;
+  const wishlist = await findWishlist(await currentOwner());
+  const saved = new Set(wishlist?.items.map((item) => item.productId));
+  return <ReelsFeed reels={reels.map((reel) => ({ ...reel, saved: saved.has(reel.productId) }))} />;
 }
 
 async function NavWithCounts() {

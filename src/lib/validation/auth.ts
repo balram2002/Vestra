@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { ACCOUNTS } from '@/config/business';
+import { isCommonPassword } from '@/domain/password-strength';
 
 /**
  * Auth schemas.
@@ -20,7 +21,8 @@ export const emailSchema = z
 export const passwordSchema = z
   .string()
   .min(ACCOUNTS.passwordMinLength, `Use at least ${ACCOUNTS.passwordMinLength} characters`)
-  .max(128, 'That password is too long');
+  .max(128, 'That password is too long')
+  .refine((value) => !isCommonPassword(value), 'Choose a less common password');
 
 export const loginSchema = z.object({
   email: emailSchema,

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
 import { LoginForm } from '@/components/auth/login-form';
+import { GoogleSignIn } from '@/components/auth/google-sign-in';
 import { SignedInRedirect } from '@/components/auth/signed-in-redirect';
 
 export const metadata: Metadata = {
@@ -17,7 +18,7 @@ export const metadata: Metadata = {
 export default function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string }>;
+  searchParams: Promise<{ next?: string; error?: string }>;
 }) {
   return (
     <Suspense fallback={<FormSkeleton />}>
@@ -26,11 +27,20 @@ export default function LoginPage({
   );
 }
 
-async function Resolved({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
-  const { next } = await searchParams;
+async function Resolved({ searchParams }: { searchParams: Promise<{ next?: string; error?: string }> }) {
+  const { next, error } = await searchParams;
+  const messages: Record<string, string> = {
+    'google-unavailable': 'Google sign-in is not configured yet. Please use your email.',
+    'google-cancelled': 'Google sign-in was cancelled. You can try again.',
+    'google-existing': 'An account already uses this email. Sign in with your password, or reset it to regain access.',
+    'google-inactive': 'This account is not active. Please contact support.',
+    'google-failed': 'Google sign-in could not be completed. Please try again.',
+  };
   return (
     <>
       <SignedInRedirect next={next} />
+      {error && messages[error] ? <p role="alert" className="bg-danger-50 text-danger-700 mb-4 rounded-xl p-3 text-sm">{messages[error]}</p> : null}
+      <GoogleSignIn next={next} />
       <LoginForm next={next} />
     </>
   );

@@ -4,6 +4,8 @@ import { ProductRailSkeleton } from '@/components/skeletons/product-card-skeleto
 import type { HomeSection } from '@/domain/types';
 import { cn } from '@/lib/cn';
 import { getHeroSlides } from '@/server/services/content';
+import { getReels } from '@/server/services/live';
+import { topTestimonials } from '@/server/services/reviews';
 import {
   gridBanners,
   railProducts,
@@ -12,14 +14,18 @@ import {
   stripCategories,
 } from '@/server/services/section-items';
 import { getSiteContent } from '@/server/services/site-content';
+import { categoryPageImages } from '@/server/services/category-page';
 
 import { BannerGrid } from './banner-grid';
+import { Countdown } from './countdown';
 import { BrandStrip } from './brand-strip';
 import { CategoryRail } from './category-rail';
 import { Editorial } from './editorial';
 import { HeroCarousel, HeroSkeleton } from './hero-carousel';
 import { ProductRail } from './product-rail';
+import { ReelsStrip } from './reels-strip';
 import { SellerSpotlight } from './seller-spotlight';
+import { Testimonials } from './testimonials';
 import { ValueProps } from './value-props';
 
 /**
@@ -99,10 +105,30 @@ function SectionRenderer({ section, priority }: { section: HomeSection; priority
       );
 
     case 'PRODUCT_RAIL':
-    case 'DEAL_COUNTDOWN':
       return (
         <Suspense fallback={<RailSkeleton section={section} />}>
           <RailSection section={section} priority={priority} />
+        </Suspense>
+      );
+
+    case 'DEAL_COUNTDOWN':
+      return (
+        <Suspense fallback={<RailSkeleton section={section} />}>
+          <DealSection section={section} priority={priority} />
+        </Suspense>
+      );
+
+    case 'REELS_STRIP':
+      return (
+        <Suspense fallback={<StripSkeleton title={section.title} />}>
+          <ReelsSection section={section} />
+        </Suspense>
+      );
+
+    case 'TESTIMONIALS':
+      return (
+        <Suspense fallback={<StripSkeleton title={section.title} />}>
+          <TestimonialSection section={section} />
         </Suspense>
       );
 
@@ -136,7 +162,6 @@ function SectionRenderer({ section, priority }: { section: HomeSection; priority
 
     case 'EDITORIAL':
     case 'NEWSLETTER':
-    case 'TESTIMONIALS':
       return <Editorial section={section} />;
 
     default:
@@ -151,7 +176,7 @@ async function HeroSection() {
 }
 
 async function CategorySection({ section }: { section: HomeSection }) {
-  return <CategoryRail section={section} categories={await stripCategories(section)} />;
+  return <CategoryRail section={section} categories={await categoryPageImages(await stripCategories(section))} />;
 }
 
 async function RailSection({ section, priority }: { section: HomeSection; priority: boolean }) {
@@ -172,7 +197,39 @@ async function SellerSection({ section }: { section: HomeSection }) {
 
 async function PropsSection() {
   const content = await getSiteContent();
-  return <ValueProps items={content.valueProps} />;
+  return <ValueProps items={content.visibility.valueProps ? content.valueProps : []} />;
+}
+
+/**
+ * A rail with a deadline on it.
+ *
+ * The same products as any other rail -- the discounts, by default -- with the
+ * section's own end date counted down beside the heading. The urgency is real
+ * or it is not shown: with no end date this is simply a rail, because a
+ * countdown to nothing is the oldest dark pattern in retail.
+ */
+async function DealSection({ section, priority }: { section: HomeSection; priority: boolean }) {
+  const products = await railProducts({
+    ...section,
+    config: { source: 'DEALS', ...section.config },
+  });
+
+  return (
+    <ProductRail
+      section={section}
+      products={products}
+      priority={priority}
+      badge={section.endsAt ? <Countdown to={section.endsAt} /> : null}
+    />
+  );
+}
+
+async function ReelsSection({ section }: { section: HomeSection }) {
+  return <ReelsStrip section={section} reels={await getReels(section.config.limit ?? 10)} />;
+}
+
+async function TestimonialSection({ section }: { section: HomeSection }) {
+  return <Testimonials section={section} items={await topTestimonials(section.config.limit ?? 6)} />;
 }
 
 /* ---------------------------------------------------------------- skeletons */

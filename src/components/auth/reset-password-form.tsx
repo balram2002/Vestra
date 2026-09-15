@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useState, useTransition } from 'react';
 
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { PasswordInput } from './password-input';
 import { resetPassword } from '@/server/actions/auth';
 
 /**
@@ -70,7 +70,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
   }
 
   return (
-    <form action={onSubmit} className="space-y-4" noValidate>
+    <form action={onSubmit} className="space-y-5">
       <div>
         <h1 className="font-display text-ink text-2xl">Choose a new password</h1>
         <p className="text-muted mt-1 text-sm">
@@ -88,7 +88,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
         </p>
       ) : null}
 
-      <Input
+      <PasswordInput strength
         label="New password"
         name="password"
         type="password"
@@ -97,7 +97,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
         error={fieldError ?? undefined}
       />
 
-      <Input label="Confirm new password" name="confirm" type="password" autoComplete="new-password" required />
+      <PasswordInput label="Confirm new password" name="confirm" type="password" autoComplete="new-password" required />
 
       <Button type="submit" size="cta" disabled={pending}>
         {pending ? 'Saving…' : 'Change my password'}

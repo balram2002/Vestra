@@ -107,7 +107,19 @@ export function HeaderShell({
       onMouseLeave={() => setHeld(false)}
       className={cn(
         'sticky top-0 z-50 w-full',
-        'transition-transform duration-(--duration-slow) ease-(--ease-out)',
+        /*
+         * ITS OWN COMPOSITING LAYER, and this is the whole fix for the stutter
+         * on the first scroll.
+         *
+         * The bar is glass: a 20px `backdrop-filter` over whatever is behind
+         * it. Moving a blurred element without a promoted layer makes the
+         * browser re-read and re-blur the page underneath on every frame, and
+         * the first scroll also pays to create that layer -- which is exactly
+         * when it was felt. `transform-gpu` and `will-change` hand it a layer
+         * up front, so the scroll only moves a texture that is already drawn.
+         */
+        'transform-gpu will-change-transform',
+        'transition-transform duration-(--duration-base) ease-(--ease-out)',
         // The border and the shadow only exist once there is something
         // underneath to separate from. At the top of the page the header should
         // read as part of the page, not as a bar bolted onto it.
