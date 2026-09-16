@@ -100,8 +100,8 @@ export async function ListingView({
       */}
       <div
         className={cn(
-          'glass border-line sticky z-30 -mx-4 mt-4 flex min-w-0 items-center gap-2 border-b px-4 py-2.5',
-          'top-(--spacing-header) sm:-mx-6 sm:px-6 lg:hidden',
+          'glass border-line sticky z-30 -mx-4 mt-4 flex min-w-0 items-center gap-2 border-b px-4 py-2.5 transition-[top] duration-200',
+          'top-(--app-sticky-offset) sm:-mx-6 sm:px-6 lg:hidden',
         )}
       >
         <FilterDrawer appliedCount={result.appliedFilterCount}>{rail}</FilterDrawer>
@@ -143,7 +143,7 @@ export async function ListingView({
           filtering row forty requires scrolling back to row one.
         */}
         <div className="hidden w-60 shrink-0 lg:block">
-          <div className="sticky top-[calc(var(--spacing-header-lg)+1.5rem)] max-h-[calc(100dvh-var(--spacing-header-lg)-3rem)] overflow-y-auto overscroll-contain pr-1">
+          <div className="sticky top-[calc(var(--app-sticky-offset)+1rem)] max-h-[calc(100dvh-var(--app-sticky-offset)-2rem)] overflow-y-auto overscroll-contain pr-1">
             {rail}
           </div>
         </div>

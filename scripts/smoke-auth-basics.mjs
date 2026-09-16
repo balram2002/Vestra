@@ -77,6 +77,11 @@ try {
   await page.goto(`${BASE}/account`, { waitUntil: 'domcontentloaded' });
   expect(new URL(page.url()).pathname).toBe('/login');
 
+  await context.addCookies([{ name: 'vestra_session_hint', value: '1', url: BASE, httpOnly: true }]);
+  await page.goto(`${BASE}/account/profile`, { waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('dialog', { name: 'Your session has expired' })).toBeVisible();
+  await context.clearCookies();
+
   await page.goto(`${BASE}/api/auth/google`, { waitUntil: 'domcontentloaded' });
   expect(new URL(page.url()).pathname).toBe('/login');
   expect(new URL(page.url()).searchParams.get('error')).toBe('google-unavailable');

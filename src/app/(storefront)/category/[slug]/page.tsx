@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
 import { Suspense } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
 
 import { atLeastOne, PLACEHOLDER_SLUG } from '@/lib/static-params';
 import { Breadcrumbs } from '@/components/commerce/breadcrumbs';
@@ -100,6 +102,7 @@ export default async function CategoryPage({ params, searchParams }: PageProps) 
   }
 
   const ancestors = await getCategoryAncestors(category.slug);
+  const children = (await getCategoryTree()).filter((item) => item.parentId === category.id);
 
   return (
     <div className="gutter shell-max py-5">
@@ -129,14 +132,20 @@ export default async function CategoryPage({ params, searchParams }: PageProps) 
         into the sticky bar below, so the grid starts near the top where someone
         who came to shop is already looking.
       */}
-      <header className="mt-2 sm:mt-3">
-        <h1 className="headline text-ink text-2xl sm:text-4xl">{category.name}</h1>
+      <header className="bg-ink relative mt-3 min-h-48 overflow-hidden rounded-3xl sm:min-h-64">
+        {category.imageUrl ? <Image src={category.imageUrl} alt="" fill priority sizes="(min-width: 1024px) 1200px, 100vw" className="object-cover" /> : null}
+        <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-black/10" />
+        <div className="relative flex min-h-48 max-w-2xl flex-col justify-end p-5 text-white sm:min-h-64 sm:p-10">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-white/75">Explore the collection</p>
+        <h1 className="font-display text-3xl font-bold leading-tight text-white sm:text-5xl">{category.name}</h1>
         {category.description ? (
-          <p className="text-muted mt-1 line-clamp-2 max-w-2xl text-sm sm:mt-1.5 sm:line-clamp-none">
+          <p className="mt-2 line-clamp-2 max-w-xl text-sm leading-relaxed text-white/85 sm:mt-3 sm:line-clamp-3">
             {category.description}
           </p>
         ) : null}
+        </div>
       </header>
+      {children.length ? <nav aria-label={`Shop ${category.name} by type`} className="no-scrollbar mt-4 flex gap-2 overflow-x-auto pb-1">{children.map((child) => <Link key={child.id} href={`/category/${child.slug}`} className="border-line bg-raised text-ink hover:border-ink inline-flex min-h-11 shrink-0 items-center rounded-full border px-4 text-xs font-semibold transition-colors">{child.name}</Link>)}</nav> : null}
 
       <Suspense fallback={<ListingSkeleton />}>
         <CategoryListing slug={category.slug} searchParams={searchParams} />

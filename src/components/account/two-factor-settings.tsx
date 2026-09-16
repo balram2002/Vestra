@@ -23,14 +23,14 @@ import {
  * computer. The code step opens inline, under the switch it belongs to, rather
  * than in a dialog that a phone keyboard would half cover.
  */
-export function TwoFactorSettings({ enabled, email }: { enabled: boolean; email: string }) {
+export function TwoFactorSettings({ enabled, email, mandatory = false }: { enabled: boolean; email: string; mandatory?: boolean }) {
   const router = useRouter();
   const [stage, setStage] = useState<'idle' | 'code'>('idle');
   const [sentTo, setSentTo] = useState('');
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const [effectiveEnabled, setEffectiveEnabled] = useState(enabled);
+  const [effectiveEnabled, setEffectiveEnabled] = useState(enabled || mandatory);
 
   const enable = !effectiveEnabled;
 
@@ -105,13 +105,13 @@ export function TwoFactorSettings({ enabled, email }: { enabled: boolean; email:
             </span>
           </p>
           <p className="text-muted mt-1 text-xs">
-            {effectiveEnabled
+            {mandatory ? `Administrator sign-in always requires a code emailed to ${email}.` : effectiveEnabled
               ? `Signing in with your password also needs a code we email to ${email}.`
               : `Add a code, emailed to ${email}, to every sign-in. A stolen password alone would no longer be enough.`}
           </p>
         </div>
 
-        {stage === 'idle' ? (
+        {stage === 'idle' && !mandatory ? (
           <Button
             type="button"
             size="sm"

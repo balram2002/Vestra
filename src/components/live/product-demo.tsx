@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, BadgeCheck, ChevronDown, ChevronUp, Maximize, Pause, Play, RotateCcw, Share2, ShoppingBag, Volume2, VolumeX } from 'lucide-react';
+import { ArrowLeft, BadgeCheck, ChevronDown, ChevronUp, Maximize, Pause, Play, RotateCcw, ShoppingBag, Volume2, VolumeX } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useRef, useState, useTransition, type CSSProperties } from 'react';
@@ -19,7 +19,7 @@ export function ProductDemo({ demo }: { demo: ProductDemoData }) {
   const video = useRef<HTMLVideoElement>(null);
   const player = useRef<HTMLDivElement>(null);
   const [paused, setPaused] = useState(true);
-  const [muted, setMuted] = useState(true);
+  const [muted, setMuted] = useState(false);
   const [duration, setDuration] = useState(demo.durationSeconds);
   const [elapsed, setElapsed] = useState(0);
   const [failed, setFailed] = useState(false);
@@ -37,6 +37,17 @@ export function ProductDemo({ demo }: { demo: ProductDemoData }) {
     return () => document.removeEventListener('visibilitychange', onVisibility);
   }, []);
   useEffect(() => {
+    const node = video.current;
+    if (!node) return;
+    // Browsers may reject autoplay with sound. Try it first, then keep the
+    // video moving silently and leave a visible sound control for one tap.
+    void node.play().catch(async () => {
+      node.muted = true;
+      setMuted(true);
+      try { await node.play(); } catch { setPaused(true); }
+    });
+  }, []);
+  useEffect(() => {
     if (paused || !controls) return;
     const timer = window.setTimeout(() => setControls(false), 2600);
     return () => window.clearTimeout(timer);
@@ -47,11 +58,6 @@ export function ProductDemo({ demo }: { demo: ProductDemoData }) {
     setControls(true);
     if (video.current.paused) { try { await video.current.play(); } catch { toast.error('Tap play again to start the video.'); } }
     else video.current.pause();
-  };
-  const share = async () => {
-    const url = new URL(demo.path, window.location.origin).href;
-    try { if (navigator.share) await navigator.share({ title: demo.title, url }); else { await navigator.clipboard.writeText(url); toast.success('Demo link copied'); } }
-    catch (error) { if (!(error instanceof DOMException && error.name === 'AbortError')) toast.error('Unable to share. Try the copy link menu.'); }
   };
   const fullscreen = async () => {
     try {
@@ -64,7 +70,8 @@ export function ProductDemo({ demo }: { demo: ProductDemoData }) {
 
   return <main className="demo-layout" style={{ '--demo-sheet': `${sheet}%` } as CSSProperties}>
     <div ref={player} className="demo-player relative min-h-0 min-w-0 overflow-hidden bg-black text-white" onPointerMove={() => setControls(true)}>
-      {demo.videoUrl && !failed ? <video ref={video} src={demo.videoUrl} poster={demo.posterUrl ?? undefined} muted={muted} playsInline preload="metadata" className="absolute inset-0 size-full object-contain" onPlay={() => setPaused(false)} onPause={() => setPaused(true)} onEnded={() => { setPaused(true); setControls(true); }} onLoadedMetadata={(event) => setDuration(Number.isFinite(event.currentTarget.duration) ? event.currentTarget.duration : demo.durationSeconds)} onDurationChange={(event) => { if (Number.isFinite(event.currentTarget.duration)) setDuration(event.currentTarget.duration); }} onTimeUpdate={(event) => setElapsed(event.currentTarget.currentTime)} onWaiting={() => setLoading(true)} onPlaying={() => setLoading(false)} onCanPlay={() => setLoading(false)} onError={() => { setFailed(true); setLoading(false); }} /> : demo.posterUrl ? <Image src={demo.posterUrl} alt={demo.title} fill sizes="(min-width: 1024px) 65vw, 100vw" priority className="object-contain" /> : <div className="absolute inset-0 grid place-items-center"><ShoppingBag className="size-20 text-white/40" /></div>}
+      {demo.videoUrl && !failed ? <video ref={video} src={demo.videoUrl} poster={demo.posterUrl ?? undefined} muted={muted} playsInline autoPlay preload="metadata" className="absolute inset-0 size-full object-contain" onPlay={() => setPaused(false)} onPause={() => setPaused(true)} onEnded={() => { setPaused(true); setControls(true); }} onLoadedMetadata={(event) => setDuration(Number.isFinite(event.currentTarget.duration) ? event.currentTarget.duration : demo.durationSeconds)} onDurationChange={(event) => { if (Number.isFinite(event.currentTarget.duration)) setDuration(event.currentTarget.duration); }} onTimeUpdate={(event) => setElapsed(event.currentTarget.currentTime)} onWaiting={() => setLoading(true)} onPlaying={() => setLoading(false)} onCanPlay={() => setLoading(false)} onError={() => { setFailed(true); setLoading(false); }} /> : demo.posterUrl ? <Image src={demo.posterUrl} alt={demo.title} fill sizes="(min-width: 1024px) 65vw, 100vw" priority className="object-contain" /> : <div className="absolute inset-0 grid place-items-center"><ShoppingBag className="size-20 text-white/40" /></div>}
+      {demo.videoUrl && !failed ? <div aria-hidden className="absolute inset-x-0 top-0 z-10 h-1 bg-white/25"><span className="block h-full bg-white transition-[width] duration-150" style={{ width: `${duration ? elapsed / duration * 100 : 0}%` }} /></div> : null}
 
       {demo.videoUrl && !failed ? <button onClick={toggle} aria-label={paused ? 'Play demo' : 'Pause demo'} className="absolute inset-0 grid size-full place-items-center focus-visible:outline-4 focus-visible:outline-white"><span className={`grid size-16 place-items-center rounded-full bg-black/55 transition-opacity ${paused || controls ? 'opacity-100' : 'opacity-0'}`}>{paused ? <Play className="ml-1 size-7" /> : <Pause className="size-7" />}</span></button> : null}
 
@@ -73,12 +80,8 @@ export function ProductDemo({ demo }: { demo: ProductDemoData }) {
           <Link href={`/store/${demo.seller.slug}`} aria-label="Back to store" className="grid size-11 shrink-0 place-items-center rounded-full bg-black/35"><ArrowLeft className="size-5" /></Link>
           <Picture src={demo.seller.logo} name={demo.seller.name} sizes="44px" className="size-11 shrink-0 rounded-full border border-white/30" />
           <Link href={`/store/${demo.seller.slug}`} className="min-w-0 flex-1"><span className="flex items-center gap-1 text-sm font-semibold"><span className="truncate">{demo.seller.name}</span>{demo.seller.verified ? <BadgeCheck className="size-4 shrink-0 text-sky-300" aria-label="Verified seller" /> : null}</span><span className="text-xs text-white/80">Visit store</span></Link>
-          <ShareMenu title={demo.title} path={demo.path} />
+          <ShareMenu title={demo.title} path={demo.path} showWhatsApp className="bg-black/50 text-white border-white/20" />
         </div>
-      </div>
-      <div className="absolute bottom-24 right-3 flex flex-col gap-3 sm:right-5">
-        <button onClick={share} aria-label="Share this demo" className="grid size-11 place-items-center rounded-full bg-black/60"><Share2 className="size-5" /></button>
-        <button aria-label="Share demo on WhatsApp" className="grid size-11 place-items-center rounded-full bg-emerald-700 text-xs font-bold text-white" onClick={() => { const url = new URL(demo.path, window.location.origin).href; window.open(`https://wa.me/?text=${encodeURIComponent(`${demo.title} ${url}`)}`, '_blank', 'noopener,noreferrer'); }}>WA</button>
       </div>
       {loading ? <p role="status" className="pointer-events-none absolute inset-x-0 top-1/2 mt-12 text-center text-sm">Loading video…</p> : null}
       {failed ? <div role="alert" className="absolute inset-x-6 top-1/2 rounded-xl bg-black/80 p-4 text-center text-sm"><p>We couldn’t load this clip. You can still shop below.</p><button className="mt-3 inline-flex min-h-11 items-center gap-2 underline" onClick={() => { setFailed(false); setPaused(true); }}><RotateCcw className="size-4" />Retry video</button></div> : null}
@@ -86,8 +89,7 @@ export function ProductDemo({ demo }: { demo: ProductDemoData }) {
         <h1 className="mb-2 line-clamp-2 pr-12 text-sm font-medium text-white sm:text-lg">{demo.title}</h1>
         {!demo.videoUrl ? <p className="text-xs text-white/80">Product preview · a video hasn’t been added yet</p> : !failed ? <div className="flex items-center gap-2">
           <button onClick={toggle} aria-label={paused ? 'Play video' : 'Pause video'} className="grid size-11 shrink-0 place-items-center">{paused ? <Play className="size-5" /> : <Pause className="size-5" />}</button>
-          <label className="min-w-0 flex-1"><span className="sr-only">Video timeline</span><input type="range" min={0} max={duration || 1} step={0.1} value={Math.min(elapsed, duration || 1)} disabled={!duration} aria-valuetext={`${timeLabel(elapsed)} of ${timeLabel(duration)}`} onChange={(event) => { const value = Number(event.target.value); if (video.current) video.current.currentTime = value; setElapsed(value); }} className="h-8 w-full accent-white" /></label>
-          <span className="whitespace-nowrap text-[10px] tabular-nums">{timeLabel(elapsed)} / {timeLabel(duration)}</span>
+          <label className="min-w-0 flex-1"><span className="sr-only">Video timeline</span><input type="range" min={0} max={duration || 1} step={0.1} value={Math.min(elapsed, duration || 1)} disabled={!duration} aria-valuetext={`${timeLabel(elapsed)} of ${timeLabel(duration)}`} onChange={(event) => { const value = Number(event.target.value); if (video.current) video.current.currentTime = value; setElapsed(value); }} className="demo-seek h-8 w-full accent-white" /></label>
           <button onClick={() => setMuted(!muted)} aria-label={muted ? 'Unmute video' : 'Mute video'} className="grid size-11 shrink-0 place-items-center">{muted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}</button>
           <label className="hidden shrink-0 sm:block"><span className="sr-only">Playback speed</span><select className="min-h-11 bg-transparent text-xs text-white" defaultValue="1" onChange={(event) => { if (video.current) video.current.playbackRate = Number(event.target.value); }}><option value="0.5" className="text-black">0.5×</option><option value="1" className="text-black">1×</option><option value="1.5" className="text-black">1.5×</option><option value="2" className="text-black">2×</option></select></label>
           <button onClick={fullscreen} aria-label="Toggle fullscreen" className="grid size-11 shrink-0 place-items-center"><Maximize className="size-4" /></button>
@@ -100,8 +102,8 @@ export function ProductDemo({ demo }: { demo: ProductDemoData }) {
       <header className="flex shrink-0 items-center justify-between gap-2 px-4 pb-2 lg:px-6 lg:pt-7"><div className="min-w-0"><h2 className="font-display text-base font-semibold lg:text-2xl">Featured products</h2><p className="text-muted mt-0.5 text-xs">{demo.products.length} {demo.products.length === 1 ? 'piece' : 'pieces'} in this {demo.videoUrl ? 'demo' : 'preview'}</p></div><div className="flex shrink-0 items-center"><button onClick={() => setSheet(sheet > 50 ? 32 : 72)} className="text-accent-ink flex min-h-11 items-center gap-1 text-xs font-semibold lg:hidden">{sheet > 50 ? 'Collapse' : 'See all'}{sheet > 50 ? <ChevronDown className="size-4" /> : <ChevronUp className="size-4" />}</button><Link href="/bag" aria-label="View bag" className="text-ink grid size-11 place-items-center lg:hidden"><ShoppingBag className="size-5" /></Link></div><Link href={`/store/${demo.seller.slug}`} className="text-accent-ink hidden text-sm lg:block">Visit store →</Link></header>
       <div className={`demo-product-scroll min-h-0 flex-1 overflow-auto overscroll-contain px-4 pb-5 lg:px-6 ${sheet > 50 ? 'is-expanded' : ''}`}>
         <div className="demo-product-grid">
-          {demo.products.map((product) => <article key={product.id} className="border-line bg-canvas min-w-0 overflow-hidden rounded-2xl border">
-            <Link href={`/product/${product.slug}`} className="relative block aspect-[4/3]"><Image src={product.primaryImage} alt={product.title} fill sizes="(min-width: 1024px) 200px, 45vw" className="object-cover" /></Link>
+          {demo.products.map((product, index) => <article key={product.id} className="demo-tile border-line bg-canvas min-w-0 overflow-hidden rounded-2xl border shadow-sm transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-lg">
+            <Link href={`/product/${product.slug}`} className="relative block aspect-[4/3] bg-gradient-to-br from-amber-100 to-stone-200"><Image src={product.primaryImage} alt={product.title} fill priority={index < 2} sizes="(min-width: 1024px) 200px, 45vw" className="object-cover" /></Link>
             <div className="p-3"><h3 className="line-clamp-2 text-sm font-medium"><Link href={`/product/${product.slug}`}>{product.title}</Link></h3><p className="mt-2 text-base font-semibold">{formatMoney(product.sellingPrice)}</p>{product.discountPercent > 0 ? <p className="mt-0.5 flex flex-wrap gap-x-2 text-xs"><s className="text-muted">{formatMoney(product.mrp)}</s><span className="text-success-700 font-medium">{product.discountPercent}% off</span></p> : null}
               <button onClick={() => { video.current?.pause(); setVariantId(''); setChosen(product); }} disabled={product.stockLevel === 'OUT_OF_STOCK'} className="bg-ink text-canvas mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-2 text-xs font-medium disabled:opacity-50"><ShoppingBag className="size-4" />{product.stockLevel === 'OUT_OF_STOCK' ? 'Sold out' : 'Choose & add'}</button>
             </div>

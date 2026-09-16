@@ -308,7 +308,7 @@ export function ProductViewer({
         replacing it. Swiping works, the desktop click still works, and there is
         one set of images in the DOM instead of a mobile copy and a desktop copy.
       */}
-      <div className="min-w-0 flex flex-col-reverse gap-3 lg:sticky lg:top-28 lg:self-start lg:flex-row lg:gap-4">
+      <div className="min-w-0 flex flex-col-reverse gap-3 lg:sticky lg:top-[calc(var(--app-sticky-offset)+1rem)] lg:self-start lg:flex-row lg:gap-4">
         {gallery.length > 1 ? (
           <div
             aria-label={`${title} images`}
@@ -419,7 +419,7 @@ export function ProductViewer({
 
       {/* ------------------------------------------------------ buy box */}
 
-      <div className="bg-raised border-line min-w-0 rounded-2xl border p-4 sm:p-6 lg:self-start">
+      <div className="bg-raised border-line min-w-0 rounded-3xl border p-4 shadow-sm sm:p-6 lg:self-start">
         {header}
 
         <div className="space-y-6">
@@ -593,30 +593,19 @@ export function ProductViewer({
               </div>
             ) : null}
 
-            {/*
-              On a phone the live button is an ICON in the pinned bar, not a
-              second full-width pill.
-              
-              The bar already carries a price, a wishlist heart and Add to bag
-              across 390px. A fourth full-width control would either push Add to
-              bag under the fold of its own bar or shrink both to the point
-              where neither is comfortably tappable. The icon keeps its 44px
-              target and its label reaches assistive tech; the desktop layout,
-              which has the room, spells it out.
-            */}
+            {/* Keep the unfamiliar live option legible beside the purchase CTA. */}
             <SeeLiveButton
               productId={productId}
               variantId={selected?.id ?? null}
               sizeLabel={selected?.size ?? null}
-              size="icon-touch"
+              size="sm"
               variant="secondary"
-              iconOnly
-              label="See this product live"
-              className="shrink-0"
+              label="See it live"
+              className="min-h-11 w-auto min-w-0 shrink-0 px-2.5 text-xs sm:px-4"
             />
 
-            <Button size="cta" shape="pill" onClick={handleAdd} loading={pending} className="min-w-0 flex-1 px-3 text-sm">
-              {!pending ? <ShoppingBag className="size-4" /> : null}
+            <Button size="cta" shape="pill" onClick={handleAdd} loading={pending} className="w-auto min-w-0 flex-1 px-2 text-xs sm:px-3 sm:text-sm">
+              {!pending ? <ShoppingBag className="hidden size-4 min-[375px]:block" /> : null}
               Add to bag
             </Button>
           </div>

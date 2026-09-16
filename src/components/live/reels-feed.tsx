@@ -1,7 +1,7 @@
 'use client';
 
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { ArrowDown, ArrowUp, Heart, Pause, Play, Radio, Share2, ShoppingBag, Volume2, VolumeX } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, Heart, Pause, Play, Radio, Share2, ShoppingBag, Volume2, VolumeX } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -124,6 +124,8 @@ function ReelSlide({
   const [saving, setSaving] = useState(false);
   const [paused, setPaused] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [loading, setLoading] = useState(Boolean(reel.videoUrl));
+  const [progress, setProgress] = useState(0);
   const reduced = useReducedMotion() ?? false;
 
   /*
@@ -197,7 +199,10 @@ function ReelSlide({
           playsInline
           loop
           muted={muted}
-          onError={() => setFailed(true)}
+          onError={() => { setFailed(true); setLoading(false); }}
+          onWaiting={() => setLoading(true)}
+          onPlaying={() => setLoading(false)}
+          onTimeUpdate={(event) => setProgress(event.currentTarget.duration ? event.currentTarget.currentTime / event.currentTarget.duration : 0)}
           // Only the first reel is worth fetching before anybody has swiped.
           preload={index === 0 ? 'auto' : 'none'}
         />
@@ -224,45 +229,14 @@ function ReelSlide({
         className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/55 to-transparent"
       />
       <div aria-hidden className="scrim absolute inset-x-0 bottom-0 h-2/3" />
-      {reel.videoUrl && !failed ? <button type="button" aria-label={paused ? 'Play reel' : 'Pause reel'} onClick={() => setPaused(!paused)} className="absolute left-4 top-20 grid size-11 place-items-center rounded-full bg-black/40 text-white">
-        {paused ? <Play className="size-5" /> : <Pause className="size-5" />}
-      </button> : null}
-      {failed ? <p role="status" className="absolute left-4 top-20 rounded-lg bg-black/50 p-2 text-xs text-white">Video unavailable. You can still shop this look.</p> : null}
+      {reel.videoUrl && !failed ? <button type="button" aria-label={paused ? 'Play reel' : 'Pause reel'} onClick={() => setPaused(!paused)} className="absolute inset-0 grid place-items-center text-white focus-visible:outline-4 focus-visible:outline-white"><span className={cn('grid size-16 place-items-center rounded-full bg-black/45 transition-opacity', paused ? 'opacity-100' : 'opacity-0 hover:opacity-70 focus-visible:opacity-100')}>{paused ? <Play className="size-7" /> : <Pause className="size-7" />}</span></button> : null}
+      {loading && active && !failed ? <span role="status" className="pointer-events-none absolute left-1/2 top-[43%] size-10 -translate-x-1/2 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-label="Loading reel" /> : null}
+      {failed ? <p role="status" className="absolute inset-x-4 top-1/2 rounded-xl bg-black/60 p-3 text-center text-xs text-white">Video unavailable. You can still shop this look.</p> : null}
 
       {/* ------------------------------------------------------------- shop */}
 
-      <div className="absolute inset-x-0 top-0 flex items-center gap-2.5 p-4">
-        <a
-          href={`/store/${reel.sellerSlug}`}
-          className="flex min-w-0 items-center gap-2.5 rounded-full"
-        >
-          <span className="relative size-9 shrink-0 overflow-hidden rounded-full ring-2 ring-white/30">
-            {reel.sellerLogoUrl ? (
-              <Image src={reel.sellerLogoUrl} alt="" fill sizes="36px" className="object-cover" />
-            ) : null}
-          </span>
-          <span className="min-w-0">
-            <span className="block truncate text-xs font-semibold text-white">
-              {reel.sellerName}
-            </span>
-            {reel.sellerIsLive ? (
-              <span className="flex items-center gap-1 text-2xs font-medium text-white/80">
-                <span className="bg-danger-500 size-1.5 rounded-full" aria-hidden />
-                Live now
-              </span>
-            ) : null}
-          </span>
-        </a>
-
-        <button
-          type="button"
-          onClick={onToggleMute}
-          aria-label={muted ? 'Unmute' : 'Mute'}
-          className="ml-auto grid size-11 shrink-0 place-items-center rounded-full bg-white/15 text-white backdrop-blur-md transition-transform motion-safe:active:scale-90"
-        >
-          {muted ? <VolumeX className="size-5" /> : <Volume2 className="size-5" />}
-        </button>
-      </div>
+      <div aria-hidden className="absolute inset-x-0 top-0 z-10 h-1 bg-white/25"><span className="block h-full bg-white transition-[width] duration-150" style={{ width: `${progress * 100}%` }} /></div>
+      <div className="absolute inset-x-0 top-2 z-10 flex items-center justify-between px-4"><a href="/categories" aria-label="Back to shopping" className="grid size-11 place-items-center rounded-full bg-black/40 text-white"><ArrowLeft className="size-5" /></a><span className="rounded-full bg-black/45 px-4 py-2 text-sm font-semibold text-white">Browse</span></div>
 
       {/* ------------------------------------------------------------ rail */}
 
@@ -271,7 +245,8 @@ function ReelSlide({
         the viewport. The storefront's bottom bar is fixed over this feed, and a
         Save button underneath it is a Save button nobody can press.
       */}
-      <div className="absolute bottom-[calc(var(--spacing-bottom-nav)+7.5rem)] right-3 flex flex-col items-center gap-4">
+      <div className="absolute bottom-[calc(var(--spacing-bottom-nav)+11rem)] right-3 z-10 flex flex-col items-center gap-3">
+        <RailButton label={muted ? 'Turn sound on' : 'Mute reel'} onClick={onToggleMute}>{muted ? <VolumeX className="size-6 text-white" /> : <Volume2 className="size-6 text-white" />}</RailButton>
         <RailButton
           label={liked ? 'Remove from wishlist' : 'Save to wishlist'}
           onClick={() => {
@@ -313,8 +288,9 @@ function ReelSlide({
 
       {/* --------------------------------------------------------- product */}
 
-      <div className="absolute inset-x-0 bottom-[--spacing-bottom-nav] p-4">
-        <p className="clamp-2 text-xs leading-relaxed text-white/90">{reel.caption}</p>
+      <div className="absolute inset-x-0 bottom-(--spacing-bottom-nav) p-4">
+        <a href={`/store/${reel.sellerSlug}`} className="mb-3 flex w-fit min-w-0 items-center gap-2.5 text-white"><span className="relative size-9 shrink-0 overflow-hidden rounded-full ring-2 ring-white/50">{reel.sellerLogoUrl ? <Image src={reel.sellerLogoUrl} alt="" fill sizes="36px" className="object-cover" /> : null}</span><span className="truncate text-sm font-semibold">{reel.sellerName}</span>{reel.sellerIsLive ? <span className="rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-semibold">LIVE</span> : null}</a>
+        {reel.caption ? <p className="clamp-2 max-w-[calc(100%-3rem)] text-xs leading-relaxed text-white/90">{reel.caption}</p> : null}
 
         <AnimatePresence initial={false}>
           <motion.div
@@ -326,6 +302,7 @@ function ReelSlide({
           >
             <a
               href={`/product/${reel.productSlug}`}
+              aria-label={`View ${reel.productTitle}`}
               className="bg-sunken relative size-14 shrink-0 overflow-hidden rounded-xl ring-1 ring-inset ring-black/[0.07]"
             >
               {reel.productImage ? (
@@ -363,7 +340,7 @@ function ReelSlide({
             <Button asChild size="sm" shape="pill" className="shrink-0">
               <a href={`/product/${reel.productSlug}`}>
                 <ShoppingBag className="size-3.5" aria-hidden />
-                Buy
+                View product
               </a>
             </Button>
           </motion.div>

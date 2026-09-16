@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import { LoginForm } from '@/components/auth/login-form';
 import { GoogleSignIn } from '@/components/auth/google-sign-in';
 import { SignedInRedirect } from '@/components/auth/signed-in-redirect';
+import { SessionExpiredDialog } from '@/components/auth/session-expired-dialog';
 
 export const metadata: Metadata = {
   title: 'Sign in',
@@ -18,7 +19,7 @@ export const metadata: Metadata = {
 export default function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string; error?: string }>;
+  searchParams: Promise<{ next?: string; error?: string; session?: string }>;
 }) {
   return (
     <Suspense fallback={<FormSkeleton />}>
@@ -27,8 +28,8 @@ export default function LoginPage({
   );
 }
 
-async function Resolved({ searchParams }: { searchParams: Promise<{ next?: string; error?: string }> }) {
-  const { next, error } = await searchParams;
+async function Resolved({ searchParams }: { searchParams: Promise<{ next?: string; error?: string; session?: string }> }) {
+  const { next, error, session } = await searchParams;
   const messages: Record<string, string> = {
     'google-unavailable': 'Google sign-in is not configured yet. Please use your email.',
     'google-cancelled': 'Google sign-in was cancelled. You can try again.',
@@ -39,6 +40,7 @@ async function Resolved({ searchParams }: { searchParams: Promise<{ next?: strin
   return (
     <>
       <SignedInRedirect next={next} />
+      {session === 'expired' ? <SessionExpiredDialog /> : null}
       {error && messages[error] ? <p role="alert" className="bg-danger-50 text-danger-700 mb-4 rounded-xl p-3 text-sm">{messages[error]}</p> : null}
       <GoogleSignIn next={next} />
       <LoginForm next={next} />

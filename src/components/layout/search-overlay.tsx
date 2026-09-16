@@ -109,13 +109,13 @@ export function HeaderSearch({ quickLinks }: { quickLinks: SearchQuickLink[] }) 
             type="button"
             className={cn(
               'bg-sunken border-line-control text-faint hidden h-10 items-center gap-2.5',
-              'rounded-full border pl-3.5 pr-2.5 text-sm lg:flex xl:w-64',
+              'rounded-full border pl-3.5 pr-2.5 text-sm lg:flex lg:w-44 xl:w-64',
               'hover:border-line-bold hover:text-muted transition-colors',
               'focus-visible:outline-accent focus-visible:outline-2 focus-visible:outline-offset-2',
             )}
           >
             <Search className="size-4 shrink-0" aria-hidden />
-            <span className="hidden xl:inline">Search products</span>
+            <span className="hidden lg:inline">Search products</span>
             {/*
               The shortcut hint is `aria-hidden`: "/" announced mid-sentence is
               noise, and it is a visual affordance for people who already know
@@ -291,7 +291,7 @@ export function SearchOverlay({
             input.current?.focus();
           }}
           className={cn(
-            'bg-raised border-line fixed inset-x-0 top-0 z-[60] border-b shadow-xl',
+            'bg-raised border-line fixed inset-x-0 top-0 z-[60] border-b shadow-2xl sm:inset-x-12 sm:top-5 sm:rounded-3xl sm:border lg:inset-x-[calc((100vw-900px)/2)]',
             'motion-safe:data-[state=open]:animate-[mrd-slide-from-top_var(--duration-drawer)_var(--ease-out)]',
             'motion-safe:data-[state=closed]:animate-[mrd-slide-to-top_var(--duration-base)_var(--ease-in)]',
           )}
@@ -570,8 +570,8 @@ function HitGroup({
                 onMouseMove={() => onHover(position)}
                 aria-selected={highlighted}
                 className={cn(
-                  'flex min-h-12 items-center gap-3 rounded-md px-2 py-1.5 transition-colors',
-                  highlighted ? 'bg-sunken' : 'hover:bg-sunken',
+                  'flex min-h-14 items-center gap-3 rounded-xl px-3 py-2 transition-[background-color,transform] duration-150',
+                  highlighted ? 'bg-accent-soft text-accent-ink' : 'hover:bg-sunken hover:translate-x-0.5',
                 )}
               >
                 <span

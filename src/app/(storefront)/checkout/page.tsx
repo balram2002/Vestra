@@ -105,7 +105,7 @@ async function CheckoutFlow() {
           )}
         </div>
 
-        <aside className="lg:sticky lg:top-28 lg:self-start">
+        <aside className="lg:sticky lg:top-[calc(var(--app-sticky-offset)+1rem)] lg:self-start">
           <div className="border-line rounded-lg border p-5">
             <h2 className="text-faint text-2xs font-medium uppercase tracking-[0.14em]">
               Order summary

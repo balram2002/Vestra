@@ -44,7 +44,7 @@ export default function StorefrontLayout({ children }: { children: React.ReactNo
         every page has to remember. The value is the bar's own token, so the two
         cannot drift.
       */}
-      <main id="main" className="flex-1 pb-(--spacing-bottom-nav) lg:pb-0">
+      <main id="main" className="flex-1">
         {children}
       </main>
 
@@ -94,4 +94,3 @@ async function hiddenDestinations(): Promise<string[]> {
   if (!headerActions.bag) hidden.push('/bag');
   return hidden;
 }
-

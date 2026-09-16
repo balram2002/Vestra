@@ -7,7 +7,7 @@ import { forbidden, redirect, unauthorized } from 'next/navigation';
 import type { Permission, PublicUser, SessionUser, UserRole } from '@/domain/types';
 
 import { collections } from '../db/collections';
-import { cookieOptions, GUEST_COOKIE, SESSION_COOKIE, sessionTtlSeconds, signSession, verifySession } from './jwt';
+import { cookieOptions, GUEST_COOKIE, SESSION_COOKIE, SESSION_HINT_COOKIE, sessionTtlSeconds, signSession, verifySession } from './jwt';
 import { hasPermission, permissionsFor, primaryRole } from './rbac';
 
 /**
@@ -162,6 +162,7 @@ export async function startSession(user: PublicUser, role?: UserRole): Promise<v
 
   const store = await cookies();
   store.set(SESSION_COOKIE, token, cookieOptions(sessionTtlSeconds(activeRole)));
+  store.set(SESSION_HINT_COOKIE, '1', cookieOptions(sessionTtlSeconds(activeRole) + 30 * 24 * 60 * 60));
 }
 
 /**
@@ -186,6 +187,7 @@ export async function refreshSession(role?: UserRole): Promise<void> {
 export async function endSession(): Promise<void> {
   const store = await cookies();
   store.delete(SESSION_COOKIE);
+  store.delete(SESSION_HINT_COOKIE);
 }
 
 /**

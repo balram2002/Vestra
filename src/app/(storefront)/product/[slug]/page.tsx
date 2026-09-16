@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { Play } from 'lucide-react';
 import { notFound, permanentRedirect } from 'next/navigation';
 import { Suspense } from 'react';
 
@@ -107,7 +108,7 @@ export default async function ProductPage({ params }: PageProps) {
   });
 
   return (
-    <div className="gutter shell-max min-w-0 py-3 pb-24 sm:py-5 lg:pb-8">
+    <div className="gutter shell-max min-w-0 py-3 pb-8 sm:py-5 lg:pb-8">
       <div className="flex min-w-0 items-center gap-3"><div className="min-w-0 flex-1"><Breadcrumbs
         items={[
           { href: '/', label: 'Home' },
@@ -163,6 +164,7 @@ export default async function ProductPage({ params }: PageProps) {
                 ) : null}
                 {brand?.isPremium ? <Badge tone="premium" size="sm">Premium</Badge> : null}
               </div>
+              {product.media.some((asset) => asset.kind === 'VIDEO') ? <Link href={`/demo/${product.slug}`} className="border-accent text-accent-ink hover:bg-accent-soft mt-4 inline-flex min-h-11 items-center gap-2 rounded-full border px-4 text-xs font-semibold transition-colors"><Play className="size-4 fill-current" />Watch the product demo</Link> : null}
             </div>
           }
           footer={

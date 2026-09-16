@@ -84,12 +84,13 @@ async function Sections() {
       <Card
         id="security"
         title="Sign-in and security"
-        description="How you prove it is you: your password, and an optional code by email."
+        description="How you prove it is you: your password and a code by email."
       >
         <TwoFactorSettings
           key={record?.twoFactor?.enabled ? 'two-factor-on' : 'two-factor-off'}
           enabled={Boolean(record?.twoFactor?.enabled)}
           email={session.email}
+          mandatory={session.roles.some((role) => role === 'ADMIN' || role === 'SUPER_ADMIN')}
         />
         <div className="border-line my-5 border-t" />
         <h3 className="text-ink text-sm font-medium">Change your password</h3>

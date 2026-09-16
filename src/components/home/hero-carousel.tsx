@@ -2,7 +2,7 @@
 
 import { animate, motion, useMotionValue, useReducedMotion, useTransform } from 'framer-motion';
 import type { AnimationPlaybackControls, MotionValue, PanInfo } from 'framer-motion';
-import { ArrowRight, ChevronLeft, ChevronRight, Pause, Play } from 'lucide-react';
+import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -64,10 +64,8 @@ import { spring, tween } from '@/lib/motion';
  * single running animation to interrupt. A drag that ends where it started
  * springs back through the same call.
  *
- * Autoplay runs every three seconds and stops for anything that suggests
- * someone is looking: hover, focus inside, a finger down, a hidden tab, the
- * hero scrolled out of view, or `prefers-reduced-motion`. It ships a real pause
- * control, because autoplay without one is a dark pattern.
+ * Autoplay runs every three seconds and pauses during a drag, in a hidden tab,
+ * off-screen, or when reduced motion is requested. Slide chips show progress.
  */
 
 const AUTOPLAY_MS = 3000;
@@ -103,9 +101,7 @@ function Hero({ shown, count }: { shown: Banner[]; count: number }) {
   /** The page the placements are measured from. Only a finished move moves it. */
   const [settled, setSettled] = useState(0);
 
-  const [playing, setPlaying] = useState(true);
   const [dragging, setDragging] = useState(false);
-  const [focused, setFocused] = useState(false);
   const [awake, setAwake] = useState(true);
 
   const current = ((page % count) + count) % count;
@@ -203,13 +199,10 @@ function Hero({ shown, count }: { shown: Banner[]; count: number }) {
    * Hover-to-pause is the textbook rule and it was wrong here: on a desktop the
    * pointer sits over the middle of the window, which is exactly where the hero
    * is, so autoplay never ran at all. Everything that indicates real intent
-   * still stops it -- a finger on the panel, focus inside it, a hidden tab, the
-   * hero scrolled out of view -- and there is a visible pause control for
-   * anyone who wants it off. Reading is not interrupted either way: a slide
-   * being read is a slide being hovered, and the copy stays put for its full
-   * three seconds regardless.
+   * still stops it -- a finger on the panel, a hidden tab, or the hero scrolled
+   * out of view. Focus after clicking an arrow must not stop autoplay forever.
    */
-  const paused = dragging || focused || !awake || !playing || reduced || count < 2;
+  const paused = dragging || !awake || reduced || count < 2;
 
   /*
    * `page` is in the dependencies, and that is the whole reset.
@@ -277,8 +270,6 @@ function Hero({ shown, count }: { shown: Banner[]; count: number }) {
       <div
         ref={viewport}
         className="relative overflow-hidden"
-        onFocusCapture={() => setFocused(true)}
-        onBlurCapture={() => setFocused(false)}
       >
         <motion.div
           ref={track}
@@ -339,19 +330,6 @@ function Hero({ shown, count }: { shown: Banner[]; count: number }) {
           */}
           <Arrow side="left" onClick={() => step1(-1)} />
 
-          <button
-            type="button"
-            onClick={() => setPlaying((value) => !value)}
-            aria-label={playing ? 'Pause the carousel' : 'Play the carousel'}
-            className={cn(
-              'text-muted hover:text-ink grid size-8 shrink-0 place-items-center rounded-full',
-              'hover:bg-sunken transition-colors',
-              'focus-visible:outline-accent focus-visible:outline-2 focus-visible:outline-offset-2',
-            )}
-          >
-            {playing ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
-          </button>
-
           <ol className="flex items-center gap-1.5">
             {shown.map((banner, index) => (
               <li key={banner.id}>
@@ -361,20 +339,17 @@ function Hero({ shown, count }: { shown: Banner[]; count: number }) {
                   aria-label={`Go to slide ${index + 1} of ${count}`}
                   aria-current={index === current ? 'true' : undefined}
                   className={cn(
-                    'block h-1.5 rounded-full transition-all duration-(--duration-base)',
+                    'hero-progress relative block h-2 overflow-hidden rounded-full transition-all duration-(--duration-base)',
                     'focus-visible:outline-accent focus-visible:outline-2 focus-visible:outline-offset-4',
-                    index === current ? 'bg-ink w-6' : 'bg-line-strong hover:bg-muted w-1.5',
+                    index === current ? 'bg-line-strong w-9' : 'bg-line-strong hover:bg-muted w-2',
                   )}
-                />
+                >{index === current ? <span key={page} className={cn('hero-progress-fill absolute inset-y-0 left-0 bg-ink', paused && 'paused')} style={{ animationDuration: `${AUTOPLAY_MS}ms` }} /> : null}</button>
               </li>
             ))}
           </ol>
 
           <Arrow side="right" onClick={() => step1(1)} />
 
-          <p className="text-faint tabular shrink-0 text-2xs" aria-hidden>
-            {String(current + 1).padStart(2, '0')} / {String(count).padStart(2, '0')}
-          </p>
         </div>
       ) : null}
 

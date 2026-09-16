@@ -1,6 +1,6 @@
 import { chromium, expect as baseExpect } from '@playwright/test';
 import { MongoClient } from 'mongodb';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 
 const expect = baseExpect.configure({ timeout: 20000 });
 const BASE = process.env.BASE_URL ?? 'http://localhost:3001';
@@ -40,10 +40,12 @@ try {
   await page.goto(BASE + path, { waitUntil: 'networkidle' });
   await expect(page.getByRole('heading', { name: 'Featured products', exact: true })).toBeVisible();
   await expect(page.getByText('2 pieces in this demo', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Play video', exact: true }).click();
+  console.log('initial playback', await page.locator('video').evaluate((element) => ({ src: element.currentSrc, paused: element.paused, muted: element.muted, readyState: element.readyState, error: element.error?.code })));
   await expect.poll(() => page.locator('video').evaluate((element) => element.currentTime)).toBeGreaterThan(0.1);
   await page.getByRole('button', { name: 'Pause video', exact: true }).click();
   expect(await page.locator('video').evaluate((element) => element.paused)).toBe(true);
+  await page.getByRole('button', { name: 'Play video', exact: true }).click();
+  if (!await page.locator('video').evaluate((element) => element.muted)) await page.getByLabel('Mute video').click();
   await page.getByLabel('Unmute video').click();
   expect(await page.locator('video').evaluate((element) => element.muted)).toBe(false);
   console.log('video metadata', await page.locator('video').evaluate((v) => ({ duration: v.duration, time: v.currentTime, seekable: v.seekable.length ? v.seekable.end(0) : 0 })));
@@ -54,6 +56,7 @@ try {
   await expect(slider).toHaveAttribute('aria-valuenow', '40');
   await page.getByRole('button', { name: 'See all', exact: true }).click();
   await expect(slider).toHaveAttribute('aria-valuenow', '72');
+  await page.screenshot({ path: `${shots}/demo-expanded.png` });
   await page.getByRole('button', { name: 'Choose & add', exact: true }).first().click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Add to bag', exact: true })).toBeDisabled();
@@ -75,22 +78,60 @@ try {
     const responsive = await makeContext(width);
     const screen = await responsive.newPage();
     screen.on('pageerror', (error) => errors.push(error.message));
-    for (const route of [`/store/${seller.slug}`, `/product/${product.slug}`, path, '/category/womens-ethnic-wear', '/search?q=dress', '/categories', '/login', '/register', '/bag']) {
+    for (const route of [`/store/${seller.slug}`, `/product/${product.slug}`, path, '/category/womens-ethnic-wear', '/search?q=dress', '/categories', '/reels', '/login', '/register', '/bag']) {
       await screen.goto(BASE + route, { waitUntil: 'domcontentloaded' });
       await screen.waitForTimeout(800);
       const overflow = await screen.evaluate(() => ({ width: innerWidth, scroll: document.documentElement.scrollWidth }));
       if (overflow.scroll > overflow.width + 1) throw new Error(`Overflow ${width} ${route}: ${JSON.stringify(overflow)}`);
-      if (/^\/(store|product|demo|category)\//.test(route)) await screen.screenshot({ path: `${shots}/${width}-${route.split('/')[1]}.png` });
+      if (/^\/(store|product|demo|category)\//.test(route) || route === '/reels') await screen.screenshot({ path: `${shots}/${width}-${route.split('/')[1]}.png` });
     }
-    console.log(`PASS ${width}px overflow sweep across 9 storefront/auth/demo routes`);
+    if (width === 390) {
+      await screen.goto(`${BASE}/category/womens-ethnic-wear`);
+      await screen.getByRole('link', { name: 'In stock', exact: true }).click();
+      await expect(screen).toHaveURL(/inStock=1/);
+      await screen.getByRole('button', { name: /Filters/ }).click();
+      await expect(screen.getByRole('dialog', { name: 'Filters' })).toBeVisible();
+    }
+    console.log(`PASS ${width}px overflow sweep across 10 storefront/auth/demo/reels routes`);
     await responsive.close();
   }
+  const desktop = await makeContext(1440);
+  const home = await desktop.newPage();
+  await home.goto(BASE + '/', { waitUntil: 'domcontentloaded' });
+  const slideDots = home.getByRole('button', { name: /^Go to slide/ });
+  await expect(slideDots.first()).toBeVisible();
+  await expect(home.getByRole('button', { name: 'Pause the carousel' })).toHaveCount(0);
+  const initialSlide = await slideDots.evaluateAll((dots) => dots.findIndex((dot) => dot.getAttribute('aria-current') === 'true'));
+  await expect.poll(async () => slideDots.evaluateAll((dots) => dots.findIndex((dot) => dot.getAttribute('aria-current') === 'true')), { timeout: 9000 }).not.toBe(initialSlide);
+  await home.getByRole('button', { name: 'Next slide' }).click();
+  await home.screenshot({ path: `${shots}/desktop-hero.png` });
+  console.log('PASS desktop hero autoplay, manual slide, and progress-only controls');
+  await home.getByRole('button', { name: /Search products/ }).click();
+  await home.getByRole('combobox', { name: /Search products, brands/ }).fill('dress');
+  await expect(home.getByRole('listbox', { name: 'Results for dress' })).toBeVisible();
+  await expect(home.getByRole('option').first()).toBeVisible();
+  await home.keyboard.press('Escape');
+  await home.getByRole('navigation', { name: 'Departments' }).getByRole('link', { name: 'Women', exact: true }).first().hover();
+  await expect(home.getByRole('group', { name: 'Women' })).toBeVisible();
+  console.log('PASS search suggestions and department hover menu');
+  await desktop.close();
   const admin = await makeContext(1440);
   const adminPage = await admin.newPage();
   await adminPage.goto(BASE + '/login');
   await adminPage.locator('[name=email]').fill('superadmin@vestra.test');
   await adminPage.locator('[name=password]').fill('vestra123');
-  await Promise.all([adminPage.waitForURL((url) => !url.pathname.startsWith('/login')), adminPage.getByRole('button', { name: 'Sign in', exact: true }).click()]);
+  await adminPage.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await adminPage.waitForURL('**/login/verify');
+  expect((await admin.cookies()).some((cookie) => cookie.name === 'vestra_session')).toBe(false);
+  const codeFiles = (await readdir('.data/outbox')).filter((name) => name.includes('sign-in-code')).sort();
+  const code = codeFiles.at(-1)?.match(/-(\d{6})-/)?.[1];
+  if (!code) throw new Error('Administrator sign-in code missing from the local test outbox');
+  await adminPage.getByLabel('Sign-in code').fill(code === '000000' ? '111111' : '000000');
+  await expect(adminPage.getByText(/That code is not right/)).toBeVisible();
+  await adminPage.getByLabel('Sign-in code').fill(code);
+  await adminPage.waitForURL((url) => !url.pathname.startsWith('/login'));
+  const adminSession = (await admin.cookies()).find((cookie) => cookie.name === 'vestra_session');
+  expect(adminSession.expires - Date.now() / 1000).toBeGreaterThan(14 * 24 * 60 * 60);
   await adminPage.goto(`${BASE}/admin/sellers/${seller.id}`);
   await adminPage.getByLabel('Trust score', { exact: false }).fill('99/100');
   await adminPage.getByLabel('Average ship time', { exact: false }).fill('<1 day');
@@ -101,6 +142,9 @@ try {
   await expect(adminPage.getByText('99/100', { exact: true })).toBeVisible();
   await expect(adminPage.getByText('<1 day', { exact: true })).toBeVisible();
   await expect(adminPage.getByText('1.5L', { exact: true })).toBeVisible();
+  await adminPage.goto(`${BASE}/account/profile`);
+  await expect(adminPage.getByText(/Administrator sign-in always requires a code/)).toBeVisible();
+  await expect(adminPage.getByRole('button', { name: 'Turn off' })).toHaveCount(0);
   console.log('PASS admin scorecard persistence and public cache invalidation');
   await admin.close();
   const missing = await browser.newPage();

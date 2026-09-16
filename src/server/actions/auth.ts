@@ -15,7 +15,7 @@ import {
 import { completeSignIn } from '../auth/complete-sign-in';
 import { hashPassword, needsRehash, verifyPassword } from '../auth/password';
 import { endSession } from '../auth/session';
-import { startSignInChallenge } from '../auth/two-factor';
+import { requiresSignInCode, startSignInChallenge } from '../auth/two-factor';
 import { collections, toEntity } from '../db/collections';
 import { LIMITS, clientIp, hitAll, peekAll, retryMessage } from '../security/rate-limit';
 
@@ -115,7 +115,7 @@ export async function signIn(input: {
    * no last-login stamp, no guest bag merged: all of that waits for the code,
    * on the page this redirects to. See `auth/two-factor`.
    */
-  if (user.twoFactor?.enabled) {
+  if (requiresSignInCode(user)) {
     const started = await startSignInChallenge(user, parsed.data.next ?? null);
     if (!started.ok) return { ok: false, error: started.error };
     redirect('/login/verify');

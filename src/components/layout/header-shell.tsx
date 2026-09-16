@@ -94,6 +94,11 @@ export function HeaderShell({
   // it corrects the state a bounce left behind.
   const away = hidden && !held && !atTop;
 
+  useEffect(() => {
+    document.documentElement.style.setProperty('--app-sticky-offset', away ? '0px' : 'var(--app-header-row)');
+    return () => { document.documentElement.style.removeProperty('--app-sticky-offset'); };
+  }, [away]);
+
   return (
     <header
       /*

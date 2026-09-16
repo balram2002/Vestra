@@ -18,6 +18,7 @@ import type { UserRole } from '@/domain/types';
  */
 
 export const SESSION_COOKIE = 'vestra_session';
+export const SESSION_HINT_COOKIE = 'vestra_session_hint';
 export const GUEST_COOKIE = 'vestra_guest';
 
 export interface SessionClaims {

@@ -118,7 +118,7 @@ async function BagContents() {
 
       {/* --------------------------------------------------------- summary */}
 
-      <aside className="space-y-4 lg:sticky lg:top-28 lg:self-start">
+      <aside className="space-y-4 lg:sticky lg:top-[calc(var(--app-sticky-offset)+1rem)] lg:self-start">
         <CouponPanel applied={cart.coupon} offers={cart.availableCoupons} />
 
         <div className="border-line rounded-lg border p-5">

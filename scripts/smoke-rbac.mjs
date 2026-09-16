@@ -15,6 +15,7 @@
  */
 
 import { chromium } from '@playwright/test';
+import { readdir } from 'node:fs/promises';
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:3000';
 const PASSWORD = 'vestra123';
@@ -23,8 +24,8 @@ const PASSWORD = 'vestra123';
 const CASES = [
   { who: 'anonymous', email: null, path: '/admin', allow: false },
   { who: 'anonymous', email: null, path: '/seller', allow: false },
-  // Guests may look up an order with its number and email address.
-  { who: 'anonymous', email: null, path: '/orders', allow: true },
+  // Guests may look up an individual order, but the account order list is private.
+  { who: 'anonymous', email: null, path: '/orders', allow: false },
   { who: 'anonymous', email: null, path: '/', allow: true },
   { who: 'anonymous', email: null, path: '/category/womens-ethnic-wear', allow: true },
 
@@ -45,6 +46,8 @@ const CASES = [
 
   { who: 'finance', email: 'finance@vestra.test', path: '/admin/payments', allow: true },
   { who: 'finance', email: 'finance@vestra.test', path: '/admin/settings', allow: false },
+
+  { who: 'admin', email: 'admin@vestra.test', path: '/admin', allow: true },
 
   { who: 'superadmin', email: 'superadmin@vestra.test', path: '/admin/settings', allow: true },
   { who: 'superadmin', email: 'superadmin@vestra.test', path: '/admin/audit-logs', allow: true },
@@ -69,10 +72,15 @@ for (const [who, cases] of byWho) {
     await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
     await page.fill('input[name="email"]', cases[0].email);
     await page.fill('input[name="password"]', PASSWORD);
-    await Promise.all([
-      page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 30000 }),
-      page.click('button[type="submit"]'),
-    ]);
+    await page.click('button[type="submit"]');
+    await page.waitForURL((url) => url.pathname === '/login/verify' || !url.pathname.startsWith('/login'), { timeout: 30000 });
+    if (new URL(page.url()).pathname === '/login/verify') {
+      const files = (await readdir('.data/outbox')).filter((name) => name.includes('sign-in-code')).sort();
+      const code = files.at(-1)?.match(/-(\d{6})-/)?.[1];
+      if (!code) throw new Error('Administrator sign-in code missing from the local test outbox');
+      await page.getByLabel('Sign-in code').fill(code);
+      await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 30000 });
+    }
   }
 
   for (const item of cases) {

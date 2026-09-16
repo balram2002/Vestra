@@ -101,7 +101,7 @@ export async function SiteFooter() {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="bg-sunken border-line mt-20 border-t">
+    <footer className="bg-sunken border-line mt-10 border-t pb-(--spacing-bottom-nav) lg:mt-20 lg:pb-0">
       <div className="shell-max gutter py-14 sm:py-16">
         {/* ------------------------------------------------- brand + social */}
         <div className="border-line flex flex-col gap-8 border-b pb-10 lg:flex-row lg:items-start lg:justify-between">

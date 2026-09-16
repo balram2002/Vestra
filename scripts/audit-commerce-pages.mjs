@@ -17,8 +17,9 @@ try {
   for (const width of [390, 1440]) {
     const context = await browser.newContext({ viewport: { width, height: 900 } });
     const page = await context.newPage();
-    for (const route of [`/store/${seller.slug}`, `/product/${product.slug}`, `/demo/${product.slug}`, '/category/womens-ethnic-wear']) {
-      await page.goto(base + route, { waitUntil: 'networkidle' });
+    for (const route of ['/', `/store/${seller.slug}`, `/product/${product.slug}`, `/demo/${product.slug}`, '/category/womens-ethnic-wear', '/reels']) {
+      await page.goto(base + route, { waitUntil: 'load', timeout: 60000 });
+      await page.waitForTimeout(1500);
       const result = await new AxeBuilder({ page }).analyze();
       const violations = result.violations.filter((item) => ['serious', 'critical'].includes(item.impact));
       console.log(width, route, violations.map((item) => `${item.id}: ${item.nodes.length}`).join(', ') || 'PASS');

@@ -42,6 +42,10 @@ import {
 
 export type ChallengePurpose = AuthChallenge['purpose'];
 
+export function requiresSignInCode(user: Pick<User, 'roles' | 'twoFactor'>): boolean {
+  return Boolean(user.twoFactor?.enabled) || user.roles.some((role) => role === 'ADMIN' || role === 'SUPER_ADMIN');
+}
+
 export type SendResult =
   | { ok: true; sentTo: string }
   | { ok: false; error: string; retryAfterSeconds?: number };

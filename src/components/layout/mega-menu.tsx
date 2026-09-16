@@ -68,7 +68,7 @@ export function MegaMenu({
                 role="group"
                 aria-label={department.name}
                 className={cn(
-                  'bg-raised border-line absolute inset-x-0 top-full z-40 border-y shadow-lg',
+                  'bg-raised border-line absolute inset-x-3 top-[calc(100%-2px)] z-40 overflow-hidden rounded-b-3xl border shadow-2xl lg:inset-x-5',
                   'invisible -translate-y-2 opacity-0',
                   'transition-[opacity,transform,visibility] duration-(--duration-base) ease-(--ease-out)',
                   /*

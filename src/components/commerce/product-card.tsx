@@ -1,5 +1,4 @@
 import Image from 'next/image';
-import { Play } from 'lucide-react';
 import Link from 'next/link';
 
 import type { ProductBadgeKind, ProductSummary } from '@/domain/types';
@@ -167,31 +166,10 @@ export function ProductCard({
             loading={priority ? undefined : 'lazy'}
             sizes={imageSizes}
             className={cn(
-              'object-cover transition-[opacity,transform] duration-(--duration-hero) ease-(--ease-out)',
-              // A gentle push-in reads as depth; the second shot then
-              // cross-fades over it, so hovering makes no new request.
-              'motion-safe:group-hover:scale-[1.06]',
-              product.hoverImage && 'group-hover:opacity-0',
+              'object-cover transition-transform duration-500 ease-out motion-safe:group-hover:scale-[1.045]',
               soldOut && 'opacity-50 saturate-[0.35]',
             )}
           />
-
-          {product.hoverImage ? (
-            <Image
-              src={product.hoverImage}
-              alt=""
-              aria-hidden
-              fill
-              loading="lazy"
-              sizes={imageSizes}
-              className={cn(
-                'pointer-events-none object-cover opacity-0',
-                'transition-[opacity,transform] duration-(--duration-hero) ease-(--ease-out)',
-                'group-hover:opacity-100 motion-safe:group-hover:scale-[1.03]',
-                soldOut && 'saturate-[0.35]',
-              )}
-            />
-          ) : null}
         </Link>
 
         {/*
@@ -264,7 +242,6 @@ export function ProductCard({
         ) : null}
       </div>
 
-      {product.demoPath ? <Link href={product.demoPath} aria-label={`Watch ${product.title} demo`} className="bg-ink text-canvas relative z-10 mt-2 flex min-h-9 w-fit items-center gap-1.5 rounded-full px-3 text-[11px]"><Play className="size-3 fill-current" />Watch demo</Link> : null}
       <div className="flex min-w-0 flex-1 flex-col gap-1.5 px-1 pb-2 pt-3">
         <p className="text-faint truncate text-2xs font-semibold uppercase tracking-[0.13em]">
           {product.brandName}

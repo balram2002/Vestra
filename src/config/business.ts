@@ -141,8 +141,8 @@ export const CATALOG = {
 
 export const ACCOUNTS = {
   sessionTtlDays: 30,
-  /** Sessions for staff and sellers expire faster. */
-  staffSessionTtlHours: 12,
+  /** Privileged accounts also keep a 15-day session; each sign-in requires a code. */
+  staffSessionTtlHours: 15 * 24,
   passwordMinLength: 8,
   maxAddresses: 10,
   otpLength: 6,

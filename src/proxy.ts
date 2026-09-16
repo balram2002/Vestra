@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
-import { SESSION_COOKIE, verifySession } from '@/server/auth/jwt';
+import { SESSION_COOKIE, SESSION_HINT_COOKIE, verifySession } from '@/server/auth/jwt';
 import { consoleForPath, isSellerRole, isStaffRole } from '@/server/auth/rbac';
 
 /**
@@ -33,6 +33,7 @@ export async function proxy(request: NextRequest) {
   if (!claims) {
     const login = new URL('/login', request.url);
     login.searchParams.set('next', `${pathname}${search}`);
+    if (request.cookies.has(SESSION_COOKIE) || request.cookies.has(SESSION_HINT_COOKIE)) login.searchParams.set('session', 'expired');
     return NextResponse.redirect(login);
   }
 

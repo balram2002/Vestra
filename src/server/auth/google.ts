@@ -11,7 +11,7 @@ import { entityId } from '@/lib/ids';
 import { safeNext } from '@/lib/safe-next';
 import { collections, toEntity } from '../db/collections';
 import { completeSignIn } from './complete-sign-in';
-import { startSignInChallenge } from './two-factor';
+import { requiresSignInCode, startSignInChallenge } from './two-factor';
 
 const COOKIE = 'vestra_google_flow';
 const keys = createRemoteJWKSet(new URL('https://www.googleapis.com/oauth2/v3/certs'));
@@ -96,7 +96,7 @@ export async function finishGoogleSignIn(url: URL): Promise<string> {
   }
   if (user.status !== 'ACTIVE') return '/login?error=google-inactive';
   const next = typeof flow.next === 'string' ? flow.next : null;
-  if (user.twoFactor?.enabled) {
+  if (requiresSignInCode(user)) {
     const challenge = await startSignInChallenge(user, next);
     return challenge.ok ? '/login/verify' : '/login?error=google-failed';
   }

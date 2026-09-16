@@ -36,7 +36,7 @@ export function DropdownMenuContent({
         sideOffset={sideOffset}
         align={align}
         className={cn(
-          'bg-raised border-line z-50 min-w-56 overflow-hidden rounded-xl border p-1.5 shadow-lg',
+          'bg-raised border-line z-50 min-w-56 overflow-hidden rounded-2xl border p-2 shadow-2xl',
           // Grows from the edge nearest its trigger, so it reads as coming OUT
           // of the thing that opened it.
           'origin-(--radix-dropdown-menu-content-transform-origin)',

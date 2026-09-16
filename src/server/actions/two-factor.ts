@@ -114,6 +114,10 @@ export async function requestTwoFactorChange(input: { enable: boolean }): Promis
   const user = await accountFor(session.id);
   if (!user) return { ok: false, error: 'Your account could not be found.' };
 
+  if (!input.enable && user.roles.some((role) => role === 'ADMIN' || role === 'SUPER_ADMIN')) {
+    return { ok: false, error: 'Two-step sign-in is required for administrators.' };
+  }
+
   const enabled = Boolean(user.twoFactor?.enabled);
   if (Boolean(input.enable) === enabled) {
     return {
@@ -149,6 +153,10 @@ export async function confirmTwoFactorChange(input: {
   const session = await requireUser();
   const user = await accountFor(session.id);
   if (!user) return { ok: false, error: 'Your account could not be found.' };
+
+  if (!input.enable && user.roles.some((role) => role === 'ADMIN' || role === 'SUPER_ADMIN')) {
+    return { ok: false, error: 'Two-step sign-in is required for administrators.' };
+  }
 
   const enable = Boolean(input.enable);
   const challenge = await latestSettingsChallenge(user.id, purposeFor(enable));
