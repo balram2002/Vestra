@@ -44,7 +44,7 @@ export function FilterDrawer({
           type="button"
           className={cn(
             'border-line-control text-ink hover:border-line-bold inline-flex min-h-11 items-center',
-            'gap-2 rounded-full border px-4 text-sm font-medium transition-colors',
+            'shrink-0 gap-2 rounded-full border px-3 text-sm font-medium transition-colors sm:px-4',
             'motion-safe:active:scale-[0.97]',
           )}
         >

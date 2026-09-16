@@ -7,6 +7,7 @@ import { atLeastOne, PLACEHOLDER_SLUG } from '@/lib/static-params';
 import { Breadcrumbs } from '@/components/commerce/breadcrumbs';
 import { ProductCard } from '@/components/commerce/product-card';
 import { RatingStars } from '@/components/commerce/rating-stars';
+import { ShareMenu } from '@/components/commerce/share-menu';
 import { ProductViewer } from '@/components/product/product-viewer';
 import { ReviewSummary } from '@/components/product/review-summary';
 import { JsonLd } from '@/components/seo/json-ld';
@@ -106,14 +107,14 @@ export default async function ProductPage({ params }: PageProps) {
   });
 
   return (
-    <div className="gutter shell-max py-5">
-      <Breadcrumbs
+    <div className="gutter shell-max min-w-0 py-3 pb-24 sm:py-5 lg:pb-8">
+      <div className="flex min-w-0 items-center gap-3"><div className="min-w-0 flex-1"><Breadcrumbs
         items={[
           { href: '/', label: 'Home' },
           ...ancestors.map((c) => ({ href: `/category/${c.slug}`, label: c.name })),
           { href: `/product/${product.slug}`, label: product.title },
         ]}
-      />
+      /></div><ShareMenu title={product.title} path={`/product/${product.slug}`} demoPath={`/demo/${product.slug}`} /></div>
 
       <JsonLd
         data={breadcrumbListJsonLd([
@@ -133,7 +134,7 @@ export default async function ProductPage({ params }: PageProps) {
           sizeSystem={product.sizeSystem}
           colorOptions={colorOptions}
           header={
-            <div className="mb-7">
+            <div className="mb-5">
               {brand ? (
                 <Link
                   href={`/brand/${brand.slug}`}

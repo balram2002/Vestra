@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import { Play } from 'lucide-react';
 import Link from 'next/link';
 
 import type { ProductBadgeKind, ProductSummary } from '@/domain/types';
@@ -122,7 +123,7 @@ export function ProductCard({
   const sizeRail = soldOut ? [] : (sizeOptions ?? []).slice(0, 6);
 
   return (
-    <article className={cn('group relative flex flex-col', className)}>
+    <article className={cn('group bg-raised border-line relative min-w-0 flex flex-col overflow-hidden rounded-2xl border p-1.5 sm:p-2', className)}>
       <div
         className={cn(
           'bg-sunken relative aspect-4/5 overflow-hidden rounded-xl',
@@ -207,7 +208,7 @@ export function ProductCard({
         {badge ? (
           <span
             className={cn(
-              'pointer-events-none absolute left-2.5 top-2.5 rounded-full px-2.5 py-1',
+              'pointer-events-none absolute left-2.5 top-2.5 max-w-[calc(100%-3.5rem)] truncate rounded-full px-2.5 py-1',
               'text-2xs font-semibold uppercase tracking-[0.06em] shadow-xs',
               BADGE_STYLE[badge.kind],
             )}
@@ -224,7 +225,7 @@ export function ProductCard({
           </div>
         ) : null}
 
-        {action ? <div className="absolute right-2.5 top-2.5">{action}</div> : null}
+        {action ? <div className="absolute right-2.5 top-2.5 z-20">{action}</div> : null}
 
         {/*
           The size rail.
@@ -263,7 +264,8 @@ export function ProductCard({
         ) : null}
       </div>
 
-      <div className="flex flex-1 flex-col gap-1.5 pt-3.5">
+      {product.demoPath ? <Link href={product.demoPath} aria-label={`Watch ${product.title} demo`} className="bg-ink text-canvas relative z-10 mt-2 flex min-h-9 w-fit items-center gap-1.5 rounded-full px-3 text-[11px]"><Play className="size-3 fill-current" />Watch demo</Link> : null}
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5 px-1 pb-2 pt-3">
         <p className="text-faint truncate text-2xs font-semibold uppercase tracking-[0.13em]">
           {product.brandName}
         </p>
@@ -299,7 +301,7 @@ export function ProductCard({
           className="mt-0.5"
         />
 
-        <div className="mt-auto flex items-center justify-between gap-2 pt-2">
+        <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-2">
           <RatingStars rating={product.rating} count={product.ratingCount} />
 
           {product.colorOptions.length > 1 ? (

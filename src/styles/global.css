@@ -1166,3 +1166,31 @@
     break-after: page;
   }
 }
+
+/* Store branding and the shared-reel purchase landing page. */
+.store-awning {
+  background: repeating-linear-gradient(100deg, #fbbf24 0 38px, #fffbeb 38px 76px);
+  border-radius: 0 0 12px 12px;
+}
+.demo-layout {
+  display: grid;
+  height: 100dvh;
+  overflow: hidden;
+  background: #000;
+  grid-template-rows: minmax(0, 1fr) var(--demo-sheet, 32%);
+  padding-top: env(safe-area-inset-top);
+}
+.demo-products { padding-bottom: env(safe-area-inset-bottom); }
+.demo-product-grid { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(235px, 82%); gap: 12px; }
+.demo-product-scroll:not(.is-expanded) .demo-product-grid article { display: grid; grid-template-columns: 84px minmax(0, 1fr); min-height: 158px; }
+.demo-product-scroll:not(.is-expanded) .demo-product-grid article > a { height: 100%; min-height: 158px; aspect-ratio: auto; }
+.demo-product-scroll:not(.is-expanded) .demo-product-grid article > div { padding: 8px; }
+.demo-product-scroll:not(.is-expanded) .demo-product-grid article button { margin-top: 4px; }
+.is-expanded .demo-product-grid { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.demo-player:fullscreen { width: 100%; height: 100%; }
+@media (min-width: 1024px) {
+  .demo-layout { grid-template-rows: minmax(0, 1fr); grid-template-columns: minmax(0, 1fr) minmax(360px, 420px); }
+  .demo-product-grid { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .demo-product-scroll:not(.is-expanded) .demo-product-grid article { display: block; min-height: 0; }
+  .demo-product-scroll:not(.is-expanded) .demo-product-grid article > a { height: auto; min-height: 0; aspect-ratio: 4 / 3; }
+}

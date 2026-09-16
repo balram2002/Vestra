@@ -67,7 +67,7 @@ export function ProductGrid({
   return (
     <ul
       className={cn(
-        'stagger grid grid-cols-2 gap-x-3 gap-y-8 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5',
+        'stagger grid grid-cols-2 gap-x-2.5 gap-y-4 sm:gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5',
         className,
       )}
     >
@@ -83,7 +83,7 @@ export function ProductGrid({
 
           Deliberately a STOREFRONT-only flourish; the consoles never stagger.
         */
-        <li key={product.id} style={staggerIndex(index)}>
+        <li className="min-w-0" key={product.id} style={staggerIndex(index)}>
           <ProductCard
             product={product}
             priority={index < 4}

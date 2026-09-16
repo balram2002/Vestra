@@ -30,7 +30,7 @@ export function Breadcrumbs({
         {items.map((item, index) => {
           const last = index === items.length - 1;
           return (
-            <li key={item.href} className="flex items-center gap-1">
+            <li key={item.href} className="flex shrink-0 items-center gap-1">
               {last ? (
                 <span aria-current="page" className="text-muted max-w-[14rem] truncate sm:max-w-none">
                   {item.label}

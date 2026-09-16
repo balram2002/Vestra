@@ -46,7 +46,7 @@ export function ReelsStrip({ section, reels }: { section: HomeSection; reels: Re
             className="w-40 shrink-0 snap-start sm:w-48"
             style={staggerIndex(index)}
           >
-            <Link href="/reels" className="group block">
+            <Link href={reel.demoPath} className="group block">
               <div className="relative">
                 <Picture
                   src={reel.posterUrl}

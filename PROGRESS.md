@@ -42,3 +42,11 @@ The previous milestone 1–3.2 implementation was audited, corrected where neede
 - `npm audit --omit=dev`: 0 production vulnerabilities after upgrading Next.js, Nodemailer and Sharp.
 
 Google's live consent screen still requires deployment-owned OAuth credentials. Configure both Google values described in `.env.example` and `docs/enhancements.md` before the deployment build.
+
+## Storefront commerce enhancement — 16 September 2026
+
+- Rebuilt the public seller profile around an image-led identity, verified badge, configurable trust/dispatch/sales scorecard, policies, store search, and existing catalogue filters. Admins can edit each seller's scorecard; saves are audited and invalidate the public store cache.
+- Added shareable `/demo/[slug]?clip=...` landing pages for exact product reels. The video player supports play/pause, seek, mute, playback speed, fullscreen, sharing, WhatsApp, loading/error recovery, and a touch/keyboard-resizable featured-products sheet. Sellers can curate products per clip; shoppers can select a variant and add it to the bag without leaving the demo.
+- Refined product details with a bounded image gallery, mobile purchase bar, and a three-dot menu that copies the demo link. Reel shares and homepage reel cards lead to the demo. Product listings gained clearer cards, demo links, compact mobile filters, and two-column mobile grids.
+- Browser smoke on an isolated production server passed video playback/seek/mute, panel resizing, guest add-to-bag, demo link copy, admin scorecard persistence/cache invalidation, exact-clip 404 behavior, and 36 responsive route/width checks with no horizontal overflow or browser errors.
+- Targeted axe audit passed the store, product, demo, and category pages at 390px and 1440px with no serious or critical violations. Final `npm run verify` passed after the mobile gallery-height adjustment; all 341 unit tests passed. The production browser smoke was repeated on the final build and passed again.

@@ -143,6 +143,13 @@ export interface Seller {
   about: string;
   logoUrl: string;
   bannerUrl: string;
+  /** Admin-managed public scorecard; null values use the operational record. */
+  storefrontStats?: {
+    trustScore: string | null;
+    averageShipTime: string | null;
+    productsSold: string | null;
+    showStats: boolean;
+  };
   status: SellerStatus;
   ownerUserId: string;
   supportEmail: string;

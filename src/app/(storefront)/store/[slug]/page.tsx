@@ -7,11 +7,10 @@ import { ListingView } from '@/components/commerce/listing-view';
 import { Breadcrumbs } from '@/components/commerce/breadcrumbs';
 import { JsonLd } from '@/components/seo/json-ld';
 import { ProductGridSkeleton } from '@/components/skeletons/product-card-skeleton';
-import { Badge } from '@/components/ui/badge';
+import { StoreProfile } from '@/components/commerce/store-profile';
 import { absoluteUrl } from '@/config/site';
 import { isIndexableListing, parseProductQuery, type RawSearchParams } from '@/lib/product-query';
 import { breadcrumbListJsonLd, sellerJsonLd } from '@/lib/seo/structured-data';
-import { formatCompactNumber } from '@/lib/format';
 import { getSellerBySlug, listSellers } from '@/server/services/catalog';
 import { listProducts } from '@/server/services/listing';
 
@@ -59,7 +58,7 @@ export default async function StorePage({ params, searchParams }: PageProps) {
   const { slug } = await params;
   const seller = await getSellerBySlug(slug);
 
-  if (!seller) notFound();
+  if (!seller || !['ACTIVE', 'APPROVED'].includes(seller.status)) notFound();
   if (seller.slug !== slug) permanentRedirect(`/store/${seller.slug}`);
 
   const url = absoluteUrl(`/store/${seller.slug}`);
@@ -85,58 +84,11 @@ export default async function StorePage({ params, searchParams }: PageProps) {
         ]}
       />
 
-      <header className="border-line mt-3 rounded-lg border p-5 sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="font-display text-ink text-2xl sm:text-3xl">{seller.displayName}</h1>
-              {seller.rating.average >= 4.5 ? <Badge tone="success">Top rated</Badge> : null}
-            </div>
-            {seller.tagline ? <p className="text-muted mt-1 text-sm">{seller.tagline}</p> : null}
-          </div>
-
-          <p className="text-faint text-xs">
-            {seller.kyc.registeredAddress.city}, {seller.kyc.registeredAddress.state} · Since{' '}
-            {new Date(seller.joinedAt).getFullYear()}
-          </p>
-        </div>
-
-        <p className="text-muted mt-3 max-w-3xl text-pretty text-sm">{seller.about}</p>
-
-        {/* Their record, stated plainly. */}
-        <dl className="border-line mt-5 grid grid-cols-2 gap-4 border-t pt-4 sm:grid-cols-4">
-          <Stat label="Rating" value={`${seller.rating.average}★`} hint={`${formatCompactNumber(seller.rating.count)} ratings`} />
-          <Stat
-            label="Dispatched on time"
-            value={`${seller.rating.onTimeDispatchRate}%`}
-            hint={`within ${seller.policies.dispatchSlaHours}h`}
-          />
-          <Stat
-            label="Orders shipped"
-            value={formatCompactNumber(seller.metrics.orderCount)}
-            hint="lifetime"
-          />
-          <Stat
-            label="Returns"
-            value={`${seller.rating.returnRate}%`}
-            hint={`${seller.policies.returnWindowDays}-day window`}
-          />
-        </dl>
-      </header>
+      <StoreProfile seller={seller} />
 
       <Suspense fallback={<ProductGridSkeleton className="mt-6" count={15} />}>
         <StoreListing slug={seller.slug} searchParams={searchParams} />
       </Suspense>
-    </div>
-  );
-}
-
-function Stat({ label, value, hint }: { label: string; value: string; hint: string }) {
-  return (
-    <div>
-      <dt className="text-faint text-2xs uppercase tracking-wider">{label}</dt>
-      <dd className="text-ink tabular mt-0.5 text-lg font-semibold">{value}</dd>
-      <p className="text-faint text-2xs">{hint}</p>
     </div>
   );
 }
@@ -155,6 +107,7 @@ async function StoreListing({
 
   return (
     <ListingView
+      heading={<div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-display text-xl font-semibold sm:text-2xl">Shop this store</h2><form action={basePath} className="flex w-full gap-2 sm:w-auto"><input name="q" defaultValue={query.q} aria-label="Search this store" placeholder="Search this store?" className="bg-raised border-line h-11 min-w-0 flex-1 rounded-xl border px-3 text-sm" /><button className="bg-ink text-canvas rounded-xl px-4 text-sm">Search</button></form></div>}
       result={result}
       params={raw}
       basePath={basePath}

@@ -8,6 +8,8 @@ import { PageHeader } from '@/components/console/page-header';
 import { ListingForm } from '@/components/seller/listing-form';
 import { ListingStatus } from '@/components/seller/listing-status';
 import { MediaManager } from '@/components/seller/media-manager';
+import { DemoProductsEditor } from '@/components/seller/demo-products-editor';
+import { collections } from '@/server/db/collections';
 import { VariantGrid } from '@/components/seller/variant-grid';
 import { StatusBadge } from '@/components/ui/badge';
 import { PRODUCT_STATUS_META } from '@/domain/enums';
@@ -43,6 +45,7 @@ async function Editor({ params }: { params: Promise<{ id: string }> }) {
     authoringOptions(user.sellerId),
     blockersFor(product),
   ]);
+  const demoProducts = await (await collections.products()).find({ sellerId: user.sellerId, status: 'PUBLISHED', _id: { $ne: product.id } }, { projection: { id: 1, title: 1 } }).sort({ title: 1 }).limit(500).toArray();
 
   return (
     <>
@@ -91,6 +94,7 @@ async function Editor({ params }: { params: Promise<{ id: string }> }) {
           />
 
           <MediaManager productId={product.id} media={product.media} />
+          <DemoProductsEditor productId={product.id} slug={product.slug} media={product.media} products={demoProducts.map((item) => ({ id: item.id, title: item.title }))} />
         </aside>
       </div>
     </>

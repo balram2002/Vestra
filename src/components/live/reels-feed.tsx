@@ -16,6 +16,7 @@ import { toggleWishlistItem } from '@/server/actions/wishlist';
 /** Commerce reels with custom spring navigation and one active video decoder. */
 
 export interface Reel {
+  demoPath: string;
   saved?: boolean;
   id: string;
   /** The clip. Null renders the poster alone, which is a valid reel. */
@@ -298,7 +299,7 @@ function ReelSlide({
         <RailButton
           label="Share"
           onClick={() => { void (async () => {
-            const url = `${window.location.origin}/product/${reel.productSlug}`;
+            const url = `${window.location.origin}${reel.demoPath}`;
             try {
               if (navigator.share) await navigator.share({ title: reel.productTitle, url });
               else if (navigator.clipboard) { await navigator.clipboard.writeText(url); toast.success('Link copied.'); }

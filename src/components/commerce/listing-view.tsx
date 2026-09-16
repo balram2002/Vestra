@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import type { ProductListResult, ProductSort } from '@/domain/types';
 import { cn } from '@/lib/cn';
-import type { RawSearchParams } from '@/lib/product-query';
+import { withParam, type RawSearchParams } from '@/lib/product-query';
 import { currentOwner } from '@/server/auth/session';
 import { getWishlistIds } from '@/server/services/wishlist';
 
@@ -86,7 +86,7 @@ export async function ListingView({
   );
 
   return (
-    <div className={className}>
+    <div className={cn("min-w-0", className)}>
       {heading}
 
       {/*
@@ -100,7 +100,7 @@ export async function ListingView({
       */}
       <div
         className={cn(
-          'glass border-line sticky z-30 -mx-4 mt-4 flex items-center gap-3 border-b px-4 py-2.5',
+          'glass border-line sticky z-30 -mx-4 mt-4 flex min-w-0 items-center gap-2 border-b px-4 py-2.5',
           'top-(--spacing-header) sm:-mx-6 sm:px-6 lg:hidden',
         )}
       >
@@ -114,6 +114,19 @@ export async function ListingView({
           the left edge of a 360px screen instead of scrolling.
         */}
         <SortChips activeSort={sort} params={params} basePath={basePath} className="min-w-0" />
+      </div>
+
+      <p className="text-muted mt-4 text-xs lg:hidden" role="status"><span className="text-ink font-semibold">{result.total}</span> {result.total === 1 ? 'style' : 'styles'} available</p>
+      <div aria-label="Popular filters" className="no-scrollbar mt-2 flex min-w-0 gap-2 overflow-x-auto pb-1 lg:hidden">
+        {[
+          { label: 'In stock', key: 'inStock', value: '1' },
+          { label: '4 stars & above', key: 'rating', value: '4' },
+          { label: 'Under ₹999', key: 'maxPrice', value: '999' },
+          { label: '30% off', key: 'discount', value: '30' },
+        ].map((filter) => {
+          const active = params[filter.key] === filter.value;
+          return <Link key={filter.key} href={withParam(params, filter.key, active ? null : filter.value, basePath)} aria-current={active ? 'true' : undefined} className={cn('inline-flex min-h-10 shrink-0 items-center rounded-full border px-3 text-xs', active ? 'border-ink bg-ink text-canvas font-medium' : 'border-line-control bg-raised text-muted')}>{filter.label}</Link>;
+        })}
       </div>
 
       <AppliedFilters

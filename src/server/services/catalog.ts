@@ -291,8 +291,10 @@ export function toProductSummary(
     product.sizeSystem,
   );
 
-  const primary = product.media[0];
-  const hover = product.media[1] ?? null;
+  const photographs = product.media.filter((asset) => asset.kind === 'IMAGE');
+  const primary = photographs[0];
+  const hover = photographs[1] ?? null;
+  const demoClip = product.media.find((asset) => asset.kind === 'VIDEO' && asset.role === 'REEL') ?? product.media.find((asset) => asset.kind === 'VIDEO');
 
   const colorOptions = product.colorOptions.map((value) => {
     const def = COLOR_BY_VALUE.get(value);
@@ -307,6 +309,7 @@ export function toProductSummary(
 
   return {
     id: product.id,
+    demoPath: demoClip ? `/demo/${product.slug}?clip=${encodeURIComponent(demoClip.id)}` : undefined,
     slug: product.slug,
     title: product.title,
     brandName: brand?.name ?? '',

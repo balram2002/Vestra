@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 
 import { SellerStatusActions } from '@/components/console/admin-actions';
+import { SellerStorefrontForm } from '@/components/console/seller-storefront-form';
 import { PageHeader } from '@/components/console/page-header';
 import { StatusBadge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -91,6 +92,7 @@ async function SellerDetail({ params }: { params: Promise<{ id: string }> }) {
         </p>
       ) : null}
 
+      <SellerStorefrontForm sellerId={seller.id} stats={seller.storefrontStats} />
       <div className="mt-6 grid gap-5 lg:grid-cols-2">
         <Panel title="Application">
           <Field label="Store name" value={seller.displayName} />

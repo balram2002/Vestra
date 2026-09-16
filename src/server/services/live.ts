@@ -900,6 +900,7 @@ export async function getLiveStats(sellerId: string, days = 30): Promise<LiveSta
 /* ----------------------------------------------------------------- reels */
 
 export interface ReelView {
+  demoPath: string;
   id: string;
   videoUrl: string | null;
   posterUrl: string;
@@ -1029,6 +1030,7 @@ export async function getReels(limit = 15): Promise<ReelView[]> {
     for (const clip of clips.length > 0 ? clips : [null]) {
       reels.push({
         id: clip ? `${product.id}-${clip.id}` : product.id,
+        demoPath: `/demo/${product.slug}${clip ? `?clip=${encodeURIComponent(clip.id)}` : ""}`,
         videoUrl: clip?.url ?? null,
         posterUrl: poster.url,
         // The listing's first highlight, which is written as a short selling line

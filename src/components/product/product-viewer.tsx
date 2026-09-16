@@ -127,7 +127,7 @@ function ZoomShot({ media, priority = false }: { media: Media; priority?: boolea
    * The layer is already `scale-105` at rest, which covers it: 5% of a 600px
    * well is 30px of headroom on each side.
    */
-  const parallaxX = useSlideParallax(24);
+  const parallaxX = useSlideParallax(0);
 
   return (
     <div
@@ -135,7 +135,7 @@ function ZoomShot({ media, priority = false }: { media: Media; priority?: boolea
       onPointerMove={track}
       onPointerLeave={leave}
       className={cn(
-        'bg-sunken relative aspect-4/5 w-full overflow-hidden rounded-xl sm:aspect-3/4',
+        'bg-sunken relative h-[min(32svh,22rem)] min-h-56 w-full overflow-hidden rounded-2xl lg:h-[min(72dvh,44rem)]',
         // Only advertise the affordance where it exists.
         !reduced && 'lg:cursor-zoom-in',
       )}
@@ -151,7 +151,7 @@ function ZoomShot({ media, priority = false }: { media: Media; priority?: boolea
           // Only the first is the LCP candidate; the rest are a swipe away.
           priority={priority}
           sizes="(max-width: 64rem) 100vw, 46vw"
-          className="object-cover"
+          className="object-contain"
         />
       </motion.div>
 
@@ -294,7 +294,7 @@ export function ProductViewer({
   };
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_25rem] lg:gap-14">
+    <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:gap-10 xl:gap-14">
       {/* ------------------------------------------------------- gallery */}
 
       {/*
@@ -308,12 +308,12 @@ export function ProductViewer({
         replacing it. Swiping works, the desktop click still works, and there is
         one set of images in the DOM instead of a mobile copy and a desktop copy.
       */}
-      <div className="flex flex-col-reverse gap-3 lg:flex-row lg:gap-4">
+      <div className="min-w-0 flex flex-col-reverse gap-3 lg:sticky lg:top-28 lg:self-start lg:flex-row lg:gap-4">
         {gallery.length > 1 ? (
           <div
             aria-label={`${title} images`}
             role="group"
-            className="scrollbar-none flex gap-2 overflow-x-auto lg:w-16 lg:flex-col lg:overflow-visible"
+            className="scrollbar-none flex max-w-full gap-2 overflow-x-auto p-1 lg:max-h-[72dvh] lg:w-16 lg:shrink-0 lg:flex-col lg:overflow-y-auto"
           >
             {gallery.map((item, index) => (
               <button
@@ -408,7 +408,7 @@ export function ProductViewer({
                 controls
                 playsInline
                 preload="metadata"
-                className="bg-sunken aspect-4/5 w-full rounded-xl object-cover sm:aspect-3/4"
+                className="bg-sunken h-[min(32svh,22rem)] min-h-56 w-full rounded-2xl object-contain lg:h-[min(72dvh,44rem)]"
               >
                 <track kind="captions" />
               </video>
@@ -419,7 +419,7 @@ export function ProductViewer({
 
       {/* ------------------------------------------------------ buy box */}
 
-      <div className="lg:sticky lg:top-28 lg:self-start">
+      <div className="bg-raised border-line min-w-0 rounded-2xl border p-4 sm:p-6 lg:self-start">
         {header}
 
         <div className="space-y-6">
@@ -572,7 +572,7 @@ export function ProductViewer({
           */}
           <div
             className={cn(
-              'glass border-line fixed inset-x-0 z-30 flex items-center gap-3 border-t px-4 py-2.5 lg:hidden',
+              'glass border-line fixed inset-x-0 z-30 flex items-center gap-2 border-t px-3 py-2.5 lg:hidden',
               // Sits directly on top of the bottom navigation, using its own
               // token rather than a hardcoded 3.5rem — the two used to drift
               // apart every time the bar's height changed.
@@ -615,14 +615,7 @@ export function ProductViewer({
               className="shrink-0"
             />
 
-            <WishlistButton
-              productId={productId}
-              productTitle={title}
-              size="lg"
-              variant="outline"
-            />
-
-            <Button size="cta" shape="pill" onClick={handleAdd} loading={pending} className="flex-1">
+            <Button size="cta" shape="pill" onClick={handleAdd} loading={pending} className="min-w-0 flex-1 px-3 text-sm">
               {!pending ? <ShoppingBag className="size-4" /> : null}
               Add to bag
             </Button>

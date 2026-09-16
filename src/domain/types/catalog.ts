@@ -38,6 +38,8 @@ export interface Media {
   role?: MediaRole;
   /** Seconds. Video only, and only when the browser reported it. */
   durationSeconds?: number | null;
+  /** Other products explicitly featured in this clip, scoped to the same seller. */
+  featuredProductIds?: string[];
 }
 
 /* -------------------------------------------------------------- taxonomy */
@@ -272,6 +274,7 @@ export interface ProductStats {
  * discount maths.
  */
 export interface ProductSummary {
+  demoPath?: string;
   id: string;
   slug: string;
   title: string;

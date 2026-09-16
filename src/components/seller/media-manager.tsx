@@ -55,9 +55,9 @@ export function MediaManager({ productId, media }: { productId: string; media: M
         </p>
       </header>
 
-      {media.length > 0 ? (
+      {images.length > 0 ? (
         <ul className="mb-4 grid grid-cols-3 gap-3 sm:grid-cols-4">
-          {media.map((asset, index) => (
+          {images.map((asset, index) => (
             <li key={asset.id} className="group relative">
               <div className="bg-sunken relative aspect-3/4 overflow-hidden rounded-md">
                 <Image
