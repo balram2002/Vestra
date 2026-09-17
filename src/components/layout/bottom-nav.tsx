@@ -126,7 +126,7 @@ export function BottomNavBar({
     <nav
       aria-label="Primary"
       className={cn(
-        'glass border-line fixed inset-x-0 bottom-0 z-40 border-t',
+        'bg-raised border-line fixed inset-x-0 bottom-0 z-40 border-t shadow-[0_-6px_22px_rgba(0,0,0,0.05)]',
         'pb-[env(safe-area-inset-bottom)] lg:hidden',
       )}
     >

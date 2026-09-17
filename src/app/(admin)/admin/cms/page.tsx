@@ -7,6 +7,7 @@ import {
   AdoptDefaultSlidesButton,
   BannerDialog,
   BannerToggle,
+  DeleteHeroBannerButton,
   MoveBannerButtons,
 } from '@/components/console/banner-manager';
 import { ResetPlacementButton } from '@/components/console/banner-placement-reset';
@@ -163,8 +164,7 @@ function BannerRow({
                       first={index === 0}
                       last={index === banners.length - 1}
                     />
-                    {/* No delete here, on purpose: a slide that should come down
-                        is set to Hidden, and stays in this list ready to return. */}
+                    {placement === 'HOME_HERO' ? <DeleteHeroBannerButton bannerId={banner.id} name={banner.name} /> : null}
                     <BannerDialog banner={banner} />
                   </div>
                 </div>

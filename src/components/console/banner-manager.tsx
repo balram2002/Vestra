@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowDown, ArrowUp, Eye, EyeOff, Pencil, Plus, Sparkles } from 'lucide-react';
+import { ArrowDown, ArrowUp, Eye, EyeOff, Pencil, Plus, Sparkles, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 import { useId, useState, useTransition } from 'react';
 import { toast } from 'sonner';
@@ -16,6 +16,7 @@ import { cn } from '@/lib/cn';
 import {
   adoptDefaultHeroSlides,
   createBanner,
+  deleteHeroBanner,
   moveBanner,
   setBannerActive,
   updateBanner,
@@ -36,7 +37,7 @@ type FieldErrors = Partial<Record<string, string>>;
 type Placement = 'HOME_HERO' | 'HOME_GRID';
 
 /** A link worth previewing: an upload, or a complete https address. */
-const previewable = (url: string) => /^(https:\/\/[^\s/]+\.[^\s/]+\/\S*|\/api\/media\/\S+)$/.test(url);
+const previewable = (url: string) => /^(https:\/\/[^\s/]+\.[^\s/]+\/\S*|\/api\/media\/\S+|\/hero\/[\w.-]+\.(?:jpe?g|png|webp))$/.test(url);
 
 function useRun() {
   const [pending, startTransition] = useTransition();
@@ -108,6 +109,7 @@ function BannerForm({
   const formId = useId();
   const [errors, setErrors] = useState<FieldErrors>({});
   const [imageUrl, setImageUrl] = useState(banner?.imageUrl ?? '');
+  const [mobileImageUrl, setMobileImageUrl] = useState(banner?.mobileImageUrl ?? '');
   const [pending, startTransition] = useTransition();
 
   const submit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -119,6 +121,7 @@ function BannerForm({
       name: read('name'),
       placement: read('placement') === 'HOME_GRID' ? 'HOME_GRID' : 'HOME_HERO',
       imageUrl: imageUrl.trim(),
+      mobileImageUrl: mobileImageUrl.trim(),
       alt: read('alt'),
       eyebrow: read('eyebrow'),
       headline: read('headline'),
@@ -224,6 +227,16 @@ function BannerForm({
             error={errors.alt}
           />
         </fieldset>
+
+        {placement !== 'HOME_GRID' && banner?.placement !== 'HOME_GRID' ? (
+          <fieldset className="space-y-3">
+            <legend className="text-ink text-sm font-semibold">Phone image</legend>
+            <p className="text-muted text-xs">Optional portrait crop. Leave blank to use the desktop image on phones.</p>
+            {previewable(mobileImageUrl) ? <div className="bg-sunken relative mx-auto aspect-4/5 w-40 overflow-hidden rounded-md"><Image src={mobileImageUrl} alt="" fill sizes="160px" className="object-cover" /></div> : null}
+            <FileUpload purpose="listing" multiple={false} label="Upload a phone image" hint="A portrait crop around 900 by 1125 pixels works well." onUploaded={(file) => setMobileImageUrl(file.url)} />
+            <Input label="Or a link to the phone image" name="mobileImageUrl" type="url" inputMode="url" placeholder="https://" value={mobileImageUrl} onChange={(event) => setMobileImageUrl(event.target.value)} error={errors.mobileImageUrl} />
+          </fieldset>
+        ) : null}
 
         <fieldset className="space-y-3">
           <legend className="text-ink mb-3 text-sm font-semibold">Words and link</legend>
@@ -343,6 +356,20 @@ export function BannerToggle({
         }
       />
     </div>
+  );
+}
+
+export function DeleteHeroBannerButton({ bannerId, name }: { bannerId: string; name: string }) {
+  const { pending, run } = useRun();
+  return (
+    <ConfirmDialog
+      trigger={<Button type="button" size="xs" variant="ghost" disabled={pending} aria-label={`Delete ${name}`}><Trash2 className="size-3.5" aria-hidden />Delete</Button>}
+      title={`Delete “${name}”?`}
+      description="This removes the slide and its settings. If you remove the last live slide, the built-in hero slides appear again."
+      confirmLabel="Delete slide"
+      tone="danger"
+      onConfirm={() => run(() => deleteHeroBanner({ bannerId }), `${name} deleted`)}
+    />
   );
 }
 

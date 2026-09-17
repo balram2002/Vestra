@@ -74,7 +74,7 @@ export async function stripCategories(section: HomeSection): Promise<Category[]>
   const all = await getCategoryTree();
   const chosen = section.config.categoryIds ?? [];
 
-  if (chosen.length > 0) {
+  if (section.config.categoryMode === 'MANUAL' || (chosen.length > 0 && section.config.categoryMode !== 'AUTO')) {
     return inChosenOrder(
       all.filter((category) => category.isActive),
       chosen,

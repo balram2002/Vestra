@@ -1152,6 +1152,7 @@ const bannerSchema = z.object({
   name: z.string().trim().min(2, 'Name the banner, for this list.').max(60),
   placement: z.enum(['HOME_HERO', 'HOME_GRID']),
   imageUrl: z.string().trim().min(1, 'Upload an image, or paste a link to one.').max(1000),
+  mobileImageUrl: z.string().trim().max(1000).optional(),
   alt: z.string().trim().min(3, 'Describe the image for people who cannot see it.').max(160),
   eyebrow: z.string().trim().max(40, 'Keep the label short.'),
   headline: z.string().trim().max(80),
@@ -1163,7 +1164,7 @@ const bannerSchema = z.object({
 export type BannerInput = z.infer<typeof bannerSchema>;
 
 /** The image must be an upload or https; the link must stay on this site or be https. */
-function bannerLinkProblem(data: Pick<BannerInput, 'imageUrl' | 'href'>): ActionResult | null {
+function bannerLinkProblem(data: Pick<BannerInput, 'imageUrl' | 'mobileImageUrl' | 'href'>): ActionResult | null {
   // An upload, an https link, or one of the default slides' own pictures,
   // which a customised default slide keeps until someone replaces it.
   if (
@@ -1172,6 +1173,9 @@ function bannerLinkProblem(data: Pick<BannerInput, 'imageUrl' | 'href'>): Action
     !/^\/hero\/[\w.-]+\.(?:jpe?g|png|webp)$/.test(data.imageUrl)
   ) {
     return fail('imageUrl', 'Upload the image, or use an https:// link.');
+  }
+  if (data.mobileImageUrl && !/^https:\/\/\S+$/.test(data.mobileImageUrl) && !/^\/api\/media\/\S+$/.test(data.mobileImageUrl) && !/^\/hero\/[\w.-]+\.(?:jpe?g|png|webp)$/.test(data.mobileImageUrl)) {
+    return fail('mobileImageUrl', 'Upload the phone image, or use an https:// link.');
   }
   if (!/^\/(?!\/)\S*$/.test(data.href) && !/^https:\/\/\S+$/.test(data.href)) {
     return fail('href', 'Use a path on this site, like /category/kurtas, or an https:// link.');
@@ -1209,7 +1213,7 @@ export async function createBanner(input: BannerInput): Promise<ActionResult> {
     ctaLabel: data.ctaLabel || null,
     href: data.href,
     imageUrl: data.imageUrl,
-    mobileImageUrl: null,
+    mobileImageUrl: data.mobileImageUrl || null,
     alt: data.alt,
     // The storefront sets banner type in white over the photograph.
     theme: 'light',
@@ -1275,7 +1279,7 @@ export async function updateBanner(input: BannerInput & { bannerId: string }): P
     ctaLabel: data.ctaLabel || null,
     href: data.href,
     imageUrl: data.imageUrl,
-    mobileImageUrl: data.imageUrl === banner.imageUrl ? banner.mobileImageUrl : null,
+    mobileImageUrl: data.mobileImageUrl === undefined ? banner.mobileImageUrl : data.mobileImageUrl || null,
     alt: data.alt,
     ...(moved ? { position: last ? last.position + 1 : 0 } : {}),
     updatedAt: new Date().toISOString(),
@@ -1290,9 +1294,24 @@ export async function updateBanner(input: BannerInput & { bannerId: string }): P
     entityType: 'banner',
     entityId: banner.id,
     entityLabel: data.name,
-    changes: audit.diff(banner, patch, ['name', 'placement', 'headline', 'href', 'imageUrl']),
+    changes: audit.diff(banner, patch, ['name', 'placement', 'headline', 'href', 'imageUrl', 'mobileImageUrl']),
   });
 
+  revalidatePath('/admin/cms');
+  revalidatePath('/');
+  return { ok: true };
+}
+
+/** Remove one hero slide. Remaining positions still sort correctly. */
+export async function deleteHeroBanner(input: { bannerId: string }): Promise<ActionResult> {
+  const actor = await requirePermission('cms:write');
+  const banners = await collections.banners();
+  const banner = toEntity(await banners.findOne({ _id: input.bannerId }));
+  if (!banner || banner.placement !== 'HOME_HERO') return { ok: false, error: 'Hero slide not found.' };
+
+  await banners.deleteOne({ _id: banner.id, placement: 'HOME_HERO' });
+  invalidate([tags.content]);
+  await audit.record({ actor, action: 'cms.banner.delete', entityType: 'banner', entityId: banner.id, entityLabel: banner.name, severity: 'NOTICE' });
   revalidatePath('/admin/cms');
   revalidatePath('/');
   return { ok: true };

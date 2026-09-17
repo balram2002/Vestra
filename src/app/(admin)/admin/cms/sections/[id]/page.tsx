@@ -5,6 +5,7 @@ import { Suspense } from 'react';
 import { SectionEditorPage } from '@/components/console/section-editor-page';
 import { requirePermission } from '@/server/auth/session';
 import { collections, toEntity } from '@/server/db/collections';
+import { stripCategories } from '@/server/services/section-items';
 
 export const metadata: Metadata = { title: 'Edit section' };
 
@@ -42,7 +43,10 @@ async function Editor({ params }: { params: Promise<{ id: string }> }) {
 
   // Keyed by the last write, so a save, a reset or a visibility change
   // remounts the editor from what is now stored rather than from a stale draft.
-  return <SectionEditorPage key={section.updatedAt} section={section} back={back} />;
+  const displayedCategories = section.kind === 'CATEGORY_STRIP'
+    ? (await stripCategories({ ...section, config: { ...section.config, categoryMode: 'AUTO' } })).map(({ id, name, imageUrl }) => ({ id, label: name, imageUrl }))
+    : [];
+  return <SectionEditorPage key={section.updatedAt} section={section} back={back} displayedCategories={displayedCategories} />;
 }
 
 function EditorSkeleton() {

@@ -323,6 +323,11 @@ export interface HomeSection {
 }
 
 export interface HomeSectionConfig {
+  /** Independent visual compositions; absent means the shipped layout. */
+  layoutDesktop?: 'DEFAULT' | 'FEATURED' | 'MOSAIC';
+  layoutMobile?: 'DEFAULT' | 'FEATURED' | 'MOSAIC';
+  /** Auto keeps the existing shelf selection; manual may intentionally be empty. */
+  categoryMode?: 'AUTO' | 'MANUAL';
   /** For PRODUCT_RAIL: how products are chosen. */
   source?: 'MANUAL' | 'NEW_ARRIVALS' | 'BESTSELLERS' | 'TRENDING' | 'DEALS' | 'RECOMMENDED' | 'CATEGORY' | 'BRAND';
   productIds?: string[];

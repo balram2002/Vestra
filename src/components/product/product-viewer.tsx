@@ -571,12 +571,13 @@ export function ProductViewer({
             pending flag. Only the position differs.
           */}
           <div
+            style={{ margin: 0 }}
             className={cn(
-              'glass border-line fixed inset-x-0 z-30 flex items-center gap-2 border-t px-3 py-2.5 lg:hidden',
+              'bg-raised border-line fixed inset-x-0 z-30 flex min-h-16 items-center gap-2 border-t px-3 py-2 shadow-[0_-8px_24px_rgba(0,0,0,0.08)] lg:hidden',
               // Sits directly on top of the bottom navigation, using its own
               // token rather than a hardcoded 3.5rem — the two used to drift
               // apart every time the bar's height changed.
-              'bottom-(--spacing-bottom-nav)',
+              'bottom-[calc(var(--spacing-bottom-nav)+env(safe-area-inset-bottom))]',
             )}
           >
             {quoted ? (

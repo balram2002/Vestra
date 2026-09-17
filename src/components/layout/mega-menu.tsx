@@ -39,7 +39,7 @@ export function MegaMenu({
     <nav aria-label="Departments" className="hidden h-full min-w-0 lg:block">
       <ul className="flex h-full items-stretch">
         {menu.map(({ department, groups }) => (
-          <li key={department.id} className="group static flex items-stretch">
+          <li key={department.id} className="mega-department group static flex items-stretch">
             <Link
               href={`/category/${department.slug}`}
               className={cn(
@@ -94,8 +94,7 @@ export function MegaMenu({
                    */
                   'group-hover:visible group-hover:translate-y-0 group-hover:opacity-100',
                   'group-hover:[transition-delay:130ms]',
-                  'group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100',
-                  'group-focus-within:[transition-delay:0ms]',
+                  'mega-panel',
                 )}
               >
                 <div className="shell-max gutter grid grid-cols-4 gap-x-8 gap-y-7 py-8 xl:grid-cols-5">

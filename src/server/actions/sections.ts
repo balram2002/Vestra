@@ -75,6 +75,9 @@ const KIND_DEFAULTS: Partial<Record<HomeSectionKind, Partial<HomeSection>>> = {
 };
 
 const configSchema = z.object({
+  layoutDesktop: z.enum(['DEFAULT', 'FEATURED', 'MOSAIC']).optional(),
+  layoutMobile: z.enum(['DEFAULT', 'FEATURED', 'MOSAIC']).optional(),
+  categoryMode: z.enum(['AUTO', 'MANUAL']).optional(),
   source: z
     .enum(['MANUAL', 'NEW_ARRIVALS', 'BESTSELLERS', 'TRENDING', 'DEALS', 'RECOMMENDED', 'CATEGORY', 'BRAND'])
     .optional(),

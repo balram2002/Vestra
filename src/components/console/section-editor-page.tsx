@@ -48,9 +48,11 @@ function editable(section: HomeSection) {
 export function SectionEditorPage({
   section,
   back,
+  displayedCategories,
 }: {
   section: HomeSection;
   back: { href: string; label: string };
+  displayedCategories: Array<{ id: string; label: string; imageUrl: string | null }>;
 }) {
   const router = useRouter();
   const [draft, setDraft] = useState(section);
@@ -214,7 +216,7 @@ export function SectionEditorPage({
       {/* ---------------------------------------------------- the work */}
       <div className="mt-5 grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
         <div className="min-w-0">
-          <SectionForm draft={draft} update={setDraft} />
+          <SectionForm draft={draft} update={setDraft} displayedCategories={displayedCategories} />
         </div>
 
         <aside className="min-w-0 xl:sticky xl:top-28 xl:self-start">

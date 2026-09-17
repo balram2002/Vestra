@@ -62,7 +62,13 @@ function connect(): Promise<MongoClient> {
   if (global.__vestraMongo) return global.__vestraMongo.promise;
 
   const client = new MongoClient(uri(), options);
-  const promise = client.connect();
+  const promise = client.connect().catch(async (error: unknown) => {
+    // A cold database can miss the first connection window. Keep the pool
+    // shared, but let the next request establish a fresh one after recovery.
+    if (global.__vestraMongo?.client === client) global.__vestraMongo = undefined;
+    await client.close();
+    throw error;
+  });
   global.__vestraMongo = { client, promise };
   return promise;
 }

@@ -68,7 +68,7 @@ const COUNT_ONLY: Array<HomeSection['kind']> = [
   'TESTIMONIALS',
 ];
 
-export function SectionForm({ draft, update }: { draft: HomeSection; update: DraftUpdate }) {
+export function SectionForm({ draft, update, displayedCategories = [] }: { draft: HomeSection; update: DraftUpdate; displayedCategories?: ItemOption[] }) {
   const config = draft.config ?? {};
   const kind = draft.kind;
 
@@ -84,6 +84,17 @@ export function SectionForm({ draft, update }: { draft: HomeSection; update: Dra
 
   return (
     <div className="space-y-4">
+      <FormCard title="Layout by screen" description="Change the composition without changing this section's content. Layout 1 is the current design.">
+        <div className="grid gap-3 sm:grid-cols-2">
+          {(['layoutDesktop', 'layoutMobile'] as const).map((field) => (
+            <Select key={field} label={field === 'layoutDesktop' ? 'Desktop layout' : 'Mobile layout'} value={config[field] ?? 'DEFAULT'} onChange={(event) => setConfig({ [field]: event.target.value } as Partial<HomeSectionConfig>)}>
+              <option value="DEFAULT">Layout 1 · Default</option>
+              <option value="FEATURED">Layout 2 · Featured</option>
+              <option value="MOSAIC">Layout 3 · Mosaic</option>
+            </Select>
+          ))}
+        </div>
+      </FormCard>
       {kind === 'VALUE_PROPS' ? (
         <Note>
           The promises themselves are site-wide copy, edited under{' '}
@@ -246,11 +257,18 @@ export function SectionForm({ draft, update }: { draft: HomeSection; update: Dra
 
       {picks ? (
         <FormCard title={picks.label} description={picks.help}>
+          {kind === 'CATEGORY_STRIP' ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+              <span className="text-muted">{config.categoryMode === 'MANUAL' || (config.categoryIds?.length && config.categoryMode !== 'AUTO') ? 'Showing your selected categories' : 'Showing the current automatic categories below'}</span>
+              <button type="button" className="text-accent-ink underline" onClick={() => setConfig({ categoryMode: 'AUTO', categoryIds: [] })}>Use automatic selection</button>
+            </div>
+          ) : null}
           <ItemPicker
             kind={picks.kind}
             label={picks.label}
-            ids={picks.ids}
-            onChange={(ids) => setConfig({ [picks.field]: ids } as Partial<HomeSectionConfig>)}
+            ids={kind === 'CATEGORY_STRIP' && config.categoryMode !== 'MANUAL' && !(config.categoryIds?.length && config.categoryMode !== 'AUTO') ? displayedCategories.map((item) => item.id) : picks.ids}
+            initialItems={kind === 'CATEGORY_STRIP' ? displayedCategories : []}
+            onChange={(ids) => setConfig({ [picks.field]: ids, ...(kind === 'CATEGORY_STRIP' ? { categoryMode: 'MANUAL' } : {}) } as Partial<HomeSectionConfig>)}
           />
         </FormCard>
       ) : null}
@@ -420,11 +438,13 @@ function ItemPicker({
   kind,
   label,
   ids,
+  initialItems = [],
   onChange,
 }: {
   kind: PickerKind;
   label: string;
   ids: string[];
+  initialItems?: ItemOption[];
   onChange: (ids: string[]) => void;
 }) {
   /*
@@ -479,7 +499,7 @@ function ItemPicker({
   const searching = query.trim().length >= 2;
   const loading = searching && found?.query !== query.trim();
   const results = searching && found?.query === query.trim() ? found.items : [];
-  const chosen = ids.map((id) => known[id] ?? { id, label: '…' });
+  const chosen = ids.map((id) => known[id] ?? initialItems.find((item) => item.id === id) ?? { id, label: '…' });
 
   const add = (item: ItemOption) => {
     if (ids.includes(item.id)) return;

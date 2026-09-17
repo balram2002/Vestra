@@ -154,7 +154,7 @@ export function MobileNav({
             swapping. The container clips, so the outgoing panel disappears at
             the edge instead of overflowing the drawer.
           */}
-          <div className="relative min-h-0 flex-1" onClick={closeOnNavigate}>
+          <div className="relative min-h-0 flex-1 overflow-hidden" onClick={closeOnNavigate}>
             <AnimatePresence initial={false}>
               {active ? (
                 <motion.div
@@ -199,9 +199,9 @@ export function MobileNav({
               ) : (
                 <motion.div
                   key="root"
-                  initial={reduced ? false : { x: '-30%', opacity: 0.4 }}
+                  initial={reduced ? false : { x: '-100%', opacity: 0.8 }}
                   animate={{ x: 0, opacity: 1 }}
-                  exit={reduced ? undefined : { x: '-30%', opacity: 0.4 }}
+                  exit={reduced ? undefined : { x: '-100%', opacity: 0.8 }}
                   transition={spring.base}
                   className="absolute inset-0 overflow-y-auto overscroll-contain p-2"
                 >

@@ -22,6 +22,7 @@ import { BrandStrip } from './brand-strip';
 import { CategoryRail } from './category-rail';
 import { Editorial } from './editorial';
 import { HeroCarousel, HeroSkeleton } from './hero-carousel';
+import { DesktopHeroCarousel } from './desktop-hero-carousel';
 import { ProductRail } from './product-rail';
 import { ReelsStrip } from './reels-strip';
 import { SellerSpotlight } from './seller-spotlight';
@@ -58,7 +59,7 @@ export function PageSections({ sections }: { sections: HomeSection[] }) {
   return (
     <div className="pb-8">
       {sections.map((section) => (
-        <DeviceScope key={section.id} visibleOn={section.visibleOn}>
+        <DeviceScope key={section.id} visibleOn={section.visibleOn} section={section}>
           <SectionRenderer section={section} priority={section.id === firstRailId} />
         </DeviceScope>
       ))}
@@ -76,15 +77,20 @@ export function PageSections({ sections }: { sections: HomeSection[] }) {
  */
 function DeviceScope({
   visibleOn,
+  section,
   children,
 }: {
   visibleOn: HomeSection['visibleOn'];
+  section: HomeSection;
   children: React.ReactNode;
 }) {
-  if (visibleOn === 'ALL') return <>{children}</>;
-
   return (
-    <div className={cn(visibleOn === 'MOBILE' ? 'lg:hidden' : 'hidden lg:block')}>{children}</div>
+    <div
+      data-home-section={section.kind}
+      data-home-mobile={section.config.layoutMobile ?? 'DEFAULT'}
+      data-home-desktop={section.config.layoutDesktop ?? 'DEFAULT'}
+      className={cn(visibleOn === 'MOBILE' && 'lg:hidden', visibleOn === 'DESKTOP' && 'hidden lg:block')}
+    >{children}</div>
   );
 }
 
@@ -93,7 +99,7 @@ function SectionRenderer({ section, priority }: { section: HomeSection; priority
     case 'HERO_CAROUSEL':
       return (
         <Suspense fallback={<HeroSkeleton />}>
-          <HeroSection />
+          <HeroSection section={section} />
         </Suspense>
       );
 
@@ -171,8 +177,9 @@ function SectionRenderer({ section, priority }: { section: HomeSection; priority
 
 /* ----------------------------------------------------------- data wrappers */
 
-async function HeroSection() {
-  return <HeroCarousel banners={await getHeroSlides()} />;
+async function HeroSection({ section }: { section: HomeSection }) {
+  const banners = await getHeroSlides();
+  return <><div className="lg:hidden"><HeroCarousel banners={banners} /></div><div className="hidden lg:block"><DesktopHeroCarousel banners={banners} layout={section.config.layoutDesktop ?? 'DEFAULT'} /></div></>;
 }
 
 async function CategorySection({ section }: { section: HomeSection }) {
