@@ -1,7 +1,8 @@
 import { Suspense } from 'react';
 
 import { ProductRailSkeleton } from '@/components/skeletons/product-card-skeleton';
-import type { HomeSection } from '@/domain/types';
+import { DEFAULT_HERO_SLIDES } from '@/config/home';
+import type { Banner, HomeSection } from '@/domain/types';
 import { cn } from '@/lib/cn';
 import { getHeroSlides } from '@/server/services/content';
 import { getReels } from '@/server/services/live';
@@ -45,7 +46,17 @@ import { ValueProps } from './value-props';
  * AN UNKNOWN KIND RENDERS NOTHING. The composition data can always be ahead of
  * the code -- a section added by a newer deploy must not crash an older one.
  */
-export function PageSections({ sections }: { sections: HomeSection[] }) {
+export function PageSections({
+  sections,
+  banners,
+}: {
+  sections: HomeSection[];
+  /**
+   * The hero slides and grid tiles to use instead of the published ones. Only
+   * the draft preview passes this: it shows the working copy, not the page.
+   */
+  banners?: Banner[];
+}) {
   /*
    * Which rail gets `priority`.
    *
@@ -60,7 +71,7 @@ export function PageSections({ sections }: { sections: HomeSection[] }) {
     <div className="pb-8">
       {sections.map((section) => (
         <DeviceScope key={section.id} visibleOn={section.visibleOn} section={section}>
-          <SectionRenderer section={section} priority={section.id === firstRailId} />
+          <SectionRenderer section={section} priority={section.id === firstRailId} banners={banners} />
         </DeviceScope>
       ))}
     </div>
@@ -94,12 +105,12 @@ function DeviceScope({
   );
 }
 
-function SectionRenderer({ section, priority }: { section: HomeSection; priority: boolean }) {
+function SectionRenderer({ section, priority, banners }: { section: HomeSection; priority: boolean; banners?: Banner[] }) {
   switch (section.kind) {
     case 'HERO_CAROUSEL':
       return (
         <Suspense fallback={<HeroSkeleton />}>
-          <HeroSection section={section} />
+          <HeroSection section={section} banners={banners} />
         </Suspense>
       );
 
@@ -141,7 +152,7 @@ function SectionRenderer({ section, priority }: { section: HomeSection; priority
     case 'BANNER_GRID':
       return (
         <Suspense fallback={<GridSkeleton />}>
-          <GridSection section={section} />
+          <GridSection section={section} banners={banners} />
         </Suspense>
       );
 
@@ -177,8 +188,9 @@ function SectionRenderer({ section, priority }: { section: HomeSection; priority
 
 /* ----------------------------------------------------------- data wrappers */
 
-async function HeroSection({ section }: { section: HomeSection }) {
-  const banners = await getHeroSlides();
+async function HeroSection({ section, banners: override }: { section: HomeSection; banners?: Banner[] }) {
+  const own = override?.filter((banner) => banner.placement === 'HOME_HERO');
+  const banners = own ? (own.length > 0 ? own : DEFAULT_HERO_SLIDES) : await getHeroSlides();
   return <><div className="lg:hidden"><HeroCarousel banners={banners} /></div><div className="hidden lg:block"><DesktopHeroCarousel banners={banners} layout={section.config.layoutDesktop ?? 'DEFAULT'} /></div></>;
 }
 
@@ -190,8 +202,8 @@ async function RailSection({ section, priority }: { section: HomeSection; priori
   return <ProductRail section={section} products={await railProducts(section)} priority={priority} />;
 }
 
-async function GridSection({ section }: { section: HomeSection }) {
-  return <BannerGrid banners={await gridBanners(section)} />;
+async function GridSection({ section, banners }: { section: HomeSection; banners?: Banner[] }) {
+  return <BannerGrid banners={await gridBanners(section, banners?.filter((banner) => banner.placement === 'HOME_GRID'))} />;
 }
 
 async function BrandSection({ section }: { section: HomeSection }) {

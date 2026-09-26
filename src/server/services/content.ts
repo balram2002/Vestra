@@ -3,11 +3,13 @@ import 'server-only';
 import { cacheLife, cacheTag } from 'next/cache';
 
 import { DEFAULT_HERO_SLIDES } from '@/config/home';
+import { COMPOSITION_PAGES, isCompositionPage, visibleNow } from '@/domain/compositions';
 import type { Banner, CmsPage, HomeSection } from '@/domain/types';
 
 import { collections, toEntities, toEntity } from '../db/collections';
 import { tags } from './cache-tags';
 import { categoryPageDefaults } from './category-page';
+import { publishedComposition } from './compositions';
 
 /**
  * CMS content.
@@ -35,6 +37,16 @@ export async function getPageSections(page: string): Promise<HomeSection[]> {
   cacheTag(tags.content);
   cacheLife('minutes');
 
+  // A composed page that has been published reads its published snapshot;
+  // the working copy is a draft (see services/compositions).
+  if (isCompositionPage(page)) {
+    const published = await publishedComposition(page);
+    if (published) {
+      if (page === 'categories' && published.sections.length === 0) return categoryPageDefaults();
+      return visibleNow(published.sections, Date.now());
+    }
+  }
+
   const sections = await collections.homeSections();
   const scope =
     page === 'home' ? { $or: [{ page }, { page: { $exists: false } }] } : { page };
@@ -60,6 +72,13 @@ export async function getBanners(placement: Banner['placement']): Promise<Banner
   'use cache';
   cacheTag(tags.content);
   cacheLife('minutes');
+
+  const home = COMPOSITION_PAGES.home.placements.includes(placement)
+    ? await publishedComposition('home')
+    : null;
+  if (home) {
+    return visibleNow(home.banners.filter((banner) => banner.placement === placement), Date.now());
+  }
 
   const banners = await collections.banners();
   const docs = await banners

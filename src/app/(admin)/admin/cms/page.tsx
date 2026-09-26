@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Image from 'next/image';
 import { Suspense } from 'react';
 
+import { CompositionBar } from '@/components/console/composition-bar';
 import { SectionBuilder } from '@/components/console/section-builder';
 import {
   AdoptDefaultSlidesButton,
@@ -18,6 +19,7 @@ import type { Banner } from '@/domain/types';
 import { formatDateShort } from '@/lib/format';
 import { requirePermission } from '@/server/auth/session';
 import { collections, toEntities } from '@/server/db/collections';
+import { getCompositionState } from '@/server/services/compositions';
 
 export const metadata: Metadata = { title: 'Homepage' };
 
@@ -33,7 +35,7 @@ export default function AdminCmsPage() {
     <>
       <PageHeader
         title="Homepage"
-        description="The hero slides, the tile grid and the sections of the storefront homepage, in the order shoppers see them."
+        description="The hero slides, the tile grid and the sections of the storefront homepage, in the order shoppers see them. Changes are drafts until published."
       />
 
       <Suspense fallback={<div className="skeleton mt-6 h-96 rounded-lg" aria-hidden />}>
@@ -45,6 +47,8 @@ export default function AdminCmsPage() {
 
 async function Composition() {
   await requirePermission('cms:write');
+  // First, so the baseline exists before anything else is read.
+  const state = await getCompositionState('home');
 
   const [sectionCol, bannerCol] = await Promise.all([
     collections.homeSections(),
@@ -62,6 +66,7 @@ async function Composition() {
 
   return (
     <div className="mt-6 space-y-10">
+      <CompositionBar state={state} />
       <SectionBuilder page="home" sections={sections} addable={ADDABLE_SECTION_KINDS} />
 
       <BannerRow

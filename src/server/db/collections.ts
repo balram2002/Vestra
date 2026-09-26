@@ -154,6 +154,8 @@ export const COLLECTIONS = {
   siteContent: 'siteContent',
   /** One document per designable page: published, draft, schedule, history. */
   pageDesigns: 'pageDesigns',
+  /** Published snapshots of composed pages (homepage, shop page) and their history. */
+  compositions: 'compositions',
   homeSections: 'homeSections',
   banners: 'banners',
   cmsPages: 'cmsPages',

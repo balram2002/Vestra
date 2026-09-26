@@ -107,8 +107,9 @@ export async function spotlightSellers(section: HomeSection): Promise<Seller[]> 
   return sellers.filter((seller) => seller.metrics.liveProductCount > 0).slice(0, limit);
 }
 
-export async function gridBanners(section: HomeSection): Promise<Banner[]> {
-  const banners = await getBanners('HOME_GRID');
+export async function gridBanners(section: HomeSection, override?: Banner[]): Promise<Banner[]> {
+  // `override` is the draft preview's working copy; everything else reads live.
+  const banners = override ?? (await getBanners('HOME_GRID'));
   const chosen = section.config.bannerIds ?? [];
   return chosen.length > 0 ? inChosenOrder(banners, chosen) : banners;
 }

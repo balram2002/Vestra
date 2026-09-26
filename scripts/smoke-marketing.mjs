@@ -223,6 +223,50 @@ try {
   await staff.getByRole('dialog').getByRole('button', { name: 'Archive' }).click();
   await staff.getByText(`${promo} archived`).waitFor({ timeout: 30000 });
   check('A promotion can be archived', true);
+
+  /* ------------------------------------------------ homepage publishing */
+  const openBuilder = async () => {
+    await staff.goto(`${BASE}/admin/cms`, { waitUntil: 'networkidle' });
+    await staff.getByRole('region', { name: 'Publishing' }).waitFor({ timeout: 60000 });
+  };
+  await openBuilder();
+  // Start clean: nothing unpublished.
+  if (await staff.getByRole('button', { name: 'Discard', exact: true }).isVisible()) {
+    await staff.getByRole('button', { name: 'Discard', exact: true }).click();
+    await staff.getByRole('button', { name: 'Discard changes' }).click();
+    await staff.getByText('Draft discarded').waitFor({ timeout: 30000 });
+    await openBuilder();
+  }
+  check('The homepage builder starts with nothing unpublished', await appears(staff.getByText('Everything here is live')));
+
+  const rail = staff.locator('li[data-section-row="PRODUCT_RAIL"]').filter({ hasText: 'Live' }).first();
+  const railName = (await rail.getByRole('link').first().innerText()).trim();
+  await rail.getByRole('button', { name: 'Hide from the page' }).click();
+  await staff.getByRole('button', { name: 'Hide section' }).click();
+  await openBuilder();
+  check('Hiding a section becomes an unpublished change', await appears(staff.getByText(`Hides section “${railName}”`)));
+
+  const homeShows = async (url) => {
+    await shopper.goto(url, { waitUntil: 'networkidle' });
+    return (await shopper.getByRole('heading', { name: railName, exact: true }).count()) > 0;
+  };
+  check('The live homepage still shows it', await homeShows(`${BASE}/`));
+  // The draft preview needs a staff session.
+  await staff.goto(`${BASE}/draft/home`, { waitUntil: 'networkidle' });
+  check('The draft preview already hides it', (await staff.getByRole('heading', { name: railName, exact: true }).count()) === 0);
+
+  await openBuilder();
+  await staff.getByRole('button', { name: 'Publish', exact: true }).click();
+  await staff.getByRole('button', { name: 'Publish now' }).click();
+  await staff.getByText('Published — live now').waitFor({ timeout: 30000 });
+  check('Publishing hides it from shoppers', !(await homeShows(`${BASE}/`)));
+
+  await openBuilder();
+  await staff.getByRole('button', { name: 'History' }).click();
+  await staff.getByRole('dialog').getByRole('button', { name: 'Put back' }).first().click();
+  await staff.getByRole('button', { name: 'Put it back' }).click();
+  await staff.getByText('That version is live again').waitFor({ timeout: 30000 });
+  check('Putting the previous version back restores it', await homeShows(`${BASE}/`));
 } catch (error) {
   const where = String(error.stack ?? '').split('\n').find((line) => line.includes('smoke-marketing')) ?? '';
   check('Run completed', false, `${String(error).split('\n')[0]} ${where.trim()}`);

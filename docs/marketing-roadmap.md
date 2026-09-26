@@ -122,7 +122,16 @@ passed (13 new), `smoke:marketing` passed 13/13, and `smoke:rbac` passed 27/27
   of what runs when, and **overlap detection**: a warning when two promotions
   cover the same products in the same window, with the one that would win
   identified. A preview shows the price badge on a real product card.
-- ☐ **Phase 2.3 — Homepage and Shop page.** The existing section builders move
+- ☑ **Phase 2.3 — Homepage and Shop page.** *Done: the builders' working copy
+  is now a draft, and shoppers read a published snapshot (sections plus hero
+  and grid banners) from a new `compositions` collection. The first open sets
+  the baseline from what was live, so the switch changed nothing for shoppers.
+  A publish bar lists pending changes in words, with Preview draft (a
+  staff-only full page at `/draft/home` or `/draft/categories`), Discard,
+  Publish with a note, and History with put-back. Section schedules and
+  per-device visibility already existed. The embedded device-width preview
+  stayed with the page designer; composed pages get a full-page draft preview
+  instead.* Original scope: the existing section builders move
   onto draft → preview → publish with history. The embedded preview becomes
   whole-page with device widths. Sections gain schedule windows (show from/to)
   and per-device visibility.
