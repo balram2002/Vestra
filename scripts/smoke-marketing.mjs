@@ -198,6 +198,31 @@ try {
   await staff.getByText(`${code} archived`).waitFor({ timeout: 30000 });
   await staff.goto(`${BASE}/admin/coupons?status=archived&q=${code}`, { waitUntil: 'domcontentloaded' });
   check('Archiving moves it to Archived', await appears(staff.getByRole('row').filter({ hasText: code })));
+
+  /* -------------------------------------------------------- promotions */
+  const promo = `Smoke sale ${code}`;
+  await staff.goto(`${BASE}/admin/promotions/new`, { waitUntil: 'networkidle' });
+  await staff.getByLabel('Title', { exact: true }).fill(promo);
+  await staff.getByLabel('Description', { exact: true }).fill('Ten percent off everything, for the smoke test.');
+  await staff.getByRole('spinbutton', { name: 'Percent off' }).fill('10');
+  // The preview runs the checkout evaluator: 10% of ₹1,999 is ₹200.
+  check('The preview prices an example item', await appears(staff.getByText('Saves ₹200')));
+  check('Overlaps with other offers are shown', await appears(staff.getByText(/Overlaps \d+ other/)));
+  await staff.getByRole('button', { name: 'Create promotion' }).click();
+  await staff.waitForURL(/\/admin\/promotions\/prm_/, { timeout: 30000 });
+  const promoUrl = staff.url();
+
+  await staff.goto(`${BASE}/admin/promotions?q=${encodeURIComponent(code)}`, { waitUntil: 'domcontentloaded' });
+  check('A new promotion is saved paused', await appears(staff.getByRole('row').filter({ hasText: promo }).getByText('Paused')));
+
+  await staff.goto(`${BASE}/admin/promotions?view=calendar`, { waitUntil: 'domcontentloaded' });
+  check('It appears on the calendar', await appears(staff.getByRole('link', { name: promo })));
+
+  await staff.goto(promoUrl, { waitUntil: 'networkidle' });
+  await staff.getByRole('button', { name: 'Archive' }).click();
+  await staff.getByRole('dialog').getByRole('button', { name: 'Archive' }).click();
+  await staff.getByText(`${promo} archived`).waitFor({ timeout: 30000 });
+  check('A promotion can be archived', true);
 } catch (error) {
   const where = String(error.stack ?? '').split('\n').find((line) => line.includes('smoke-marketing')) ?? '';
   check('Run completed', false, `${String(error).split('\n')[0]} ${where.trim()}`);

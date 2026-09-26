@@ -8,16 +8,13 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/choice';
 import { Dialog, DialogClose, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Segmented } from '@/components/ui/segmented';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import {
   createBrand,
   createCategory,
-  createPromotion,
   type CreateBrandInput,
   type CreateCategoryInput,
-  type CreatePromotionInput,
 } from '@/server/actions/admin';
 
 /**
@@ -36,7 +33,6 @@ import {
 
 type FieldErrors = Partial<Record<string, string>>;
 
-const RUPEE = '\u20B9';
 
 function pad(value: number): string {
   return String(value).padStart(2, '0');
@@ -49,18 +45,12 @@ function localDate(offsetDays: number): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-const startOfDay = (value: string) => (value ? new Date(`${value}T00:00:00`).toISOString() : '');
-const endOfDay = (value: string) => (value ? new Date(`${value}T23:59:59`).toISOString() : '');
 
 function text(form: FormData, key: string): string {
   return String(form.get(key) ?? '').trim();
 }
 
 /** A number field; blank is null, which the actions read as no limit. */
-function num(form: FormData, key: string): number | null {
-  const value = text(form, key);
-  return value === '' ? null : Number(value);
-}
 
 /** Opens fresh every time: a new key and today's dates. */
 function useFreshDialog() {
@@ -77,9 +67,6 @@ function useFreshDialog() {
   return { open, onOpenChange, session, close: () => setOpen(false) };
 }
 
-function Legend({ children }: { children: React.ReactNode }) {
-  return <legend className="text-ink mb-3 text-sm font-semibold">{children}</legend>;
-}
 
 function Footer({ formId, pending, label }: { formId: string; pending: boolean; label: string }) {
   return (
@@ -236,285 +223,6 @@ function CategoryForm({
     </DialogContent>
   );
 }
-/* --------------------------------------------------------------- promotion */
-
-type ValueKind = CreatePromotionInput['valueKind'];
-
-/*
- * SALE is not a stored type: it resolves to PERCENT_DISCOUNT or FLAT_DISCOUNT
- * from the value kind, so the form never offers a "flat discount" that takes
- * a percentage off.
- */
-type Campaign = 'SALE' | 'FLASH_SALE' | 'CATEGORY_OFFER' | 'FESTIVAL_CAMPAIGN';
-
-const CAMPAIGNS: ReadonlyArray<{ value: Campaign; label: string }> = [
-  { value: 'SALE', label: 'Sale' },
-  { value: 'FLASH_SALE', label: 'Flash sale (limited units)' },
-  { value: 'CATEGORY_OFFER', label: 'Category offer' },
-  { value: 'FESTIVAL_CAMPAIGN', label: 'Festival campaign' },
-];
-
-const VALUE_KINDS: ReadonlyArray<{ value: ValueKind; label: string }> = [
-  { value: 'PERCENT', label: 'Percent off' },
-  { value: 'AMOUNT', label: 'Amount off' },
-];
-
-export interface PromotionCategoryOption {
-  id: string;
-  label: string;
-}
-
-export function CreatePromotionDialog({ categories }: { categories: PromotionCategoryOption[] }) {
-  const { open, onOpenChange, session, close } = useFreshDialog();
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogTrigger asChild>
-        <Button size="sm">
-          <Plus className="size-3.5" aria-hidden />
-          New promotion
-        </Button>
-      </DialogTrigger>
-      <PromotionForm
-        key={session.key}
-        start={session.start}
-        end={session.end}
-        categories={categories}
-        onDone={close}
-      />
-    </Dialog>
-  );
-}
-
-function PromotionForm({
-  start,
-  end,
-  categories,
-  onDone,
-}: {
-  start: string;
-  end: string;
-  categories: PromotionCategoryOption[];
-  onDone: () => void;
-}) {
-  const formId = useId();
-  const [campaign, setCampaign] = useState<Campaign>('SALE');
-  const [valueKind, setValueKind] = useState<ValueKind>('PERCENT');
-  const [errors, setErrors] = useState<FieldErrors>({});
-  const [pending, startTransition] = useTransition();
-
-  const submit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const categoryId = text(form, 'categoryId');
-
-    const input: CreatePromotionInput = {
-      title: text(form, 'title'),
-      description: text(form, 'description'),
-      badgeText: text(form, 'badgeText'),
-      type:
-        campaign === 'SALE'
-          ? valueKind === 'PERCENT'
-            ? 'PERCENT_DISCOUNT'
-            : 'FLAT_DISCOUNT'
-          : campaign,
-      valueKind,
-      value: num(form, 'value') ?? 0,
-      maxDiscount: valueKind === 'PERCENT' ? num(form, 'maxDiscount') : null,
-      minOrderValue: num(form, 'minOrderValue') ?? 0,
-      categoryId: categoryId === '' ? null : categoryId,
-      priority: num(form, 'priority') ?? 0,
-      stockLimit: campaign === 'FLASH_SALE' ? num(form, 'stockLimit') : null,
-      startsAt: startOfDay(text(form, 'startsAt')),
-      endsAt: endOfDay(text(form, 'endsAt')),
-    };
-
-    setErrors({});
-    startTransition(async () => {
-      const result = await createPromotion(input);
-      if (result.ok) {
-        toast.success(`${input.title} saved, paused`, {
-          description: 'Check it in the table, then switch it on.',
-        });
-        onDone();
-      } else if (result.field) {
-        setErrors({ [result.field]: result.error });
-      } else {
-        toast.error(result.error ?? 'Could not create the promotion.');
-      }
-    });
-  };
-
-  return (
-    <DialogContent
-      title="New promotion"
-      description="Applies on its own, with no code. It is saved paused so you can check it before it reprices the shop."
-      size="lg"
-      footer={<Footer formId={formId} pending={pending} label="Save paused" />}
-    >
-      <form id={formId} onSubmit={submit} noValidate className="space-y-6">
-        <fieldset>
-          <Legend>The offer</Legend>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Input
-              label="Title"
-              name="title"
-              required
-              maxLength={80}
-              placeholder="End of season sale"
-              error={errors.title}
-            />
-            <Input
-              label="Badge"
-              name="badgeText"
-              maxLength={24}
-              placeholder="Flash sale"
-              hint="Optional. The chip on product cards."
-              error={errors.badgeText}
-            />
-          </div>
-          <Textarea
-            className="mt-4"
-            label="Description"
-            name="description"
-            rows={2}
-            maxLength={240}
-            required
-            placeholder="Up to 40% off summer styles."
-            error={errors.description}
-          />
-        </fieldset>
-
-        <fieldset>
-          <Legend>Discount</Legend>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Select
-              label="Campaign"
-              value={campaign}
-              onChange={(event) => setCampaign(event.target.value as Campaign)}
-            >
-              {CAMPAIGNS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
-            <Select
-              label="Applies to"
-              name="categoryId"
-              defaultValue=""
-              error={errors.categoryId}
-              hint={campaign === 'CATEGORY_OFFER' ? 'Pick the category it covers.' : undefined}
-            >
-              <option value="">Everything in the shop</option>
-              {categories.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
-          </div>
-
-          <Segmented
-            className="mt-4"
-            label="Discount kind"
-            value={valueKind}
-            onChange={setValueKind}
-            options={VALUE_KINDS}
-          />
-
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <Input
-              key={valueKind}
-              label={valueKind === 'PERCENT' ? 'Percent off' : 'Amount off each item'}
-              name="value"
-              type="number"
-              inputMode="decimal"
-              min={1}
-              max={valueKind === 'PERCENT' ? 80 : undefined}
-              step={1}
-              required
-              leading={valueKind === 'AMOUNT' ? RUPEE : undefined}
-              trailing={valueKind === 'PERCENT' ? '%' : undefined}
-              error={errors.value}
-            />
-            {valueKind === 'PERCENT' ? (
-              <Input
-                label="Maximum discount"
-                name="maxDiscount"
-                type="number"
-                inputMode="decimal"
-                min={0}
-                step={1}
-                leading={RUPEE}
-                hint="Blank means no cap."
-                error={errors.maxDiscount}
-              />
-            ) : null}
-            <Input
-              label="Minimum order value"
-              name="minOrderValue"
-              type="number"
-              inputMode="decimal"
-              min={0}
-              step={1}
-              defaultValue={0}
-              leading={RUPEE}
-              error={errors.minOrderValue}
-            />
-          </div>
-        </fieldset>
-
-        <fieldset>
-          <Legend>Schedule</Legend>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Input
-              label="Starts"
-              name="startsAt"
-              type="date"
-              defaultValue={start}
-              required
-              error={errors.startsAt}
-            />
-            <Input
-              label="Ends"
-              name="endsAt"
-              type="date"
-              defaultValue={end}
-              required
-              error={errors.endsAt}
-            />
-            <Input
-              label="Priority"
-              name="priority"
-              type="number"
-              inputMode="numeric"
-              min={0}
-              max={100}
-              step={1}
-              defaultValue={10}
-              hint="Only the best offer applies to an item; priority breaks a tie."
-              error={errors.priority}
-            />
-            {campaign === 'FLASH_SALE' ? (
-              <Input
-                label="Units at this price"
-                name="stockLimit"
-                type="number"
-                inputMode="numeric"
-                min={1}
-                step={1}
-                hint="Blank means unlimited."
-                error={errors.stockLimit}
-              />
-            ) : null}
-          </div>
-        </fieldset>
-      </form>
-    </DialogContent>
-  );
-}
-
 /* ------------------------------------------------------------------- brand */
 
 export function CreateBrandDialog() {

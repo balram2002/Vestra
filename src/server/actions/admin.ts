@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
 import { PRODUCT_STATUS_META, SELLER_STATUS_META } from '@/domain/enums';
-import type { Banner, Brand, Category, Promotion } from '@/domain/types';
+import type { Banner, Brand, Category } from '@/domain/types';
 import { entityId } from '@/lib/ids';
 import { toPaise } from '@/lib/money';
 import { slugify } from '@/lib/slug';
@@ -598,15 +598,6 @@ function firstIssue(error: z.ZodError): ActionResult {
 }
 
 /** Parse a date the form sent, or report which field was wrong. */
-function parseWindow(startsAt: string, endsAt: string): ActionResult | { starts: number; ends: number } {
-  const starts = Date.parse(startsAt);
-  const ends = Date.parse(endsAt);
-  if (Number.isNaN(starts)) return fail('startsAt', 'Pick a start date.');
-  if (Number.isNaN(ends)) return fail('endsAt', 'Pick an end date.');
-  if (ends <= starts) return fail('endsAt', 'The end date must be after the start date.');
-  if (ends <= Date.now()) return fail('endsAt', 'That end date has already passed.');
-  return { starts, ends };
-}
 
 /* ---------------------------------------------------------------- category */
 
@@ -756,127 +747,6 @@ export async function setCategoryActive(input: {
   revalidatePath('/admin/categories');
   return { ok: true };
 }
-/* --------------------------------------------------------------- promotion */
-
-const createPromotionSchema = z.object({
-  title: z.string().trim().min(4, 'Give it a title of at least 4 characters.').max(80),
-  description: z.string().trim().min(8, 'Say what the offer is in a sentence.').max(240),
-  badgeText: z.string().trim().max(24),
-  type: z.enum(['PERCENT_DISCOUNT', 'FLAT_DISCOUNT', 'FLASH_SALE', 'CATEGORY_OFFER', 'FESTIVAL_CAMPAIGN']),
-  valueKind: z.enum(['PERCENT', 'AMOUNT']),
-  /** Percent, or rupees when valueKind is AMOUNT. */
-  value: z.number().min(0),
-  /** Rupees. Caps a percentage; ignored for an amount. */
-  maxDiscount: z.number().min(0).nullable(),
-  minOrderValue: z.number().min(0).max(1_000_000),
-  /** null means every category. */
-  categoryId: z.string().nullable(),
-  priority: z.number().int().min(0).max(100),
-  /** Units at the promo price; null means unlimited. */
-  stockLimit: z.number().int().min(1, 'At least 1, or leave it blank.').max(1_000_000).nullable(),
-  startsAt: z.string(),
-  endsAt: z.string(),
-});
-
-export type CreatePromotionInput = z.infer<typeof createPromotionSchema>;
-
-/**
- * Create an automatic offer.
- *
- * Always created PAUSED. A promotion needs no code, so the moment it is live it
- * changes what every shopper pays on their next page view; a typo in the value
- * would reprice the whole shop. It is saved, reviewed in the table, and then
- * switched on with the toggle that is already audited.
- */
-export async function createPromotion(input: CreatePromotionInput): Promise<ActionResult> {
-  const actor = await requirePermission('promotion:write');
-
-  const parsed = createPromotionSchema.safeParse(input);
-  if (!parsed.success) return firstIssue(parsed.error);
-  const data = parsed.data;
-
-  // The type names a campaign; valueKind says how to read the number. Where
-  // the type DOES imply one, the two must agree.
-  if (data.type === 'PERCENT_DISCOUNT' && data.valueKind !== 'PERCENT') {
-    return fail('value', 'A percentage discount must take a percentage off.');
-  }
-  if (data.type === 'FLAT_DISCOUNT' && data.valueKind !== 'AMOUNT') {
-    return fail('value', 'A flat discount must take an amount off.');
-  }
-  if (data.valueKind === 'PERCENT' && (data.value < 1 || data.value > 80)) {
-    return fail('value', 'An automatic offer takes between 1% and 80% off.');
-  }
-  if (data.valueKind === 'AMOUNT' && data.value < 1) {
-    return fail('value', 'Enter the amount to take off.');
-  }
-  if (data.type === 'CATEGORY_OFFER' && !data.categoryId) {
-    return fail('categoryId', 'A category offer needs a category.');
-  }
-
-  if (data.categoryId) {
-    const categories = await collections.categories();
-    if (!(await categories.findOne({ _id: data.categoryId }))) {
-      return fail('categoryId', 'That category no longer exists.');
-    }
-  }
-
-  const window = parseWindow(data.startsAt, data.endsAt);
-  if ('ok' in window) return window;
-
-  const promotions = await collections.promotions();
-  const id = entityId('prm');
-  let slug = slugify(data.title) || id.toLowerCase();
-  if (await promotions.findOne({ slug })) slug = `${slug}-${id.slice(-6).toLowerCase()}`;
-  const now = new Date().toISOString();
-
-  const promotion: Promotion = {
-    id,
-    slug,
-    title: data.title,
-    subtitle: null,
-    description: data.description,
-    type: data.type,
-    valueKind: data.valueKind,
-    value: data.valueKind === 'PERCENT' ? Math.round(data.value) : toPaise(data.value),
-    maxDiscount:
-      data.valueKind === 'PERCENT' && data.maxDiscount ? toPaise(data.maxDiscount) : null,
-    minOrderValue: toPaise(data.minOrderValue),
-    categoryIds: data.categoryId ? [data.categoryId] : [],
-    brandIds: [],
-    sellerIds: [],
-    productIds: [],
-    paymentMethods: [],
-    bankName: null,
-    startsAt: new Date(window.starts).toISOString(),
-    endsAt: new Date(window.ends).toISOString(),
-    isActive: false,
-    priority: data.priority,
-    fundedBy: 'PLATFORM',
-    bannerUrl: null,
-    badgeText: data.badgeText || null,
-    buyXGetY: null,
-    stockLimit: data.type === 'FLASH_SALE' ? data.stockLimit : null,
-    stockSold: 0,
-    createdAt: now,
-    updatedAt: now,
-  };
-
-  await promotions.insertOne(toDoc(promotion));
-  invalidate([tags.promotions]);
-
-  await audit.record({
-    actor,
-    action: 'promotion.create',
-    entityType: 'promotion',
-    entityId: promotion.id,
-    entityLabel: promotion.title,
-    severity: 'NOTICE',
-  });
-
-  revalidatePath('/admin/promotions');
-  return { ok: true };
-}
-
 /* ------------------------------------------------------------------- brand */
 
 const createBrandSchema = z.object({

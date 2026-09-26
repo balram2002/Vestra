@@ -111,7 +111,14 @@ passed (13 new), `smoke:marketing` passed 13/13, and `smoke:rbac` passed 27/27
   expired, paused, used up) and sorting. Each coupon gets a redemption count,
   discount given and revenue influenced, plus a preview of how it looks in the
   bag coupon panel. `valueKind` stays the only source of what `value` means.
-- ☐ **Phase 2.2 — Promotions.** The same editor treatment, a **calendar view**
+- ☑ **Phase 2.2 — Promotions.** *Done: list with status tabs, search, sort and
+  an overlap flag per row; an eight-week calendar; full-page editor for all
+  eight offer kinds (bank, store and buy-X-get-Y offers were not creatable
+  before) with a preview priced by the checkout evaluator itself, and live
+  overlap checks that say which offer a shopper gets; duplicate; archive. New
+  offers are still saved paused. The list now reads `valueKind`, fixing a
+  display that inferred rupees-or-percent from the offer's type.* Original
+  scope: the same editor treatment, a **calendar view**
   of what runs when, and **overlap detection**: a warning when two promotions
   cover the same products in the same window, with the one that would win
   identified. A preview shows the price badge on a real product card.
