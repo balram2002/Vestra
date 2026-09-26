@@ -147,6 +147,57 @@ try {
   await chooseLayout('Variant 1 · Classic');
   await publish();
   check('Left as found: Classic live', !(await liveIsSpotlight()));
+
+  /* ----------------------------------------------------------- coupons */
+  const code = `SMK${Date.now().toString(36).toUpperCase().slice(-6)}`;
+  // Lists stream in behind a skeleton: wait for the row, don't just glance.
+  const appears = (locator) => locator.first().waitFor({ timeout: 30000 }).then(() => true, () => false);
+  await staff.goto(`${BASE}/admin/coupons/new`, { waitUntil: 'networkidle' });
+  await staff.getByLabel('Code', { exact: true }).fill(code);
+  await staff.getByLabel('Title', { exact: true }).fill('Smoke test coupon');
+  // A flat discount with no minimum could make an order free: refused on the field.
+  await staff.getByRole('radio', { name: 'Amount off' }).click();
+  await staff.getByRole('spinbutton', { name: 'Amount off' }).fill('300');
+  await staff.getByLabel('Minimum order', { exact: true }).fill('100');
+  await staff.getByRole('button', { name: 'Create coupon' }).click();
+  await staff.getByText('Set a minimum above the discount').first().waitFor({ timeout: 30000 });
+  check('Coupon rules are enforced on the field', true);
+
+  await staff.getByLabel('Minimum order', { exact: true }).fill('1499');
+  check(
+    'The preview describes the rules',
+    await staff.getByText('₹300 off · orders above ₹1,499').isVisible(),
+  );
+  await staff.getByRole('button', { name: 'Create coupon' }).click();
+  await staff.waitForURL(/\/admin\/coupons\/cpn_/, { timeout: 30000 });
+  const couponUrl = staff.url();
+  check('Creating a coupon opens its page', true);
+
+  await staff.goto(`${BASE}/admin/coupons?q=${code}`, { waitUntil: 'domcontentloaded' });
+  check('It is listed as live', await appears(staff.getByRole('row').filter({ hasText: code }).getByText('Live')));
+
+  await staff.goto(couponUrl, { waitUntil: 'networkidle' });
+  await staff.getByLabel('Title', { exact: true }).fill('Smoke test coupon, edited');
+  await staff.getByRole('button', { name: 'Save changes' }).click();
+  await staff.getByText('Saved — live rules updated').waitFor({ timeout: 30000 });
+  check('A coupon can be edited', true);
+
+  await staff.getByRole('link', { name: 'Duplicate' }).click();
+  await staff.waitForURL(/\/admin\/coupons\/new\?from=/, { timeout: 30000 });
+  await staff.getByRole('heading', { name: `Duplicate ${code}` }).waitFor({ timeout: 30000 });
+  check(
+    'Duplicating keeps the rules with a fresh code',
+    // Next keeps the page just left mounted but hidden; read the visible form.
+    (await staff.getByLabel('Title', { exact: true }).filter({ visible: true }).inputValue()).includes('(copy)') &&
+      (await staff.getByLabel('Code', { exact: true }).filter({ visible: true }).inputValue()) === '',
+  );
+
+  await staff.goto(couponUrl, { waitUntil: 'networkidle' });
+  await staff.getByRole('button', { name: 'Archive' }).click();
+  await staff.getByRole('dialog').getByRole('button', { name: 'Archive' }).click();
+  await staff.getByText(`${code} archived`).waitFor({ timeout: 30000 });
+  await staff.goto(`${BASE}/admin/coupons?status=archived&q=${code}`, { waitUntil: 'domcontentloaded' });
+  check('Archiving moves it to Archived', await appears(staff.getByRole('row').filter({ hasText: code })));
 } catch (error) {
   const where = String(error.stack ?? '').split('\n').find((line) => line.includes('smoke-marketing')) ?? '';
   check('Run completed', false, `${String(error).split('\n')[0]} ${where.trim()}`);

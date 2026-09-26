@@ -304,6 +304,8 @@ export interface Coupon {
   /** Shown in the coupon list even when not currently applicable. */
   visible: boolean;
   termsAndConditions: string[];
+  /** Taken out of the list and switched off; kept, because orders refer to it. */
+  archivedAt?: string | null;
   createdByUserId: string;
   createdAt: string;
   updatedAt: string;
@@ -389,6 +391,8 @@ export interface Promotion {
   /** Flash sales cap how many units may be sold at the promo price. */
   stockLimit: number | null;
   stockSold: number;
+  /** Taken out of the list and switched off; kept, because orders refer to it. */
+  archivedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }

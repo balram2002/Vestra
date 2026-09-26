@@ -99,7 +99,13 @@ passed (13 new), `smoke:marketing` passed 13/13, and `smoke:rbac` passed 27/27
 
 ## Milestone 2 — Bring every existing Marketing screen up to standard
 
-- ☐ **Phase 2.1 — Coupons.** A full editor page (create, edit, duplicate,
+- ☑ **Phase 2.1 — Coupons.** *Done: list with status tabs, search and sort;
+  full-page editor with bag preview, plain-language rules and generated small
+  print; category / brand / store targeting and payment methods (supported by
+  the evaluator but never exposed before); duplicate; archive and restore;
+  per-coupon redemptions, discount given, revenue and latest uses.
+  `smoke:marketing` covers create, validation, list, edit, duplicate and
+  archive.* Original scope: A full editor page (create, edit, duplicate,
   archive) with rules shown in plain language ("₹200 off orders above ₹1,499,
   first order only"). The list gets search, status filters (live, scheduled,
   expired, paused, used up) and sorting. Each coupon gets a redemption count,
