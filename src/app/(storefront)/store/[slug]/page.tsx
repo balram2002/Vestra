@@ -7,7 +7,8 @@ import { absoluteUrl } from '@/config/site';
 import { isIndexableListing, parseProductQuery, type RawSearchParams } from '@/lib/product-query';
 import { breadcrumbListJsonLd, sellerJsonLd } from '@/lib/seo/structured-data';
 import { getSellerBySlug, listSellers } from '@/server/services/catalog';
-import { getSiteContent } from '@/server/services/site-content';
+import type { StorePageSettings, StorePageVariant } from '@/domain/page-designs/store';
+import { getLiveDesign } from '@/server/services/page-designs';
 
 /**
  * Public store page.
@@ -51,7 +52,7 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
 
 export default async function StorePage({ params, searchParams }: PageProps) {
   const { slug } = await params;
-  const [seller, { storePage }] = await Promise.all([getSellerBySlug(slug), getSiteContent()]);
+  const [seller, design] = await Promise.all([getSellerBySlug(slug), getLiveDesign('store')]);
 
   if (!seller || !['ACTIVE', 'APPROVED'].includes(seller.status)) notFound();
   if (seller.slug !== slug) permanentRedirect(`/store/${seller.slug}`);
@@ -72,11 +73,11 @@ export default async function StorePage({ params, searchParams }: PageProps) {
         ]}
       />
 
-      {/* Which layout, and which of its pieces, is decided under Admin › Store page. */}
+      {/* Which layout, and which of its pieces, is decided under Admin › Marketing › Store page. */}
       <StorePageView
         seller={seller}
-        variant={storePage.variant}
-        settings={storePage.settings[storePage.variant]}
+        variant={design.variant as StorePageVariant}
+        settings={design.settings[design.variant] as StorePageSettings}
         searchParams={searchParams}
         basePath={`/store/${seller.slug}`}
       />

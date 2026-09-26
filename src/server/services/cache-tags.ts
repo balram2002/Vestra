@@ -45,6 +45,9 @@ export const tags = {
 
   coupons: 'coupons',
   promotions: 'promotions',
+
+  /** One designable page's live layout and settings (Marketing › page designs). */
+  pageDesign: (page: string) => `page-design:${page}`,
 } as const;
 
 /**

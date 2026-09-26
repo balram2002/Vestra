@@ -194,11 +194,19 @@ the customer's original price, coupon share and tax snapshot intact.
   shows the promotion strip, header, footer or bottom bar lives in
   `siteContent.pageChrome` (`domain/page-chrome.ts`). A new top-level storefront
   route needs an entry in `CHROME_PAGES`, or it silently keeps the full frame.
-- **The store page layout is data too.** `siteContent.storePage` picks one of
-  three layouts and holds each one's switches; `components/store/` renders them.
-  A new switch goes in `StorePageSettings`, its default, the toggle groups and
-  the zod schema in `actions/appearance.ts`. Miss the last one and every save
-  is rejected.
+- **Designable pages are definitions, not editors.** Every page under
+  Marketing › Page designs is a plain-data definition in
+  `src/domain/page-designs/` (variants, grouped fields, per-variant defaults,
+  preview path) registered in `PAGE_DESIGNS`. The admin screen
+  (`/admin/design/[page]`), the zod schema and the defaults merge are all
+  derived from it, so a new setting is one field entry plus a default in each
+  variant; `config.test.ts` fails if a default is missing.
+- **Shoppers see only what was published.** Designs live in `pageDesigns`,
+  one document per page holding `published`, `draft`, `scheduled` and the last
+  twenty `revisions`. Storefront pages read `getLiveDesign(page)` (cached,
+  tagged `pageDesign(page)`); previews read `getPreviewDesign(page)`, which
+  asserts `cms:write`. A scheduled publish is applied on read and settled into
+  the record the next time the designer opens it; there is no cron.
 
 ## Deliberate deviations from the brief
 

@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   LayoutTemplate,
   LifeBuoy,
+  Megaphone,
   MessageSquareQuote,
   Package,
   Palette,
@@ -30,6 +31,7 @@ import { ConsoleShell } from '@/components/layout/console-shell';
 import { ConsoleUserMenu } from '@/components/layout/console-user-menu';
 import { BrandMark } from '@/components/layout/wordmark';
 import { USER_ROLE_LABEL } from '@/domain/enums';
+import { designFor, PAGE_DESIGN_KEYS } from '@/domain/page-designs';
 import { requireAnyRole } from '@/server/auth/session';
 import { isSellerRole, STAFF_ROLES } from '@/server/auth/rbac';
 import { collections } from '@/server/db/collections';
@@ -154,16 +156,36 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           ],
         },
         {
-          label: 'Marketing',
+          /*
+           * Marketing, in three groups by what is being changed: money off,
+           * how a page is laid out, and what every page carries. The overview
+           * leads, because it is where the day's questions are answered.
+           */
+          label: 'Campaigns',
           items: [
+            { href: '/admin/marketing', label: 'Marketing overview', icon: <Megaphone aria-hidden /> },
             { href: '/admin/coupons', label: 'Coupons', icon: <Ticket aria-hidden /> },
             { href: '/admin/promotions', label: 'Promotions', icon: <BadgePercent aria-hidden /> },
+          ],
+        },
+        {
+          label: 'Page designs',
+          items: [
             { href: '/admin/cms', label: 'Homepage', icon: <LayoutTemplate aria-hidden /> },
             { href: '/admin/categories-page', label: 'Shop page', icon: <LayoutTemplate aria-hidden /> },
-            { href: '/admin/store-page', label: 'Store page', icon: <Store aria-hidden /> },
-            { href: '/admin/page-chrome', label: 'Page layout', icon: <PanelsTopLeft aria-hidden /> },
-            { href: '/admin/pages', label: 'Pages', icon: <FileText aria-hidden /> },
+            ...PAGE_DESIGN_KEYS.map((page) => ({
+              href: `/admin/design/${page}`,
+              label: designFor(page).title,
+              icon: <LayoutTemplate aria-hidden />,
+            })),
+          ],
+        },
+        {
+          label: 'Site-wide',
+          items: [
             { href: '/admin/appearance', label: 'Appearance', icon: <Palette aria-hidden /> },
+            { href: '/admin/page-chrome', label: 'Page layout', icon: <PanelsTopLeft aria-hidden /> },
+            { href: '/admin/pages', label: 'Content pages', icon: <FileText aria-hidden /> },
           ],
         },
         {

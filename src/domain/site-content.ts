@@ -22,7 +22,6 @@
 
 /** Icons an editor can choose from, by meaning rather than by library name. */
 import { DEFAULT_PAGE_CHROME, withChromeDefaults, type PageChrome } from './page-chrome';
-import { DEFAULT_STORE_PAGE, withStorePageDefaults, type StorePageConfig } from './store-page';
 
 export const CONTENT_ICONS = [
   'delivery',
@@ -112,8 +111,6 @@ export interface SiteContent {
   footerNote: string | null;
   /** Which of strip, header, footer and bottom bar each page family wears. */
   pageChrome: PageChrome;
-  /** The public store page's layout and its switches. */
-  storePage: StorePageConfig;
 }
 
 export const DEFAULT_SITE_CONTENT: SiteContent = {
@@ -202,7 +199,6 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
   footerNote: null,
 
   pageChrome: DEFAULT_PAGE_CHROME,
-  storePage: DEFAULT_STORE_PAGE,
 };
 
 /**
@@ -226,9 +222,8 @@ export function withDefaults(stored: Partial<SiteContent> | null | undefined): S
     footerColumns: stored.footerColumns ?? DEFAULT_SITE_CONTENT.footerColumns,
     footerBadges: stored.footerBadges ?? DEFAULT_SITE_CONTENT.footerBadges,
     footerNote: stored.footerNote ?? DEFAULT_SITE_CONTENT.footerNote,
-    // Both merged deep, so a page family or a switch added later reads as its
-    // default rather than as missing.
+    // Merged deep, so a page family added later reads as showing everything
+    // rather than as missing.
     pageChrome: withChromeDefaults(stored.pageChrome),
-    storePage: withStorePageDefaults(stored.storePage),
   };
 }

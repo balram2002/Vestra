@@ -5,7 +5,6 @@ import { z } from 'zod';
 
 import { CHROME_PAGES } from '@/domain/page-chrome';
 import { CONTENT_ICONS, DEFAULT_SITE_CONTENT, type SiteContent } from '@/domain/site-content';
-import { PRODUCT_STYLES, STORE_PAGE_VARIANTS, type StorePageSettings } from '@/domain/store-page';
 
 import { requirePermission } from '../auth/session';
 import * as audit from '../services/audit';
@@ -80,31 +79,6 @@ const chromeRuleSchema = z.object({
   bottomNav: z.boolean(),
 });
 
-const storePageSettingsSchema = z.object({
-  breadcrumbs: z.boolean(),
-  banner: z.boolean(),
-  logo: z.boolean(),
-  shopName: z.boolean(),
-  tagline: z.boolean(),
-  verifiedBadge: z.boolean(),
-  location: z.boolean(),
-  shareButton: z.boolean(),
-  contactButton: z.boolean(),
-  trustScore: z.boolean(),
-  deliveryTime: z.boolean(),
-  ordersShipped: z.boolean(),
-  ratingSummary: z.boolean(),
-  policies: z.boolean(),
-  about: z.boolean(),
-  products: z.boolean(),
-  productStyle: z.enum(PRODUCT_STYLES),
-  productsTitle: z.string().trim().max(60),
-  search: z.boolean(),
-  filters: z.boolean(),
-  prices: z.boolean(),
-  playButton: z.boolean(),
-} satisfies Record<keyof StorePageSettings, z.ZodTypeAny>);
-
 const schemas = {
   announcements: z.array(announcementSchema).max(12),
   headerActions: z.object({
@@ -131,14 +105,6 @@ const schemas = {
       typeof chromeRuleSchema
     >,
   ),
-  storePage: z.object({
-    variant: z.enum(STORE_PAGE_VARIANTS),
-    settings: z.object({
-      classic: storePageSettingsSchema,
-      spotlight: storePageSettingsSchema,
-      studio: storePageSettingsSchema,
-    }),
-  }),
 } satisfies Record<keyof SiteContent, z.ZodTypeAny>;
 
 export type AppearanceBlock = keyof typeof schemas;
@@ -214,5 +180,4 @@ function refreshStorefront(): void {
   revalidatePath('/', 'layout');
   revalidatePath('/admin/appearance');
   revalidatePath('/admin/page-chrome');
-  revalidatePath('/admin/store-page');
 }

@@ -152,6 +152,8 @@ export const COLLECTIONS = {
   /* content */
   /** Site furniture an administrator edits: strips, promises, footer columns. */
   siteContent: 'siteContent',
+  /** One document per designable page: published, draft, schedule, history. */
+  pageDesigns: 'pageDesigns',
   homeSections: 'homeSections',
   banners: 'banners',
   cmsPages: 'cmsPages',
