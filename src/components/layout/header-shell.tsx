@@ -49,7 +49,8 @@ import { cn } from '@/lib/cn';
 export function HeaderShell({
   children,
   /** Height of the announcement strip, in the same units as the token. */
-  stripHeight = 'var(--spacing-announce)',
+  // A page that hides the strip zeroes the variable; see `StripGate`.
+  stripHeight = 'var(--app-strip-height, var(--spacing-announce))',
   className,
 }: {
   children: React.ReactNode;

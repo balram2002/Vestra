@@ -13,8 +13,10 @@ import { getSiteContent } from '@/server/services/site-content';
 import { getWishlistCount } from '@/server/services/wishlist';
 import { workspacesFor } from '@/server/services/workspaces';
 import { DEFAULT_SITE_CONTENT } from '@/domain/site-content';
+import { hiddenPagesFor } from '@/domain/page-chrome';
 
 import { AccountMenu } from './account-menu';
+import { StripGate } from './chrome-gate';
 import { HeaderShell } from './header-shell';
 import { MegaMenu } from './mega-menu';
 import { MobileNav } from './mobile-nav';
@@ -151,6 +153,24 @@ const DEFAULT_STRIP = DEFAULT_SITE_CONTENT.announcements
 export async function SiteHeader() {
   const [menu, content] = await Promise.all([getMegaMenu(), getSiteContent()]);
   const { headerActions } = content;
+  const stripHiddenOn = hiddenPagesFor(content.pageChrome, 'strip');
+
+  const announcements = (
+    <AnnouncementStrip
+      items={
+        content.visibility.announcements
+          ? content.announcements.filter((item) => item.isActive).map((item) => item.text)
+          : []
+      }
+    />
+  );
+  // Only when some page switches the strip off does the header read the path.
+  const strip =
+    stripHiddenOn.length > 0 ? (
+      <StripGate hiddenOn={stripHiddenOn}>{announcements}</StripGate>
+    ) : (
+      announcements
+    );
 
   const quickLinks = menu.map(({ department }) => ({
     label: department.name,
@@ -159,13 +179,7 @@ export async function SiteHeader() {
 
   return (
     <HeaderShell>
-      <AnnouncementStrip
-        items={
-          content.visibility.announcements
-            ? content.announcements.filter((item) => item.isActive).map((item) => item.text)
-            : []
-        }
-      />
+      {strip}
 
       <HeaderBar>
         <MobileNav

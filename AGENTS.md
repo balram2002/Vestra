@@ -190,6 +190,16 @@ the customer's original price, coupon share and tax snapshot intact.
 - **No inline mock data in components.** Everything comes through the service
   layer.
 
+- **The storefront frame is per page, and it is data.** Whether a page family
+  shows the promotion strip, header, footer or bottom bar lives in
+  `siteContent.pageChrome` (`domain/page-chrome.ts`). A new top-level storefront
+  route needs an entry in `CHROME_PAGES`, or it silently keeps the full frame.
+- **The store page layout is data too.** `siteContent.storePage` picks one of
+  three layouts and holds each one's switches; `components/store/` renders them.
+  A new switch goes in `StorePageSettings`, its default, the toggle groups and
+  the zod schema in `actions/appearance.ts`. Miss the last one and every save
+  is rejected.
+
 ## Deliberate deviations from the brief
 
 - **Public store pages live at `/store/[slug]`, not `/seller/[slug]`.** The

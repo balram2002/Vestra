@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 import { CountBubble } from '@/components/ui/badge';
+import { chromePageFor, type ChromePageKey } from '@/domain/page-chrome';
 import { cn } from '@/lib/cn';
 import { isImmersivePath } from '@/lib/immersive';
 
@@ -243,11 +244,18 @@ function NavTarget({
  *
  * Kept separate so the layout can render `BottomNavBar` directly as a fallback.
  */
-export function BottomNav(props: {
+export function BottomNav({
+  hiddenOnPages = [],
+  ...props
+}: {
   bagCount?: number;
   wishlistCount?: number;
   hide?: string[];
+  /** Page families where the whole bar is switched off, from Admin › Page layout. */
+  hiddenOnPages?: ChromePageKey[];
 }) {
   const pathname = usePathname();
+  const page = chromePageFor(pathname);
+  if (page && hiddenOnPages.includes(page)) return null;
   return <BottomNavBar pathname={pathname} {...props} />;
 }

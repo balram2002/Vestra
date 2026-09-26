@@ -1,18 +1,13 @@
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
-import { Suspense } from 'react';
-
 import { atLeastOne, PLACEHOLDER_SLUG } from '@/lib/static-params';
-import { ListingView } from '@/components/commerce/listing-view';
-import { Breadcrumbs } from '@/components/commerce/breadcrumbs';
 import { JsonLd } from '@/components/seo/json-ld';
-import { ProductGridSkeleton } from '@/components/skeletons/product-card-skeleton';
-import { StoreProfile } from '@/components/commerce/store-profile';
+import { StorePageView } from '@/components/store/store-page-view';
 import { absoluteUrl } from '@/config/site';
 import { isIndexableListing, parseProductQuery, type RawSearchParams } from '@/lib/product-query';
 import { breadcrumbListJsonLd, sellerJsonLd } from '@/lib/seo/structured-data';
 import { getSellerBySlug, listSellers } from '@/server/services/catalog';
-import { listProducts } from '@/server/services/listing';
+import { getSiteContent } from '@/server/services/site-content';
 
 /**
  * Public store page.
@@ -56,7 +51,7 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
 
 export default async function StorePage({ params, searchParams }: PageProps) {
   const { slug } = await params;
-  const seller = await getSellerBySlug(slug);
+  const [seller, { storePage }] = await Promise.all([getSellerBySlug(slug), getSiteContent()]);
 
   if (!seller || !['ACTIVE', 'APPROVED'].includes(seller.status)) notFound();
   if (seller.slug !== slug) permanentRedirect(`/store/${seller.slug}`);
@@ -64,15 +59,8 @@ export default async function StorePage({ params, searchParams }: PageProps) {
   const url = absoluteUrl(`/store/${seller.slug}`);
 
   return (
-    <div className="gutter shell-max py-5">
-      <Breadcrumbs
-        items={[
-          { href: '/', label: 'Home' },
-          { href: '/stores', label: 'Sellers' },
-          { href: `/store/${seller.slug}`, label: seller.displayName },
-        ]}
-      />
-
+    <>
+      {/* Structured data whatever the layout: search engines read it, shoppers do not. */}
       <JsonLd
         data={[
           breadcrumbListJsonLd([
@@ -84,35 +72,14 @@ export default async function StorePage({ params, searchParams }: PageProps) {
         ]}
       />
 
-      <StoreProfile seller={seller} />
-
-      <Suspense fallback={<ProductGridSkeleton className="mt-6" count={15} />}>
-        <StoreListing slug={seller.slug} searchParams={searchParams} />
-      </Suspense>
-    </div>
-  );
-}
-
-async function StoreListing({
-  slug,
-  searchParams,
-}: {
-  slug: string;
-  searchParams: Promise<RawSearchParams>;
-}) {
-  const raw = await searchParams;
-  const query = parseProductQuery(raw, { sellerSlug: slug });
-  const result = await listProducts(query);
-  const basePath = `/store/${slug}`;
-
-  return (
-    <ListingView
-      heading={<div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-display text-xl font-semibold sm:text-2xl">Shop this store</h2><form action={basePath} className="flex w-full gap-2 sm:w-auto"><input name="q" defaultValue={query.q} aria-label="Search this store" placeholder="Search this store?" className="bg-raised border-line h-11 min-w-0 flex-1 rounded-xl border px-3 text-sm" /><button className="bg-ink text-canvas rounded-xl px-4 text-sm">Search</button></form></div>}
-      result={result}
-      params={raw}
-      basePath={basePath}
-      sort={query.sort ?? 'popularity'}
-      className="mt-6"
-    />
+      {/* Which layout, and which of its pieces, is decided under Admin › Store page. */}
+      <StorePageView
+        seller={seller}
+        variant={storePage.variant}
+        settings={storePage.settings[storePage.variant]}
+        searchParams={searchParams}
+        basePath={`/store/${seller.slug}`}
+      />
+    </>
   );
 }

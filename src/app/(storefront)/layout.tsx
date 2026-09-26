@@ -1,6 +1,8 @@
 import { Suspense } from 'react';
 
 import { BottomNav, BottomNavBar } from '@/components/layout/bottom-nav';
+import { ChromeGate } from '@/components/layout/chrome-gate';
+import { hiddenPagesFor } from '@/domain/page-chrome';
 import { getSiteContent } from '@/server/services/site-content';
 import { RouteProgress } from '@/components/layout/route-progress';
 import { SiteFooter } from '@/components/layout/site-footer';
@@ -34,7 +36,7 @@ export default function StorefrontLayout({ children }: { children: React.ReactNo
 
       {/* The header reads the taxonomy, so it streams rather than blocking the page. */}
       <Suspense fallback={<SiteHeaderFallback />}>
-        <SiteHeader />
+        <HeaderSlot />
       </Suspense>
 
       {/*
@@ -49,7 +51,7 @@ export default function StorefrontLayout({ children }: { children: React.ReactNo
       </main>
 
       <Suspense fallback={null}>
-        <SiteFooter />
+        <FooterSlot />
       </Suspense>
 
       {/*
@@ -72,13 +74,58 @@ export default function StorefrontLayout({ children }: { children: React.ReactNo
  */
 async function BottomNavWithCounts() {
   const owner = await currentOwner();
-  const [bagCount, wishlistCount, hide] = await Promise.all([
+  const [bagCount, wishlistCount, hide, { pageChrome }] = await Promise.all([
     getBagCount(owner),
     getWishlistCount(owner),
     hiddenDestinations(),
+    getSiteContent(),
   ]);
 
-  return <BottomNav bagCount={bagCount} wishlistCount={wishlistCount} hide={hide} />;
+  return (
+    <BottomNav
+      bagCount={bagCount}
+      wishlistCount={wishlistCount}
+      hide={hide}
+      hiddenOnPages={hiddenPagesFor(pageChrome, 'bottomNav')}
+    />
+  );
+}
+
+/*
+ * The header and footer, each switchable per page from Admin › Page layout.
+ *
+ * The gate is mounted only when some page actually switches the piece off:
+ * it reads the path on the client, and the untouched default should stay in
+ * the static shell exactly as it always has.
+ */
+async function HeaderSlot() {
+  const { pageChrome } = await getSiteContent();
+  const hiddenOn = hiddenPagesFor(pageChrome, 'header');
+  if (hiddenOn.length === 0) return <SiteHeader />;
+  return (
+    <ChromeGate hiddenOn={hiddenOn}>
+      <SiteHeader />
+    </ChromeGate>
+  );
+}
+
+async function FooterSlot() {
+  const { pageChrome } = await getSiteContent();
+  const hiddenOn = hiddenPagesFor(pageChrome, 'footer');
+  if (hiddenOn.length === 0) return <SiteFooter />;
+
+  // The footer reserved the room under the fixed bottom bar. Where the footer
+  // goes but the bar stays, something else has to.
+  const barStays = hiddenOn.filter((page) => pageChrome[page].bottomNav);
+  return (
+    <ChromeGate
+      hiddenOn={hiddenOn}
+      replaceOn={barStays}
+      replacement={<div aria-hidden className="h-(--spacing-bottom-nav) lg:hidden" />}
+    >
+      <SiteFooter />
+    </ChromeGate>
+  );
 }
 /**
  * Destinations an administrator has switched off.
