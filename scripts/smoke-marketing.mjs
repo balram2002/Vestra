@@ -243,16 +243,21 @@ try {
   const railName = (await rail.getByRole('link').first().innerText()).trim();
   await rail.getByRole('button', { name: 'Hide from the page' }).click();
   await staff.getByRole('button', { name: 'Hide section' }).click();
+  // Let the hide land before leaving the page.
+  await staff.locator('li[data-section-row]').filter({ hasText: railName }).getByText('Hidden', { exact: true }).waitFor({ timeout: 30000 });
   await openBuilder();
   check('Hiding a section becomes an unpublished change', await appears(staff.getByText(`Hides section “${railName}”`)));
 
   const homeShows = async (url) => {
-    await shopper.goto(url, { waitUntil: 'networkidle' });
+    // Not networkidle: live sections poll, so the network never goes quiet.
+    await shopper.goto(url, { waitUntil: 'load' });
+    await shopper.waitForTimeout(3000);
     return (await shopper.getByRole('heading', { name: railName, exact: true }).count()) > 0;
   };
   check('The live homepage still shows it', await homeShows(`${BASE}/`));
   // The draft preview needs a staff session.
-  await staff.goto(`${BASE}/draft/home`, { waitUntil: 'networkidle' });
+  await staff.goto(`${BASE}/draft/home`, { waitUntil: 'load' });
+  await staff.waitForTimeout(3000);
   check('The draft preview already hides it', (await staff.getByRole('heading', { name: railName, exact: true }).count()) === 0);
 
   await openBuilder();
@@ -267,6 +272,57 @@ try {
   await staff.getByRole('button', { name: 'Put it back' }).click();
   await staff.getByText('That version is live again').waitFor({ timeout: 30000 });
   check('Putting the previous version back restores it', await homeShows(`${BASE}/`));
+
+  /* ------------------------------------------------------ content pages */
+  await staff.goto(`${BASE}/admin/pages?section=Company`, { waitUntil: 'networkidle' });
+  await staff.getByRole('link', { name: /About/ }).first().click();
+  await staff.waitForURL(/\/admin\/pages\/.+/, { timeout: 30000 });
+  await staff.getByRole('region', { name: 'Publishing' }).waitFor({ timeout: 60000 });
+  const aboutEditor = staff.url();
+  const pageId = aboutEditor.split('/').pop();
+
+  const publishPage = async () => {
+    await staff.getByRole('button', { name: 'Publish', exact: true }).click();
+    await staff.getByRole('button', { name: 'Publish now' }).click();
+    await staff.getByText('Published — live now').waitFor({ timeout: 30000 });
+  };
+  const chooseTemplate = async (name) => {
+    await staff.getByRole('button', { name: new RegExp(name) }).first().click();
+    await staff.getByText('Draft saved. Shoppers still see the published page.').waitFor({ timeout: 30000 });
+  };
+  // "min read" appears only in the Editorial template.
+  const aboutIsEditorial = async () => {
+    await shopper.goto(`${BASE}/about`, { waitUntil: 'load' });
+    await shopper.waitForTimeout(2000);
+    return (await shopper.getByText(/min read/).count()) > 0;
+  };
+
+  // Start from a known state: About published as Plain, nothing pending.
+  await staff.getByRole('button', { name: /Plain/ }).first().click();
+  await staff.waitForTimeout(2500);
+  if (await staff.getByRole('button', { name: 'Publish', exact: true }).isEnabled()) await publishPage();
+
+  await chooseTemplate('Editorial');
+  check('A template change is a draft', !(await aboutIsEditorial()));
+  await staff.goto(`${BASE}/draft/content/${pageId}`, { waitUntil: 'load' });
+  await staff.waitForTimeout(2000);
+  check('The content preview shows the draft', (await staff.getByText(/min read/).count()) > 0);
+
+  await staff.goto(aboutEditor, { waitUntil: 'networkidle' });
+  await publishPage();
+  check('Publishing a content page makes it live', await aboutIsEditorial());
+
+  await chooseTemplate('Plain');
+  await publishPage();
+  await staff.getByRole('button', { name: 'Put back' }).first().click();
+  await staff.getByRole('button', { name: 'Put it back' }).click();
+  await staff.getByText('That version is live again').waitFor({ timeout: 30000 });
+  check('A content page version can be put back', await aboutIsEditorial());
+
+  await staff.goto(aboutEditor, { waitUntil: 'networkidle' });
+  await chooseTemplate('Plain');
+  await publishPage();
+  check('Left as found: About is Plain', !(await aboutIsEditorial()));
 } catch (error) {
   const where = String(error.stack ?? '').split('\n').find((line) => line.includes('smoke-marketing')) ?? '';
   check('Run completed', false, `${String(error).split('\n')[0]} ${where.trim()}`);

@@ -135,7 +135,16 @@ passed (13 new), `smoke:marketing` passed 13/13, and `smoke:rbac` passed 27/27
   onto draft → preview → publish with history. The embedded preview becomes
   whole-page with device widths. Sections gain schedule windows (show from/to)
   and per-device visibility.
-- ☐ **Phase 2.4 — Content pages.** An SEO panel (title, description, social
+- ☑ **Phase 2.4 — Content pages.** *Done: edits are autosaved drafts, and the
+  Published/Hidden switch stays separate and immediate. Three templates: Plain
+  (unchanged), Editorial (hero image, standfirst, reading column and reading
+  time) and Help article (contents list from the headings, and a "Still
+  stuck?" card). The editor has a Write/Preview tab, a search panel with a
+  result preview and length warnings, and a hide-from-search switch. Preview
+  at `/draft/content/[id]`; history of the last ten publishes with put-back;
+  "Load the shipped wording" loads the shipped text as a draft, never
+  straight to live. Routes now honour a custom search title, noindex and the
+  hero as the social image.* Original scope: an SEO panel (title, description, social
   image, indexable) with a search-result preview. Three page templates as
   variants: *Plain*, *Editorial* (hero image, pull quotes) and *Help article*
   (sidebar table of contents). Draft, preview and publish.

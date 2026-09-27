@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 
-import { CmsPageForm } from '@/components/console/cms-page-form';
+import { ContentEditor } from '@/components/console/content-editor';
 import { PageHeader } from '@/components/console/page-header';
 import { SectionBuilder } from '@/components/console/section-builder';
 import { ADDABLE_SECTION_KINDS } from '@/domain/sections';
@@ -11,6 +11,7 @@ import { siteConfig } from '@/config/site';
 import { formatDateTime } from '@/lib/format';
 import { requirePermission } from '@/server/auth/session';
 import { collections, toEntities, toEntity } from '@/server/db/collections';
+import { getContentPageState } from '@/server/services/content-pages';
 
 export const metadata: Metadata = { title: 'Edit page' };
 
@@ -28,6 +29,10 @@ async function Editor({ params }: { params: Promise<{ id: string }> }) {
   const pages = await collections.cmsPages();
   const page = toEntity(await pages.findOne({ _id: id }));
   if (!page) notFound();
+
+  const state = await getContentPageState(page.id);
+  const { generateCmsPages } = await import('@/server/seed/pages');
+  const hasShipped = generateCmsPages(page.id, new Date(0)).some((entry) => entry.slug === page.slug);
 
   const contact =
     page.slug === 'legal/grievance' ? 'grievance' : page.slug === 'help/contact' ? 'support' : null;
@@ -47,24 +52,14 @@ async function Editor({ params }: { params: Promise<{ id: string }> }) {
             >
               /{page.slug}
             </Link>{' '}
-            · last saved {formatDateTime(page.updatedAt)}
+            · last published {formatDateTime(page.updatedAt)}
           </>
         }
       />
 
       {contact ? <ContactSettings kind={contact} /> : null}
 
-      <CmsPageForm
-        key={page.updatedAt}
-        page={{
-          id: page.id,
-          slug: page.slug,
-          title: page.title,
-          metaDescription: page.metaDescription,
-          body: page.body,
-          isPublished: page.isPublished,
-        }}
-      />
+      <ContentEditor initial={state!} hasShipped={hasShipped} />
 
       {/*
         The same builder the homepage uses, scoped to this page's slug.

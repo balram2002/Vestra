@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 
 import { atLeastOne, PLACEHOLDER_SLUG } from '@/lib/static-params';
 import { CmsPageView } from '@/components/cms/cms-page-view';
-import { absoluteUrl } from '@/config/site';
+import { cmsMetadata } from '@/lib/seo/cms-metadata';
 import { getCmsPage, listCmsPages } from '@/server/services/content';
 
 interface PageProps {
@@ -22,11 +22,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const page = await getCmsPage(`help/${slug}`);
   if (!page) return {};
 
-  return {
-    title: page.title,
-    description: page.metaDescription ?? undefined,
-    alternates: { canonical: absoluteUrl(`/help/${slug}`) },
-  };
+  return cmsMetadata(page, `/help/${slug}`);
 }
 
 export default async function HelpPage({ params }: PageProps) {
