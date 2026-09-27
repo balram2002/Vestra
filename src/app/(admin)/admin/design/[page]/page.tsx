@@ -5,6 +5,7 @@ import { Suspense } from 'react';
 import { PageDesigner } from '@/components/console/design/page-designer';
 import { PageHeader } from '@/components/console/page-header';
 import { designFor, isPageDesignKey, PAGE_DESIGN_KEYS } from '@/domain/page-designs';
+import { listExperiments } from '@/server/services/experiments';
 import { previewEntities, sellerLayoutCounts } from '@/server/services/design-preview';
 import { getDesignState } from '@/server/services/page-designs';
 
@@ -41,11 +42,12 @@ async function Designer({ params }: PageProps) {
   if (!isPageDesignKey(page)) notFound();
 
   const definition = designFor(page);
-  const [state, entities, categories, layoutCounts] = await Promise.all([
+  const [state, entities, categories, layoutCounts, experiments] = await Promise.all([
     getDesignState(page),
     previewEntities(definition.preview.entity),
     definition.categoryOverrides ? previewEntities('category') : Promise.resolve(null),
     definition.sellerChoice ? sellerLayoutCounts() : Promise.resolve(null),
+    listExperiments(page),
   ]);
 
   return (
@@ -61,6 +63,7 @@ async function Designer({ params }: PageProps) {
         entityLabel={entities.label}
         categories={categories?.options ?? []}
         layoutCounts={layoutCounts ?? {}}
+        experiments={experiments}
       />
     </>
   );

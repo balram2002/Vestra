@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
+import { Suspense } from 'react';
 
 import { atLeastOne, PLACEHOLDER_SLUG } from '@/lib/static-params';
 import { absoluteUrl } from '@/config/site';
@@ -8,6 +9,9 @@ import type { BrandPageSettings, BrandPageVariant } from '@/domain/page-designs/
 import { getBrandBySlug, listBrands } from '@/server/services/catalog';
 import { getLiveDesign } from '@/server/services/page-designs';
 
+import { ExperimentArm } from '@/components/experiments/experiment-arm';
+import { PageSkeleton } from '@/components/skeletons/page-skeleton';
+import { getRunningExperiment } from '@/server/services/experiments';
 import { BrandFrame } from './brand-frame';
 
 /**
@@ -53,8 +57,18 @@ export default async function BrandPage({ params, searchParams }: PageProps) {
 
   // Which layout, and which of its parts, is decided under
   // Admin › Page designs › Brand page. Cached, so the shell still prerenders.
-  const design = await getLiveDesign('brand');
-  const variant = design.variant as BrandPageVariant;
+  const [design, experiment] = await Promise.all([getLiveDesign('brand'), getRunningExperiment('brand')]);
+  const view = (layout: string) => (
+    <BrandFrame brand={brand} variant={layout as BrandPageVariant} settings={design.settings[layout] as BrandPageSettings} searchParams={searchParams} />
+  );
 
-  return <BrandFrame brand={brand} variant={variant} settings={design.settings[variant] as BrandPageSettings} searchParams={searchParams} />;
+  // Under an A/B test the layout is chosen per visitor.
+  if (experiment) {
+    return (
+      <Suspense fallback={<PageSkeleton shape="listing" />}>
+        <ExperimentArm experiment={experiment}>{view}</ExperimentArm>
+      </Suspense>
+    );
+  }
+  return view(design.variant);
 }

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
+import { Suspense } from 'react';
 
 import { atLeastOne, PLACEHOLDER_SLUG } from '@/lib/static-params';
 import { ProductPageView } from '@/components/product/product-page-view';
@@ -13,7 +14,10 @@ import {
   getTopProductSlugs,
 } from '@/server/services/catalog';
 import { resolveVariant } from '@/domain/page-designs/config';
+import { getRunningExperiment } from '@/server/services/experiments';
 import { getLiveDesign } from '@/server/services/page-designs';
+import { ExperimentArm } from '@/components/experiments/experiment-arm';
+import { PageSkeleton } from '@/components/skeletons/page-skeleton';
 
 /**
  * Product detail.
@@ -84,16 +88,27 @@ export default async function ProductPage({ params }: PageProps) {
 
   // Which layout, and which of its parts, is decided under Admin › Marketing › Product page --
   // including any category that has a layout of its own.
-  const variant = resolveVariant(design, { categoryPath: product.categoryPath }) as ProductPageVariant;
-
-  return (
+  const variant = resolveVariant(design, { categoryPath: product.categoryPath });
+  const view = (layout: string) => (
     <ProductPageView
       product={product}
       brand={brand}
       seller={seller}
       ancestors={ancestors}
-      variant={variant}
-      settings={design.settings[variant] as ProductPageSettings}
+      variant={layout as ProductPageVariant}
+      settings={design.settings[layout] as ProductPageSettings}
     />
   );
+
+  // Under an A/B test the layout is chosen per visitor; a category with a
+  // layout of its own stays out of the test.
+  const experiment = variant === design.variant ? await getRunningExperiment('product') : null;
+  if (experiment) {
+    return (
+      <Suspense fallback={<PageSkeleton shape="detail" />}>
+        <ExperimentArm experiment={experiment}>{view}</ExperimentArm>
+      </Suspense>
+    );
+  }
+  return view(variant);
 }

@@ -11,6 +11,7 @@ import type { DesignConfig, PageDesignState } from '@/domain/page-designs/types'
 import { requirePermission } from '../auth/session';
 import * as audit from '../services/audit';
 import { tags } from '../services/cache-tags';
+import { getRunningExperiment } from '../services/experiments';
 import * as designs from '../services/page-designs';
 
 /**
@@ -82,10 +83,25 @@ export async function discardDesignDraft(input: { page: string }) {
 
 const note = z.string().trim().max(200).nullable();
 
+/**
+ * While an A/B test runs, the page's main layout IS the test's control arm.
+ * Changing it would change what half the visitors see mid-test and make the
+ * result meaningless, so it is refused until the test ends. Settings may
+ * still change: they apply to both arms alike.
+ */
+async function testBlocks(page: PageDesignKey, variant: string): Promise<string | null> {
+  const running = await getRunningExperiment(page);
+  if (!running || running.control === variant) return null;
+  const meta = designFor(page).variantMeta[running.control];
+  return `An A/B test is running against ${meta.name}. End the test before changing the layout.`;
+}
+
 export async function publishDesign(input: { page: string; config: unknown; note: string | null }) {
   return run(input.page, 'publish', async (page, actor) => {
     const config = parse(page, input.config);
     if (typeof config === 'string') return config;
+    const blocked = await testBlocks(page, config.variant);
+    if (blocked) return blocked;
     await designs.publish(page, config, note.parse(input.note) || null, actor);
   });
 }
@@ -97,6 +113,8 @@ export async function scheduleDesign(input: { page: string; config: unknown; at:
     const at = Date.parse(input.at);
     if (!Number.isFinite(at)) return 'Pick a date and time.';
     if (at <= Date.now() + 60_000) return 'Pick a time at least a minute from now, or publish now instead.';
+    const blocked = await testBlocks(page, config.variant);
+    if (blocked) return blocked;
     await designs.schedule(page, config, new Date(at).toISOString(), actor);
   });
 }
@@ -107,6 +125,9 @@ export async function cancelDesignSchedule(input: { page: string }) {
 
 export async function revertDesign(input: { page: string; revisionId: string }) {
   return run(input.page, 'revert', async (page, actor) => {
+    const target = (await designs.getDesignState(page)).revisions.find((item) => item.id === input.revisionId);
+    const blocked = target ? await testBlocks(page, target.config.variant) : null;
+    if (blocked) return blocked;
     const revision = await designs.revertTo(page, input.revisionId, actor);
     if (!revision) return 'That version is no longer in the history.';
   });

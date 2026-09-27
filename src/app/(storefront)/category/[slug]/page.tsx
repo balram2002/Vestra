@@ -1,9 +1,13 @@
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
+import { Suspense } from 'react';
 
 import { atLeastOne, PLACEHOLDER_SLUG } from '@/lib/static-params';
 import { absoluteUrl } from '@/config/site';
 import { isIndexableListing, parseProductQuery, type RawSearchParams } from '@/lib/product-query';
+import { ExperimentArm } from '@/components/experiments/experiment-arm';
+import { PageSkeleton } from '@/components/skeletons/page-skeleton';
+import { getRunningExperiment } from '@/server/services/experiments';
 import { CategoryFrame } from './category-frame';
 import { getCategoryBySlug, getCategoryTree } from '@/server/services/catalog';
 import { getLiveDesign } from '@/server/services/page-designs';
@@ -93,15 +97,23 @@ export default async function CategoryPage({ params, searchParams }: PageProps) 
 
   // Which layout, and which of its parts, is decided under
   // Admin › Page designs › Category page. Cached, so the shell still prerenders.
-  const design = await getLiveDesign('category');
-  const variant = design.variant as CategoryPageVariant;
-
-  return (
+  const [design, experiment] = await Promise.all([getLiveDesign('category'), getRunningExperiment('category')]);
+  const view = (layout: string) => (
     <CategoryFrame
       category={category}
-      variant={variant}
-      settings={design.settings[variant] as CategoryPageSettings}
+      variant={layout as CategoryPageVariant}
+      settings={design.settings[layout] as CategoryPageSettings}
       searchParams={searchParams}
     />
   );
+
+  // Under an A/B test the layout is chosen per visitor.
+  if (experiment) {
+    return (
+      <Suspense fallback={<PageSkeleton shape="listing" />}>
+        <ExperimentArm experiment={experiment}>{view}</ExperimentArm>
+      </Suspense>
+    );
+  }
+  return view(design.variant);
 }

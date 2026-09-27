@@ -441,6 +441,16 @@ try {
   await staff.goto(`${BASE}/admin/design/product`, { waitUntil: 'load' });
   await staff.waitForTimeout(1500);
   const productSlug = await staff.getByLabel('Preview with product').inputValue();
+  // Start with no category layouts: one left by an interrupted run would
+  // decide this product's layout and make every check below misleading.
+  if (await staff.getByRole('button', { name: /^Remove the layout for/ }).count()) {
+    while ((await staff.getByRole('button', { name: /^Remove the layout for/ }).count()) > 0) {
+      await staff.getByRole('button', { name: /^Remove the layout for/ }).first().click();
+    }
+    await staff.waitForTimeout(1500);
+    await staff.getByText(/^Draft saved\./).first().waitFor({ timeout: 30000 });
+    await publish();
+  }
 
   // Start from an empty bag: runs add the same items, and a bag caps each
   // item at five, so a full bag would make a working button look broken.
@@ -747,6 +757,84 @@ try {
   await publish();
   check('Withdrawing a layout returns the store to the default', await eventually(storeIsStudio, false));
   await sellerPage.close();
+
+  /* ------------------------------------------------------------ A/B test */
+  const abPanel = staff.locator('section[aria-labelledby="ab-test"]');
+  await staff.goto(`${BASE}/admin/design/category`, { waitUntil: 'load' });
+  await staff.waitForTimeout(1500);
+  // A test left running by an interrupted run would block this one.
+  if (await abPanel.getByRole('button', { name: /^End test, keep/ }).count()) {
+    await abPanel.getByRole('button', { name: /^End test, keep/ }).click();
+    await abPanel.getByRole('button', { name: /^Yes, end and keep/ }).click();
+    await appears(staff.getByText(/^Test ended/));
+  }
+  await abPanel.getByLabel('Test this layout').selectOption('editorial');
+  await abPanel.getByLabel('Shoppers who see it').selectOption('50');
+  await abPanel.getByRole('button', { name: 'Start test' }).click();
+  check('An A/B test starts', await appears(abPanel.getByText(/^Running since/)));
+
+  await chooseLayout('Variant 3 · Visual wall');
+  await staff.getByRole('button', { name: 'Publish', exact: true }).click();
+  await staff.getByRole('button', { name: 'Publish now' }).click();
+  check('A running test blocks a layout change', await appears(staff.getByText(/An A\/B test is running/).first()));
+  await staff.keyboard.press('Escape');
+  await staff.getByRole('button', { name: 'Discard' }).click();
+  await staff.getByRole('button', { name: 'Discard draft' }).click();
+  await staff.getByText('Draft discarded').waitFor({ timeout: 30000 });
+
+  // Fresh shoppers are split between the arms, and each keeps theirs.
+  const seesEditorial = async (page) => {
+    await page.goto(`${BASE}/category/women`, { waitUntil: 'load' });
+    await page.getByRole('heading', { level: 1 }).first().waitFor({ timeout: 60000 });
+    await page.waitForTimeout(1500);
+    return (await page.getByRole('link', { name: /Shop the edit/ }).count()) > 0;
+  };
+  const visitors = [];
+  const seen = new Set();
+  for (let index = 0; index < 12 && (seen.size < 2 || visitors.length < 6); index += 1) {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const page = await context.newPage();
+    const editorial = await seesEditorial(page);
+    visitors.push({ context, page, editorial });
+    seen.add(editorial);
+  }
+  check('Shoppers are given an anonymous visitor id', (await visitors[0].context.cookies()).some((cookie) => cookie.name === 'vx'));
+  check('Shoppers are split between both layouts', seen.size === 2);
+  check('A shopper keeps the same layout on every visit', (await seesEditorial(visitors[0].page)) === visitors[0].editorial);
+
+  // One of them adds to the bag after seeing the test.
+  const buyer = visitors[0].page;
+  await buyer.goto(`${BASE}/product/${productSlug}`, { waitUntil: 'load' });
+  await buyer.waitForTimeout(2000);
+  await buyer.locator('#size-options button:not([aria-disabled="true"])').filter({ hasNotText: 'Size guide' }).first().click();
+  await buyer.getByRole('button', { name: 'Add to bag' }).filter({ visible: true }).first().click();
+  await appears(buyer.getByText('Added to your bag'));
+
+  const numbers = async () => {
+    await abPanel.getByRole('button', { name: 'Refresh numbers' }).click();
+    await staff.waitForTimeout(1500);
+    const rows = await abPanel.locator('tbody tr').evaluateAll((trs) =>
+      trs.map((tr) => [...tr.querySelectorAll('td')].map((td) => td.textContent?.trim() ?? '')),
+    );
+    return {
+      visitors: rows.reduce((sum, row) => sum + Number(row[1] || 0), 0),
+      added: rows.some((row) => row[2] && row[2] !== '0.0%'),
+    };
+  };
+  check('Each shopper is counted once', await eventually(async () => (await numbers()).visitors === visitors.length, true));
+  check('A bag add is credited to the test', await eventually(async () => (await numbers()).added, true));
+
+  await staff.goto(`${BASE}/admin/analytics`, { waitUntil: 'load' });
+  check('Analytics shows the test', await appears(staff.getByText(/Category page: Classic vs Editorial/)));
+
+  await staff.goto(`${BASE}/admin/design/category`, { waitUntil: 'load' });
+  await staff.waitForTimeout(1500);
+  await abPanel.getByRole('button', { name: /^End test, keep/ }).click();
+  await abPanel.getByRole('button', { name: /^Yes, end and keep/ }).click();
+  check('A test can be ended', await appears(abPanel.getByText('Earlier tests')));
+  const editorialVisitor = visitors.find((visitor) => visitor.editorial);
+  check('Ending a test returns everyone to the live layout', await eventually(() => seesEditorial(editorialVisitor.page), false));
+  for (const visitor of visitors) await visitor.context.close();
 } catch (error) {
   const where = String(error.stack ?? '').split('\n').find((line) => line.includes('smoke-marketing')) ?? '';
   check('Run completed', false, `${String(error).split('\n')[0]} ${where.trim()}`);

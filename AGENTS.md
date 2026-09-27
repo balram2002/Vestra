@@ -231,6 +231,14 @@ the customer's original price, coupon share and tax snapshot intact.
   (`sellerChoice`, the pick stored as `seller.storefrontLayout`). Both
   publish with the design. Routes must call `resolveVariant(design, …)` rather
   than reading `design.variant`, or the exception is silently ignored.
+- **A page under an A/B test renders its layout per visitor.** Routes ask
+  `getRunningExperiment(page)` (cached, tagged with the page's design) and,
+  when a test runs and no category/seller layout applies, render through
+  `<ExperimentArm>` inside their own `<Suspense>`. The arm is a hash of the
+  `vx` visitor cookie (set by `proxy.ts` on the designable routes) and the
+  test id. Bag adds and orders credit tests via `creditConversion`, which
+  never throws. While a test runs, publishing a different layout is refused:
+  the live layout IS the control arm.
 
 ## Deliberate deviations from the brief
 

@@ -23,6 +23,18 @@ import { COLLECTIONS, type CollectionName } from './collections';
  * bag has no userId), because a plain unique index treats every missing value
  * as the same null and would reject the second guest.
  */
+/**
+ * At most one RUNNING test per page: two would split the same visitors two
+ * ways and neither result would mean anything. Exported because the
+ * experiments service ensures it lazily too -- indexes are otherwise applied
+ * by the seeder, and a database that predates tests must still refuse the
+ * second one.
+ */
+export const EXPERIMENT_INDEXES: IndexDescription[] = [
+  { key: { page: 1 }, unique: true, name: 'uniq_running_per_page', partialFilterExpression: { status: 'RUNNING' } },
+  { key: { page: 1, startedAt: -1 }, name: 'by_page' },
+];
+
 const INDEXES: Partial<Record<CollectionName, IndexDescription[]>> = {
   /* ------------------------------------------------------------ identity */
   [COLLECTIONS.rateLimits]: [
@@ -278,6 +290,7 @@ const INDEXES: Partial<Record<CollectionName, IndexDescription[]>> = {
     { key: { placement: 1, isActive: 1, position: 1 }, name: 'by_placement' },
   ],
   [COLLECTIONS.cmsPages]: [{ key: { slug: 1 }, unique: true, name: 'uniq_slug' }],
+  [COLLECTIONS.experiments]: EXPERIMENT_INDEXES,
   [COLLECTIONS.campaigns]: [{ key: { isActive: 1, startsAt: 1 }, name: 'by_window' }],
   [COLLECTIONS.navigation]: [{ key: { parentId: 1, position: 1 }, name: 'by_parent' }],
 

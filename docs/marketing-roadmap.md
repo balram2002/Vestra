@@ -249,6 +249,8 @@ between layouts.
 
 ## Milestone 5 — More page designers, and experiments
 
+**Status: ☑ done (27 Sep 2026).**
+
 - ☑ **Phase 5.1 — Category listing** (`/category/[slug]`). V1 *Classic*
   (current). V2 *Editorial*: the name set large beside the picture, photo
   tiles by type, a bestseller rail, and shortcut tiles (New in, Under ₹999,
@@ -299,10 +301,26 @@ between layouts.
   publish, schedule and revert with it. Routes resolve the layout with
   `resolveVariant`. The seller's pick is checked on the server against what
   is allowed at that moment. Done 27 Sep 2026.
-- ☐ **Phase 5.6 — A/B experiments.** Split traffic between two variants of one
-  page. Assignment happens in `proxy.ts` and is carried in the URL rewrite, so
-  pages stay cacheable. Results (views, add-to-bag, orders) appear in
-  Analytics with a clear winner threshold.
+- ☑ **Phase 5.6 — A/B experiments.** Every designer has an *A/B test*
+  panel: choose a challenger layout and the share of shoppers who see it
+  (10-50%). Each shopper keeps their arm on every visit; the arm is a hash
+  of a first-party visitor id and the test id, so tests assign
+  independently. Views (distinct visitors), add-to-bag (distinct visitors)
+  and orders with their value are counted per arm, each count one atomic
+  `$inc`. The verdict is a two-proportion z-test that waits for 200 visitors
+  per arm and 95% confidence, and says "collecting" until then. Ending a test
+  either keeps the live layout or publishes the challenger through the
+  ordinary publish, so it lands in History. Running tests and their verdicts
+  appear in Analytics.
+
+  **Deviation from the plan above:** assignment is NOT carried in a URL
+  rewrite. `proxy.ts` cannot reach the database, so it cannot know which
+  pages are under test, and rewriting every page by visitor group would
+  fragment every page's cache for the sake of the few under test. Instead
+  `proxy.ts` only gives a visitor id (on the designable routes, once), and a
+  page under test renders its layout in a small per-visitor `<Suspense>`
+  island whose data still comes from cache. Pages with no running test are
+  exactly as fast as before. Done 27 Sep 2026.
 
 Checkout and payment stay out of scope for variants. Only trust-badge switches
 are offered there, because layout experiments on the payment step risk revenue

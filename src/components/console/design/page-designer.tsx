@@ -23,7 +23,10 @@ import {
   type DesignResult,
 } from '@/server/actions/page-designs';
 
+import type { Experiment } from '@/domain/experiments';
+
 import { CategoryLayouts, SellerChoice } from './design-exceptions';
+import { DesignExperiment } from './design-experiment';
 import { DesignFields } from './design-fields';
 import { DesignHistory, formatWhen } from './design-history';
 import { DesignPreview } from './design-preview';
@@ -56,6 +59,7 @@ export function PageDesigner({
   entityLabel,
   categories = [],
   layoutCounts = {},
+  experiments = [],
 }: {
   page: PageDesignKey;
   initial: PageDesignState;
@@ -65,6 +69,8 @@ export function PageDesigner({
   categories?: Array<{ value: string; label: string }>;
   /** For pages sellers may choose: how many stores use each layout now. */
   layoutCounts?: Record<string, number>;
+  /** This page's A/B tests, newest first. */
+  experiments?: Experiment[];
 }) {
   const definition = designFor(page);
   const [state, setState] = useState(initial);
@@ -100,6 +106,16 @@ export function PageDesigner({
     setReloadKey((key) => key + 1);
     if (message) toast.success(message);
     return true;
+  };
+
+  /** A state changed elsewhere (a test published its challenger): take it as the new baseline. */
+  const adopt = (next: PageDesignState) => {
+    setState(next);
+    const baseline = next.draft ?? next.published;
+    latest.current = baseline;
+    setWorking(baseline);
+    setEditing(baseline.variant);
+    setReloadKey((key) => key + 1);
   };
 
   const flush = async () => {
@@ -481,6 +497,13 @@ export function PageDesigner({
               onChange={(categoryOverrides) => update({ ...working, categoryOverrides })}
             />
           ) : null}
+          <DesignExperiment
+            page={page}
+            definition={definition}
+            liveVariant={state.published.variant}
+            initial={experiments}
+            onDesignChanged={adopt}
+          />
           {definition.sellerChoice ? (
             <SellerChoice
               definition={definition}

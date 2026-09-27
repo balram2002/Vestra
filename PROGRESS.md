@@ -158,3 +158,13 @@ The plan for bringing every Marketing screen up to one standard lives in `docs/m
 - **Admin:** *Layouts by category* under the Product page designer, and *Sellers may choose* under the Store page designer, with a count of stores per layout.
 - **Seller console:** Store settings has a *Store layout* card offering the allowed layouts (and the marketplace default) with their sketches. `chooseStoreLayout` checks the pick against the live design, audits it and invalidates the store's cache tag.
 - `smoke:marketing` 96/96 (category rule reaches its products, deepest category wins, a seller's pick reaches shoppers, withdrawal returns the store to the default), `smoke:rbac` 40/40.
+
+## Marketing roadmap, Phase 5.6: A/B tests — 27 September 2026
+
+- Every page designer has an **A/B test** panel. Choose a challenger layout and the share of shoppers who see it (10-50%), start, watch visitors, add-to-bag rate, order rate and revenue per visitor per arm, and end the test by keeping the live layout or publishing the challenger. Earlier tests are listed with their outcome.
+- `domain/experiments.ts`: arm assignment (FNV-1a of visitor id + test id, so each shopper keeps their arm and tests assign independently), the two-proportion z-test verdict (200 visitors per arm, 95% confidence, "collecting" until then), and the exposure cookie. Tested.
+- `proxy.ts` gives a first-party `vx` visitor id on the designable routes, into the request as well as the response, so the first render already knows the arm. It is set once and marked private on that response only.
+- Routes render through `<ExperimentArm>` in their own `<Suspense>` while a test runs; with no test they are unchanged. Records with a category or seller layout stay out of the test.
+- Counting: a beacon counts each visitor once (the server recomputes the arm, dedupes by cookie and rate limits per address); `addToBag` and `submitOrder` credit the tests the shopper saw. Every count is one `$inc` on the test document. A partial unique index allows one running test per page, and the service ensures it lazily for databases seeded before tests existed.
+- While a test runs, publishing, scheduling or reverting to a different layout is refused; settings changes still apply to both arms.
+- Analytics lists running and recent tests with the same verdict.

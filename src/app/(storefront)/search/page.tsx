@@ -6,6 +6,8 @@ import type { SearchPageSettings, SearchPageVariant } from '@/domain/page-design
 import type { RawSearchParams } from '@/lib/product-query';
 import { getLiveDesign } from '@/server/services/page-designs';
 
+import { ExperimentArm } from '@/components/experiments/experiment-arm';
+import { getRunningExperiment } from '@/server/services/experiments';
 import { SearchFrame } from './search-frame';
 
 /**
@@ -36,9 +38,12 @@ export default function SearchPage({ searchParams }: { searchParams: Promise<Raw
 }
 
 async function LiveSearch({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
-  const design = await getLiveDesign('search');
-  const variant = design.variant as SearchPageVariant;
-  return <SearchFrame variant={variant} settings={design.settings[variant] as SearchPageSettings} searchParams={searchParams} />;
+  const [design, experiment] = await Promise.all([getLiveDesign('search'), getRunningExperiment('search')]);
+  const view = (layout: string) => (
+    <SearchFrame variant={layout as SearchPageVariant} settings={design.settings[layout] as SearchPageSettings} searchParams={searchParams} />
+  );
+  // Already inside this page's Suspense: under an A/B test the layout is chosen per visitor.
+  return experiment ? <ExperimentArm experiment={experiment}>{view}</ExperimentArm> : view(design.variant);
 }
 
 function SearchSkeleton() {

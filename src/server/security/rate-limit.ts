@@ -53,6 +53,8 @@ export const LIMITS = {
   ticket: { name: 'ticket:user', max: 6, windowSeconds: 60 * 60 },
   review: { name: 'review:user', max: 10, windowSeconds: 60 * 60 },
   liveRequest: { name: 'live:owner', max: 8, windowSeconds: 10 * 60 },
+  /** A/B test views counted, per address: a forged visitor id costs a request each. */
+  exposure: { name: 'exposure:ip', max: 120, windowSeconds: 10 * 60 },
 } as const satisfies Record<string, RateLimitRule>;
 
 export interface RateLimitResult {
