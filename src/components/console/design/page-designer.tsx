@@ -208,7 +208,8 @@ export function PageDesigner({
   const settings = working.settings[editing];
   const defaults = definition.defaults[editing];
   const changedCount = changedFromDefault(definition, editing, settings).size;
-  const previewPath = entity ? definition.preview.path(entity, editing) : null;
+  // A page about no one record (a directory) previews without choosing one.
+  const previewPath = entity || definition.preview.entity === null ? definition.preview.path(entity, editing) : null;
 
   return (
     <div className="mt-6 space-y-6">

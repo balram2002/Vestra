@@ -125,3 +125,13 @@ The plan for bringing every Marketing screen up to one standard lives in `docs/m
 - `ListingView` gained options (docked rail, popular filters, tiles, wall display) that default to the old behaviour, so search, brand and store are unchanged.
 - Staff preview at `/category/[slug]/preview/[variant]` keeps filter and sort links inside the preview.
 - `smoke:marketing` 64/64 (quick view adds to the bag, tiles filter, Editorial publishes to shoppers); `smoke:rbac` 34/34.
+
+## Marketing roadmap, Phase 5.2: Sellers directory designer — 27 September 2026
+
+- **Admin › Page designs › Sellers directory** (`/admin/design/stores`) has 12 settings: breadcrumbs, title, introduction, story row, "Live now", jump to a city, the order, stores opening soon, banner, trust numbers, about line, and an invitation to sell.
+- **Variant 1 · Classic** is the directory as shipped. **Variant 2 · Local market** groups stores by city. **Variant 3 · Stories** puts a story row of logos above ranked cards; stores live for video calls lead the row.
+- The page reads a public projection of each seller (`services/store-directory.ts`), never the seller record with its KYC and bank details. Ordering and grouping are pure functions in `domain/store-directory.ts`, with tests.
+- Presence is a 90-second heartbeat, so it is read at request time in its own `<Suspense>` island; the fallback is the same row with nobody live, so the page still prerenders.
+- The designer now previews pages that have no record to preview with (`preview.entity: null`).
+- `smoke:rbac` reads the whole page when looking for a refusal. The console nav grew past its old 400-character window, which briefly made a correct refusal look like a hole. `smoke:marketing`'s publish step now waits on the status line rather than a toast that a previous publish can leave on screen.
+- `smoke:marketing` 71/71, `smoke:rbac` 36/36.

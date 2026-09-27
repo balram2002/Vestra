@@ -31,6 +31,7 @@ const CASES = [
   // A draft preview is staff-only, even though the page it previews is public.
   { who: 'anonymous', email: null, path: '/store/ash-and-oak-menswear/preview/spotlight', allow: false },
   { who: 'anonymous', email: null, path: '/category/women/preview/wall', allow: false },
+  { who: 'anonymous', email: null, path: '/stores/preview/market', allow: false },
   { who: 'anonymous', email: null, path: '/admin/design/product', allow: false },
 
   { who: 'customer', email: 'ananya.iyer@example.com', path: '/orders', allow: true },
@@ -57,6 +58,7 @@ const CASES = [
   { who: 'marketing', email: 'marketing@vestra.test', path: '/admin/design/product', allow: true },
   { who: 'marketing', email: 'marketing@vestra.test', path: '/admin/design/demo', allow: true },
   { who: 'marketing', email: 'marketing@vestra.test', path: '/admin/design/category', allow: true },
+  { who: 'marketing', email: 'marketing@vestra.test', path: '/admin/design/stores', allow: true },
   { who: 'marketing', email: 'marketing@vestra.test', path: '/category/women/preview/editorial', allow: true },
   { who: 'marketing', email: 'marketing@vestra.test', path: '/store/ash-and-oak-menswear/preview/studio', allow: true },
   { who: 'marketing', email: 'marketing@vestra.test', path: '/admin/payments', allow: false },
@@ -106,18 +108,28 @@ for (const [who, cases] of byWho) {
 
     try {
       const response = await page.goto(BASE + item.path, { waitUntil: 'domcontentloaded', timeout: 30000 });
-      await page.waitForTimeout(700);
+      // A refusal renders inside the page's own boundary, streamed after the
+      // shell: give it a few seconds to arrive before calling the page reached,
+      // or a busy server reads as a security hole.
+      const REFUSAL = /sign in to continue|do not have access|not authorised|not authorized/i;
+      let body = '';
+      for (let waited = 0; waited < 4000; waited += 400) {
+        await page.waitForTimeout(400);
+        // The whole page: the console nav comes first and grows with every
+        // screen added, so a refusal can sit past any fixed cut-off.
+        body = await page.locator('body').innerText();
+        if (REFUSAL.test(body) || new URL(page.url()).pathname !== item.path) break;
+      }
 
       const landed = new URL(page.url()).pathname;
       const status = response?.status() ?? 0;
-      const body = (await page.locator('body').innerText()).slice(0, 400);
 
       // Turned away = redirected elsewhere, or a refusal boundary rendered.
       const redirected = landed !== item.path;
       const refused =
         status === 401 ||
         status === 403 ||
-        /sign in to continue|do not have access|not authorised|not authorized/i.test(body);
+        REFUSAL.test(body);
 
       reached = !redirected && !refused;
       detail = redirected ? `redirected to ${landed}` : refused ? 'refused' : `${status}`;

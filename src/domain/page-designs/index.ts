@@ -2,6 +2,7 @@ import { categoryPageDesign } from './category';
 import { demoPageDesign } from './demo';
 import { productPageDesign } from './product';
 import { storePageDesign } from './store';
+import { storesPageDesign } from './stores';
 import type { PageDesignDefinition } from './types';
 
 /**
@@ -15,6 +16,7 @@ export const PAGE_DESIGNS = {
   product: productPageDesign,
   demo: demoPageDesign,
   category: categoryPageDesign,
+  stores: storesPageDesign,
 } as const;
 
 export type PageDesignKey = keyof typeof PAGE_DESIGNS;

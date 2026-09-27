@@ -227,6 +227,58 @@ Object.assign(SKETCHES, {
   ),
 });
 
+Object.assign(SKETCHES, {
+  'stores-classic': () => (
+    <Frame>
+      <div className="bg-ink/70 h-2.5 w-1/2 rounded-sm" />
+      <div className="grid grid-cols-3 gap-1">
+        {Array.from({ length: 6 }, (_, index) => (
+          <span key={index} className="border-line flex flex-col gap-0.5 rounded-[3px] border p-1">
+            <span className="bg-ink/50 block h-1.5 w-3/4 rounded-sm" />
+            <span className={cn(tile, 'h-1 w-full')} />
+            <span className={cn(tile, 'h-1 w-2/3')} />
+          </span>
+        ))}
+      </div>
+    </Frame>
+  ),
+  'stores-market': () => (
+    <Frame>
+      <div className="h-6 rounded-md bg-neutral-100 p-1">
+        <span className="bg-ink/70 block h-2 w-1/3 rounded-sm" />
+      </div>
+      <div className="flex gap-1">
+        <Tiles count={4} className="h-2 w-6 rounded-full" />
+      </div>
+      <span className="bg-ink/50 block h-1.5 w-1/4 rounded-sm" />
+      <div className="grid grid-cols-3 gap-1">
+        <Tiles count={3} className="h-7" />
+      </div>
+      <span className="bg-ink/50 block h-1.5 w-1/4 rounded-sm" />
+      <div className="grid grid-cols-3 gap-1">
+        <Tiles count={2} className="h-7" />
+      </div>
+    </Frame>
+  ),
+  'stores-stories': () => (
+    <Frame>
+      <div className="flex gap-1.5">
+        {Array.from({ length: 5 }, (_, index) => (
+          <span key={index} className="size-6 rounded-full bg-[conic-gradient(#f59e0b,#ef4444,#d946ef,#8b5cf6,#f59e0b)] p-[2px]">
+            <span className="bg-canvas block size-full rounded-full" />
+          </span>
+        ))}
+      </div>
+      <div className="grid grid-cols-3 gap-1">
+        <Tiles count={3} className="h-9" />
+      </div>
+      <div className="grid grid-cols-4 gap-1">
+        <Tiles count={4} className="h-5" />
+      </div>
+    </Frame>
+  ),
+});
+
 export function DesignSketch({ sketch }: { sketch: string }) {
   const draw = SKETCHES[sketch];
   return draw ? draw() : <Frame><div className={cn(tile, 'h-24')} /></Frame>;

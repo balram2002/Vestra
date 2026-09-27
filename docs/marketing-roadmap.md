@@ -257,9 +257,17 @@ between layouts.
   drawer, and a quick view that picks colour and size and adds to the bag in
   place. 14 settings; wall-only ones show only while the wall is edited
   (`onlyFor`). Done 27 Sep 2026.
-- ☐ **Phase 5.2 — Sellers directory** (`/stores`). V1 current. V2 *Local
-  market* (grouped by city, "near you" first). V3 *Stories* (live and new
-  stores as a story row, then trust-ranked cards).
+- ☑ **Phase 5.2 — Sellers directory** (`/stores`). V1 *Classic* (current).
+  V2 *Local market*: stores grouped by city, biggest markets first, with a
+  sticky bar to jump between cities; cities with a single store share one
+  "More cities" group rather than a heading each. V3 *Stories*: a story row
+  of round logos, stores live for video calls first (ringed and marked LIVE),
+  then new stores, above ranked cards with the top three shown large. Who is
+  live is read at request time in its own island, so the page still
+  prerenders. 12 settings, including the order (rating, trust, orders,
+  newest). "Near you" was dropped: it would mean asking for location on a
+  directory page, and grouping by city answers the same question. Done 27 Sep
+  2026.
 - ☐ **Phase 5.3 — Brand page** (`/brand/[slug]`). V1 current. V2 *Campaign*
   (full-bleed brand film/hero). V3 *Catalogue* (compact, filter-first).
 - ☐ **Phase 5.4 — Search results** (`/search`). V1 current. V2 *Instant*

@@ -102,7 +102,9 @@ try {
   const publish = async () => {
     await staff.getByRole('button', { name: 'Publish', exact: true }).click();
     await staff.getByRole('button', { name: 'Publish now' }).click();
-    await staff.getByText('Published — live now').waitFor({ timeout: 30000 });
+    // The status line, not the toast: two publishes in a row leave the first
+    // toast on screen, and waiting on it would pass before this one landed.
+    await staff.getByText(/^Nothing unpublished\./).first().waitFor({ timeout: 30000 });
   };
   const liveIsSpotlight = async () => {
     await shopper.goto(storeUrl, { waitUntil: 'domcontentloaded' });
@@ -563,6 +565,33 @@ try {
   await chooseLayout('Variant 1 · Classic');
   await publish();
   check('Left as found: category Classic', await eventually(categoryIsEditorial, false));
+
+  /* ------------------------------------------------ sellers directory */
+  await staff.goto(`${BASE}/stores/preview/stories`, { waitUntil: 'load' });
+  await staff.waitForTimeout(1200);
+  check('Stories shows the story row', await appears(staff.getByRole('navigation', { name: 'Stores to follow' })));
+  check('Stories ranks stores', await appears(staff.getByRole('heading', { name: 'Most trusted' })));
+  await staff.goto(`${BASE}/stores/preview/market`, { waitUntil: 'load' });
+  await staff.waitForTimeout(1200);
+  const jump = staff.getByRole('navigation', { name: 'Jump to a city' }).getByRole('link').first();
+  const target = (await jump.getAttribute('href')) ?? '';
+  check('Local market groups stores by city', target.startsWith('#city-') && (await staff.locator(target).count()) === 1);
+
+  const directoryIsMarket = async () => {
+    await shopper.goto(`${BASE}/stores`, { waitUntil: 'load' });
+    await shopper.waitForTimeout(1200);
+    return (await shopper.getByRole('navigation', { name: 'Jump to a city' }).count()) > 0;
+  };
+  await staff.goto(`${BASE}/admin/design/stores`, { waitUntil: 'load' });
+  await staff.waitForTimeout(1500);
+  check('The directory designer previews without choosing a record', await appears(staff.locator('iframe[src*="/stores/preview/"]')));
+  await chooseLayout('Variant 2 · Local market');
+  check('A directory layout change is a draft', !(await directoryIsMarket()));
+  await publish();
+  check('Publishing Local market reaches shoppers', await eventually(directoryIsMarket, true));
+  await chooseLayout('Variant 1 · Classic');
+  await publish();
+  check('Left as found: directory Classic', await eventually(directoryIsMarket, false));
 } catch (error) {
   const where = String(error.stack ?? '').split('\n').find((line) => line.includes('smoke-marketing')) ?? '';
   check('Run completed', false, `${String(error).split('\n')[0]} ${where.trim()}`);
