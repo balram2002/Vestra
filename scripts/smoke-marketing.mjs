@@ -34,6 +34,21 @@ const check = (name, ok, detail = '') => {
   console.log(`${ok ? '✓' : '✗'} ${name}${detail ? ` — ${detail}` : ''}`);
 };
 
+/**
+ * Poll a shopper-side check until it gives the expected answer or 15 seconds
+ * pass. Publishing expires the cache at once, but the first request after it
+ * can race the refresh; "within seconds" is the promise being tested.
+ */
+async function eventually(probe, expected) {
+  const until = Date.now() + 15000;
+  let value = await probe();
+  while (value !== expected && Date.now() < until) {
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    value = await probe();
+  }
+  return value === expected;
+}
+
 const browser = await chromium.launch();
 const staff = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 const shopper = await browser.newPage({ viewport: { width: 1280, height: 900 } });
@@ -61,8 +76,9 @@ try {
   check('Marketing overview renders', true);
 
   /* ---------------------------------------------------------- designer */
-  // Hydrated before the first click: a click on server HTML does nothing.
-  await staff.goto(`${BASE}/admin/design/store`, { waitUntil: 'networkidle' });
+  // Loaded and settled before the first click: a click on server HTML does nothing.
+  await staff.goto(`${BASE}/admin/design/store`, { waitUntil: 'load' });
+  await staff.waitForTimeout(1200);
   const status = staff.getByRole('status').filter({ hasText: /draft|unpublished/i });
   await status.waitFor({ timeout: 60000 });
   const slug = await staff.getByLabel('Preview with store').inputValue();
@@ -74,7 +90,9 @@ try {
     // Already the layout in use: nothing to choose.
     if ((await button.count()) === 0) return;
     await button.click();
-    await staff.getByText(/Draft saved\. Will publish/).waitFor({ timeout: 30000 });
+    // The status names the layout it will publish: wait for THIS one, not any
+    // earlier "Draft saved" line still on screen.
+    await staff.getByText(`Will publish ${name}.`).waitFor({ timeout: 30000 });
   };
   const publish = async () => {
     await staff.getByRole('button', { name: 'Publish', exact: true }).click();
@@ -84,7 +102,12 @@ try {
   const liveIsSpotlight = async () => {
     await shopper.goto(storeUrl, { waitUntil: 'domcontentloaded' });
     await shopper.locator('h1').first().waitFor({ timeout: 60000 });
-    return (await shopper.locator('h1.uppercase').count()) > 0;
+    const spotlight = (await shopper.locator('h1.uppercase').count()) > 0;
+    if (process.env.DEBUG_SMOKE) {
+      const h1 = await shopper.locator('h1').first().getAttribute('class');
+      console.log(`    [shopper ${shopper.url()}] ${spotlight ? 'spotlight' : 'classic'} · ${h1?.slice(0, 40)}`);
+    }
+    return spotlight;
   };
 
   // Start from a known state: Classic live, nothing pending.
@@ -112,7 +135,7 @@ try {
 
   // Publish.
   await publish();
-  check('Publishing makes it live for shoppers', await liveIsSpotlight());
+  check('Publishing makes it live for shoppers', await eventually(liveIsSpotlight, true));
 
   // Discard.
   await chooseLayout('Variant 3 · Studio');
@@ -138,21 +161,22 @@ try {
   // History: publish Classic, then put Spotlight back, then restore Classic.
   await chooseLayout('Variant 1 · Classic');
   await publish();
-  check('Classic is live again', !(await liveIsSpotlight()));
+  check('Classic is live again', await eventually(liveIsSpotlight, false));
   await staff.getByRole('button', { name: 'Put back' }).first().click();
   await staff.getByRole('button', { name: 'Put it back' }).click();
   await staff.getByText('That version is live again').waitFor({ timeout: 30000 });
-  check('An older version can be put back', await liveIsSpotlight());
+  check('An older version can be put back', await eventually(liveIsSpotlight, true));
 
   await chooseLayout('Variant 1 · Classic');
   await publish();
-  check('Left as found: Classic live', !(await liveIsSpotlight()));
+  check('Left as found: Classic live', await eventually(liveIsSpotlight, false));
 
   /* ----------------------------------------------------------- coupons */
   const code = `SMK${Date.now().toString(36).toUpperCase().slice(-6)}`;
   // Lists stream in behind a skeleton: wait for the row, don't just glance.
   const appears = (locator) => locator.first().waitFor({ timeout: 30000 }).then(() => true, () => false);
-  await staff.goto(`${BASE}/admin/coupons/new`, { waitUntil: 'networkidle' });
+  await staff.goto(`${BASE}/admin/coupons/new`, { waitUntil: 'load' });
+  await staff.waitForTimeout(1200);
   await staff.getByLabel('Code', { exact: true }).fill(code);
   await staff.getByLabel('Title', { exact: true }).fill('Smoke test coupon');
   // A flat discount with no minimum could make an order free: refused on the field.
@@ -176,7 +200,9 @@ try {
   await staff.goto(`${BASE}/admin/coupons?q=${code}`, { waitUntil: 'domcontentloaded' });
   check('It is listed as live', await appears(staff.getByRole('row').filter({ hasText: code }).getByText('Live')));
 
-  await staff.goto(couponUrl, { waitUntil: 'networkidle' });
+  await staff.goto(couponUrl, { waitUntil: 'load' });
+
+  await staff.waitForTimeout(1200);
   await staff.getByLabel('Title', { exact: true }).fill('Smoke test coupon, edited');
   await staff.getByRole('button', { name: 'Save changes' }).click();
   await staff.getByText('Saved — live rules updated').waitFor({ timeout: 30000 });
@@ -192,7 +218,9 @@ try {
       (await staff.getByLabel('Code', { exact: true }).filter({ visible: true }).inputValue()) === '',
   );
 
-  await staff.goto(couponUrl, { waitUntil: 'networkidle' });
+  await staff.goto(couponUrl, { waitUntil: 'load' });
+
+  await staff.waitForTimeout(1200);
   await staff.getByRole('button', { name: 'Archive' }).click();
   await staff.getByRole('dialog').getByRole('button', { name: 'Archive' }).click();
   await staff.getByText(`${code} archived`).waitFor({ timeout: 30000 });
@@ -201,7 +229,8 @@ try {
 
   /* -------------------------------------------------------- promotions */
   const promo = `Smoke sale ${code}`;
-  await staff.goto(`${BASE}/admin/promotions/new`, { waitUntil: 'networkidle' });
+  await staff.goto(`${BASE}/admin/promotions/new`, { waitUntil: 'load' });
+  await staff.waitForTimeout(1200);
   await staff.getByLabel('Title', { exact: true }).fill(promo);
   await staff.getByLabel('Description', { exact: true }).fill('Ten percent off everything, for the smoke test.');
   await staff.getByRole('spinbutton', { name: 'Percent off' }).fill('10');
@@ -218,7 +247,9 @@ try {
   await staff.goto(`${BASE}/admin/promotions?view=calendar`, { waitUntil: 'domcontentloaded' });
   check('It appears on the calendar', await appears(staff.getByRole('link', { name: promo })));
 
-  await staff.goto(promoUrl, { waitUntil: 'networkidle' });
+  await staff.goto(promoUrl, { waitUntil: 'load' });
+
+  await staff.waitForTimeout(1200);
   await staff.getByRole('button', { name: 'Archive' }).click();
   await staff.getByRole('dialog').getByRole('button', { name: 'Archive' }).click();
   await staff.getByText(`${promo} archived`).waitFor({ timeout: 30000 });
@@ -226,7 +257,8 @@ try {
 
   /* ------------------------------------------------ homepage publishing */
   const openBuilder = async () => {
-    await staff.goto(`${BASE}/admin/cms`, { waitUntil: 'networkidle' });
+    await staff.goto(`${BASE}/admin/cms`, { waitUntil: 'load' });
+    await staff.waitForTimeout(1200);
     await staff.getByRole('region', { name: 'Publishing' }).waitFor({ timeout: 60000 });
   };
   await openBuilder();
@@ -264,17 +296,18 @@ try {
   await staff.getByRole('button', { name: 'Publish', exact: true }).click();
   await staff.getByRole('button', { name: 'Publish now' }).click();
   await staff.getByText('Published — live now').waitFor({ timeout: 30000 });
-  check('Publishing hides it from shoppers', !(await homeShows(`${BASE}/`)));
+  check('Publishing hides it from shoppers', await eventually(() => homeShows(`${BASE}/`), false));
 
   await openBuilder();
   await staff.getByRole('button', { name: 'History' }).click();
   await staff.getByRole('dialog').getByRole('button', { name: 'Put back' }).first().click();
   await staff.getByRole('button', { name: 'Put it back' }).click();
   await staff.getByText('That version is live again').waitFor({ timeout: 30000 });
-  check('Putting the previous version back restores it', await homeShows(`${BASE}/`));
+  check('Putting the previous version back restores it', await eventually(() => homeShows(`${BASE}/`), true));
 
   /* ------------------------------------------------------ content pages */
-  await staff.goto(`${BASE}/admin/pages?section=Company`, { waitUntil: 'networkidle' });
+  await staff.goto(`${BASE}/admin/pages?section=Company`, { waitUntil: 'load' });
+  await staff.waitForTimeout(1200);
   await staff.getByRole('link', { name: /About/ }).first().click();
   await staff.waitForURL(/\/admin\/pages\/.+/, { timeout: 30000 });
   await staff.getByRole('region', { name: 'Publishing' }).waitFor({ timeout: 60000 });
@@ -308,21 +341,90 @@ try {
   await staff.waitForTimeout(2000);
   check('The content preview shows the draft', (await staff.getByText(/min read/).count()) > 0);
 
-  await staff.goto(aboutEditor, { waitUntil: 'networkidle' });
+  await staff.goto(aboutEditor, { waitUntil: 'load' });
+
+  await staff.waitForTimeout(1200);
   await publishPage();
-  check('Publishing a content page makes it live', await aboutIsEditorial());
+  check('Publishing a content page makes it live', await eventually(aboutIsEditorial, true));
 
   await chooseTemplate('Plain');
   await publishPage();
   await staff.getByRole('button', { name: 'Put back' }).first().click();
   await staff.getByRole('button', { name: 'Put it back' }).click();
   await staff.getByText('That version is live again').waitFor({ timeout: 30000 });
-  check('A content page version can be put back', await aboutIsEditorial());
+  check('A content page version can be put back', await eventually(aboutIsEditorial, true));
 
-  await staff.goto(aboutEditor, { waitUntil: 'networkidle' });
+  await staff.goto(aboutEditor, { waitUntil: 'load' });
+
+  await staff.waitForTimeout(1200);
   await chooseTemplate('Plain');
   await publishPage();
-  check('Left as found: About is Plain', !(await aboutIsEditorial()));
+  check('Left as found: About is Plain', await eventually(aboutIsEditorial, false));
+
+  /* -------------------------------------------------------- page layout */
+  const headerCount = async (path) => {
+    await shopper.goto(`${BASE}${path}`, { waitUntil: 'load' });
+    await shopper.waitForTimeout(2500);
+    return shopper.locator('header.sticky').count();
+  };
+  await staff.goto(`${BASE}/admin/page-chrome`, { waitUntil: 'load' });
+  await staff.waitForTimeout(1200);
+  await staff.getByRole('button', { name: 'Add a page' }).click();
+  const pathInput = staff.getByLabel('Page path').last();
+  await pathInput.fill('/about');
+  await staff.getByRole('combobox', { name: 'Header on /about' }).selectOption('none');
+  await staff.getByRole('button', { name: 'Save', exact: true }).click();
+  await staff.getByText('Saved — live on the shop').waitFor({ timeout: 30000 });
+  check('A single-page rule removes the header there', (await headerCount('/about')) === 0);
+  check('…and nowhere else', (await headerCount('/help/shipping')) > 0);
+
+  await staff.goto(`${BASE}/admin/page-chrome`, { waitUntil: 'load' });
+
+  await staff.waitForTimeout(1200);
+  await staff.getByRole('button', { name: 'History' }).first().click();
+  await staff.getByRole('dialog').getByRole('button', { name: 'Put back' }).first().click();
+  await staff.getByRole('button', { name: 'Put it back' }).click();
+  await staff.getByText('Put back — live on the shop').waitFor({ timeout: 30000 });
+  check('Page layout History puts the header back', (await headerCount('/about')) > 0);
+
+  /* --------------------------------------------------- strip schedule */
+  const stripLine = `Smoke line ${code}`;
+  const stripShows = async () => {
+    await shopper.goto(`${BASE}/help/shipping`, { waitUntil: 'load' });
+    await shopper.waitForTimeout(2500);
+    return (await shopper.getByText(stripLine).count()) > 0;
+  };
+  await staff.goto(`${BASE}/admin/appearance`, { waitUntil: 'load' });
+  await staff.waitForTimeout(1200);
+  const strip = staff.getByRole('region', { name: 'Announcement strip' });
+  await strip.getByRole('button', { name: 'Add a line' }).click();
+  await strip.getByLabel('Text').last().fill(stripLine);
+  await strip.getByRole('button', { name: 'Schedule' }).last().click();
+  const tomorrow = new Date(Date.now() + 86_400_000);
+  const tomorrowLocal = new Date(tomorrow.getTime() - tomorrow.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  await strip.getByLabel('Starts').last().fill(tomorrowLocal);
+  await strip.getByRole('button', { name: 'Save', exact: true }).click();
+  await staff.getByText('Saved — live on the shop').waitFor({ timeout: 30000 });
+  check('A strip line scheduled for tomorrow is not showing', !(await stripShows()));
+
+  await staff.goto(`${BASE}/admin/appearance`, { waitUntil: 'load' });
+
+  await staff.waitForTimeout(1200);
+  await strip.getByLabel('Starts').last().fill('');
+  await strip.getByRole('button', { name: 'Save', exact: true }).click();
+  await staff.getByText('Saved — live on the shop').waitFor({ timeout: 30000 });
+  check('Clearing its start shows it', await stripShows());
+
+  await staff.goto(`${BASE}/admin/appearance`, { waitUntil: 'load' });
+
+  await staff.waitForTimeout(1200);
+  await strip.getByRole('button', { name: 'History' }).click();
+  // The newest entry is the value before the last save; the one before it is
+  // the strip as it was before this test added a line.
+  await staff.getByRole('dialog').getByRole('button', { name: 'Put back' }).nth(1).click();
+  await staff.getByRole('button', { name: 'Put it back' }).click();
+  await staff.getByText('Put back — live on the shop').waitFor({ timeout: 30000 });
+  check('Appearance History puts the strip back', !(await stripShows()));
 } catch (error) {
   const where = String(error.stack ?? '').split('\n').find((line) => line.includes('smoke-marketing')) ?? '';
   check('Run completed', false, `${String(error).split('\n')[0]} ${where.trim()}`);

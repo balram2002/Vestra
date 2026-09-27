@@ -1,7 +1,7 @@
 'use client';
 
-import { ChevronDown, ChevronUp, Eye, EyeOff, Plus, RotateCcw, Trash2 } from 'lucide-react';
-import { useState, useTransition } from 'react';
+import { CalendarClock, ChevronDown, ChevronUp, Eye, EyeOff, Plus, RotateCcw, Trash2 } from 'lucide-react';
+import { useState, useSyncExternalStore, useTransition } from 'react';
 import { toast } from 'sonner';
 
 import { ICON_LABELS } from '@/components/ui/content-icon';
@@ -22,6 +22,7 @@ import {
   type HeaderActions,
   type SiteContent,
   type ValueProp,
+  type VERSIONED_BLOCKS,
 } from '@/domain/site-content';
 import { cn } from '@/lib/cn';
 import {
@@ -29,6 +30,10 @@ import {
   saveAppearance,
   type AppearanceBlock,
 } from '@/server/actions/appearance';
+
+import { BlockHistory } from './block-history';
+
+type VersionedBlock = (typeof VERSIONED_BLOCKS)[number];
 
 /**
  * The shop's words, edited.
@@ -50,7 +55,9 @@ export function AppearanceEditor({ content }: { content: SiteContent }) {
   const shown = useVisibility(content.visibility);
 
   return (
-    <div className="mt-6 space-y-6">
+    // Keyed on the content: after a put-back the server sends the restored
+    // value, and the cards must start again from it rather than keep drafts.
+    <div key={JSON.stringify(content)} className="mt-6 space-y-6">
       <AnnouncementsBlock initial={content.announcements} shown={shown} />
       <HeaderActionsBlock initial={content.headerActions} />
       <ValuePropsBlock initial={content.valueProps} shown={shown} />
@@ -138,6 +145,7 @@ function Block({
   onReset,
   shown,
   visibilityKey,
+  history,
   children,
 }: {
   title: string;
@@ -149,6 +157,8 @@ function Block({
   /** Blocks that can be switched off as a whole pass these. */
   shown?: Shown;
   visibilityKey?: keyof BlockVisibility;
+  /** Blocks whose earlier saves can be put back. */
+  history?: VersionedBlock;
   children: React.ReactNode;
 }) {
   const visible = shown && visibilityKey ? shown.visibility[visibilityKey] : true;
@@ -208,6 +218,8 @@ function Block({
               onConfirm={() => shown.set(visibilityKey, !visible)}
             />
           ) : null}
+
+          {history ? <BlockHistory block={history} title={title} /> : null}
 
           <ConfirmDialog
             trigger={
@@ -324,7 +336,7 @@ function newId(prefix: string): string {
 
 function Row({ children }: { children: React.ReactNode }) {
   return (
-    <div className="border-line bg-canvas flex items-start gap-3 rounded-md border p-3">
+    <div className="border-line bg-canvas flex flex-wrap items-start gap-3 rounded-md border p-3">
       {children}
     </div>
   );
@@ -382,6 +394,7 @@ function AnnouncementsBlock({ initial, shown }: { initial: AnnouncementItem[]; s
   return (
     <Block
       title="Announcement strip"
+      history="announcements"
       description="The band above the header. It sits still and centred when it fits, and scrolls when it does not."
       shown={shown}
       visibilityKey="announcements"
@@ -426,8 +439,11 @@ function AnnouncementsBlock({ initial, shown }: { initial: AnnouncementItem[]; s
             onMove={(from, to) => setDraft(move(draft, from, to))}
             onRemove={(at) => setDraft(draft.filter((_, position) => position !== at))}
           />
+          <LineSchedule item={item} onChange={(patch) => update(index, patch)} />
         </Row>
       ))}
+
+      <StripPreview items={draft} />
 
       <AddButton
         label="Add a line"
@@ -454,6 +470,7 @@ function HeaderActionsBlock({ initial }: { initial: HeaderActions }) {
   return (
     <Block
       title="Header and bottom bar"
+      history="headerActions"
       description="Which actions the shop offers. An action turned off disappears everywhere at once."
       dirty={dirty}
       pending={pending}
@@ -486,6 +503,7 @@ function ValuePropsBlock({ initial, shown }: { initial: ValueProp[]; shown: Show
   return (
     <Block
       title="Promises"
+      history="valueProps"
       description="The band near the foot of the homepage. Each one should state a number rather than a claim."
       shown={shown}
       visibilityKey="valueProps"
@@ -566,6 +584,7 @@ function FooterBadgesBlock({ initial, shown }: { initial: FooterBadge[]; shown: 
   return (
     <Block
       title="Footer badges"
+      history="footerBadges"
       description="The short reassurances at the point of leaving."
       shown={shown}
       visibilityKey="footerBadges"
@@ -615,6 +634,7 @@ function FooterColumnsBlock({ initial, shown }: { initial: FooterColumn[]; shown
   return (
     <Block
       title="Footer columns"
+      history="footerColumns"
       description="Everything but Shop, which follows the departments that actually exist."
       shown={shown}
       visibilityKey="footerColumns"
@@ -718,5 +738,129 @@ function FooterColumnsBlock({ initial, shown }: { initial: FooterColumn[]; shown
         />
       ) : null}
     </Block>
+  );
+}
+
+/* ---------------------------------------------------------- strip timing */
+
+let clock = 0;
+const listeners = new Set<() => void>();
+
+/** The time, refreshed each minute and read outside render. 0 while server-rendering. */
+function useNow(): number {
+  return useSyncExternalStore(
+    (notify) => {
+      listeners.add(notify);
+      clock = Date.now();
+      const id = setInterval(() => {
+        clock = Date.now();
+        listeners.forEach((listener) => listener());
+      }, 60_000);
+      notify();
+      return () => {
+        clearInterval(id);
+        listeners.delete(notify);
+      };
+    },
+    () => clock,
+    () => 0,
+  );
+}
+
+function lineState(item: AnnouncementItem, now: number): 'live' | 'scheduled' | 'ended' | 'off' {
+  if (!item.isActive) return 'off';
+  if (item.endsAt && Date.parse(item.endsAt) <= now) return 'ended';
+  if (item.startsAt && Date.parse(item.startsAt) > now) return 'scheduled';
+  return 'live';
+}
+
+function toLocalInput(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const date = new Date(iso);
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
+
+/** A line's optional window, folded away until it is wanted. */
+function LineSchedule({
+  item,
+  onChange,
+}: {
+  item: AnnouncementItem;
+  onChange: (patch: Partial<AnnouncementItem>) => void;
+}) {
+  const now = useNow();
+  const [open, setOpen] = useState(Boolean(item.startsAt || item.endsAt));
+  const state = now ? lineState(item, now) : null;
+
+  return (
+    <div className="w-full pl-0.5">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="text-muted hover:text-ink inline-flex items-center gap-1 text-2xs"
+        aria-expanded={open}
+      >
+        <CalendarClock className="size-3.5" aria-hidden />
+        {item.startsAt || item.endsAt ? 'Scheduled' : 'Schedule'}
+        {state === 'scheduled' ? <span className="text-info-700">· starts later</span> : null}
+        {state === 'ended' ? <span className="text-warning-700">· ended, not showing</span> : null}
+      </button>
+      {open && now ? (
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          <Input
+            label="Starts"
+            type="datetime-local"
+            value={toLocalInput(item.startsAt)}
+            onChange={(event) =>
+              onChange({ startsAt: event.target.value ? new Date(event.target.value).toISOString() : null })
+            }
+            hint="Blank: from now."
+          />
+          <Input
+            label="Ends"
+            type="datetime-local"
+            value={toLocalInput(item.endsAt)}
+            onChange={(event) =>
+              onChange({ endsAt: event.target.value ? new Date(event.target.value).toISOString() : null })
+            }
+            hint="Blank: until switched off."
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** The band as it reads right now, from the unsaved lines. */
+function StripPreview({ items }: { items: AnnouncementItem[] }) {
+  const now = useNow();
+  if (!now) return null;
+  const live = items.filter((item) => lineState(item, now) === 'live' && item.text.trim());
+  const later = items.filter((item) => lineState(item, now) === 'scheduled').length;
+  return (
+    <div>
+      <p className="text-faint mb-1.5 text-2xs font-semibold uppercase tracking-wider">Preview, as of now</p>
+      <div className="bg-inverse text-on-inverse flex min-h-9 items-center justify-center gap-4 overflow-hidden rounded-md px-3 text-2xs font-medium tracking-[0.04em]">
+        {live.length ? (
+          live.map((item, index) => (
+            <span key={item.id} className="flex shrink-0 items-center gap-4 whitespace-nowrap">
+              {index > 0 ? (
+                <span aria-hidden className="opacity-50">
+                  ·
+                </span>
+              ) : null}
+              {item.text}
+            </span>
+          ))
+        ) : (
+          <span className="opacity-70">Nothing showing right now</span>
+        )}
+      </div>
+      {later ? (
+        <p className="text-muted mt-1 text-2xs">
+          {later} more {later === 1 ? 'line starts' : 'lines start'} later.
+        </p>
+      ) : null}
+    </div>
   );
 }

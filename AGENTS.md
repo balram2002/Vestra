@@ -190,10 +190,21 @@ the customer's original price, coupon share and tax snapshot intact.
 - **No inline mock data in components.** Everything comes through the service
   layer.
 
-- **The storefront frame is per page, and it is data.** Whether a page family
-  shows the promotion strip, header, footer or bottom bar lives in
+- **The storefront frame is per page, and it is data.** Where each page family
+  shows the promotion strip, header, footer and bottom bar (everywhere,
+  desktop only, phones only, off), plus single-path overrides, lives in
   `siteContent.pageChrome` (`domain/page-chrome.ts`). A new top-level storefront
   route needs an entry in `CHROME_PAGES`, or it silently keeps the full frame.
+- **Composed pages and content pages publish; they do not save live.** The
+  homepage and shop page builders edit a working copy; shoppers read the
+  snapshot in `compositions` (`services/compositions.ts`). Content pages keep
+  a `draft` beside their live fields. Anything that reads sections, hero or
+  grid banners, or a CMS page for SHOPPERS must go through `services/content.ts`,
+  never the collections directly, or it will show unpublished work.
+- **An autosaving editor must not refresh its own route.** Its server actions
+  return the new state, and the screen applies it. A `revalidatePath` on the
+  editor's own path re-renders it mid-edit and can drop a pending autosave.
+  Revalidate lists and overviews, not the editor.
 - **Designable pages are definitions, not editors.** Every page under
   Marketing › Page designs is a plain-data definition in
   `src/domain/page-designs/` (variants, grouped fields, per-variant defaults,

@@ -148,13 +148,29 @@ passed (13 new), `smoke:marketing` passed 13/13, and `smoke:rbac` passed 27/27
   image, indexable) with a search-result preview. Three page templates as
   variants: *Plain*, *Editorial* (hero image, pull quotes) and *Help article*
   (sidebar table of contents). Draft, preview and publish.
-- ☐ **Phase 2.5 — Appearance.** A live preview of the strip, header and footer
+- ☑ **Phase 2.5 — Appearance.** *Done: every card has a History of its last
+  ten saves with put-back (put-back is itself undoable). Strip lines can be
+  scheduled to start and end on their own, applied on read through a cached
+  "live lines" query that turns over near each boundary. A preview shows the
+  band as it reads right now, from unsaved lines. Header and footer are
+  previewed in place on the storefront rather than duplicated here.*
+  Original scope: a live preview of the strip, header and footer
   beside the editor, promotion-strip scheduling (festive offers that end on
   their own), and history and revert per block.
-- ☐ **Phase 2.6 — Page layout.** Moves out of `siteContent` onto the same
+- ☑ **Phase 2.6 — Page layout.** *Done: each part is Everywhere, Desktop only,
+  Phones only or Off per page family (device-limited parts are hidden with
+  CSS, so nothing shifts). Single-page rules override a family for one exact
+  path. History with put-back comes from the same per-block history as
+  Appearance. Rules stay in `siteContent`, where saves are already atomic and
+  now versioned, rather than moving; the old boolean rules read as before.*
+  Original scope: moves out of `siteContent` onto the same
   draft → publish → history model. Per-device rules (phone / desktop), overrides
   for a single path (e.g. one landing page with no header), and a preview of
   the result.
+
+**Status: ☑ done (27 Sep 2026).** `smoke:marketing` passes 42/42 twice in a
+row, `smoke:rbac` passes 27/27, and unit tests were added for coupon,
+promotion, composition, content-page and page-layout rules.
 
 ---
 

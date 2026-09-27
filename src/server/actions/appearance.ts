@@ -3,12 +3,12 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
-import { CHROME_PAGES } from '@/domain/page-chrome';
-import { CONTENT_ICONS, DEFAULT_SITE_CONTENT, type SiteContent } from '@/domain/site-content';
+import { CHROME_MODES, CHROME_PAGES } from '@/domain/page-chrome';
+import { CONTENT_ICONS, DEFAULT_SITE_CONTENT, VERSIONED_BLOCKS, type SiteContent } from '@/domain/site-content';
 
 import { requirePermission } from '../auth/session';
 import * as audit from '../services/audit';
-import { saveSiteContent } from '../services/site-content';
+import { getBlockHistory, saveSiteContent } from '../services/site-content';
 
 /**
  * Editing the shop's own words.
@@ -42,6 +42,10 @@ const announcementSchema = z.object({
   text: z.string().trim().min(1, 'Say something, or remove the line.').max(120),
   href: href.nullable(),
   isActive: z.boolean(),
+  startsAt: z.string().datetime().nullable().optional(),
+  endsAt: z.string().datetime().nullable().optional(),
+}).refine((item) => !item.startsAt || !item.endsAt || Date.parse(item.endsAt) > Date.parse(item.startsAt), {
+  message: 'A line’s end must be after its start.',
 });
 
 const valuePropSchema = z.object({
@@ -72,11 +76,12 @@ const footerBadgeSchema = z.object({
   label: z.string().trim().min(1, 'Give the badge a label.').max(60),
 });
 
+const chromeMode = z.enum(CHROME_MODES);
 const chromeRuleSchema = z.object({
-  strip: z.boolean(),
-  header: z.boolean(),
-  footer: z.boolean(),
-  bottomNav: z.boolean(),
+  strip: chromeMode,
+  header: chromeMode,
+  footer: chromeMode,
+  bottomNav: chromeMode,
 });
 
 const schemas = {
@@ -99,12 +104,30 @@ const schemas = {
   footerBadges: z.array(footerBadgeSchema).max(6),
   footerNote: z.string().trim().max(300).nullable(),
   // Every page family, every part: the editor always sends the whole table.
-  pageChrome: z.object(
-    Object.fromEntries(CHROME_PAGES.map((page) => [page.key, chromeRuleSchema])) as Record<
-      (typeof CHROME_PAGES)[number]['key'],
-      typeof chromeRuleSchema
-    >,
-  ),
+  pageChrome: z.object({
+    pages: z.object(
+      Object.fromEntries(CHROME_PAGES.map((page) => [page.key, chromeRuleSchema])) as Record<
+        (typeof CHROME_PAGES)[number]['key'],
+        typeof chromeRuleSchema
+      >,
+    ),
+    overrides: z
+      .array(
+        z.object({
+          id: z.string().min(1).max(60),
+          path: z
+            .string()
+            .trim()
+            .regex(/^\/[a-z0-9\-/]*$/i, 'A page path starts with / and has no query string, like /sell-with-us/apply.')
+            .max(200),
+          rule: chromeRuleSchema,
+        }),
+      )
+      .max(50)
+      .refine((items) => new Set(items.map((item) => item.path)).size === items.length, {
+        message: 'Each page can have only one rule.',
+      }),
+  }),
 } satisfies Record<keyof SiteContent, z.ZodTypeAny>;
 
 export type AppearanceBlock = keyof typeof schemas;
@@ -129,7 +152,7 @@ export async function saveAppearance(input: {
     return { ok: false, error: parsed.error.issues[0]?.message ?? 'Check the highlighted fields.' };
   }
 
-  await saveSiteContent({ [input.block]: parsed.data } as Partial<SiteContent>, actor.id);
+  await saveSiteContent({ [input.block]: parsed.data } as Partial<SiteContent>, actor);
 
   await audit.record({
     actor,
@@ -153,7 +176,7 @@ export async function resetAppearance(input: {
 
   await saveSiteContent(
     { [input.block]: DEFAULT_SITE_CONTENT[input.block] } as Partial<SiteContent>,
-    actor.id,
+    actor,
   );
 
   await audit.record({
@@ -167,6 +190,63 @@ export async function resetAppearance(input: {
 
   refreshStorefront();
   return { ok: true };
+}
+
+/**
+ * Put back an earlier value of one block. It is saved like any other edit,
+ * so the value being replaced goes onto the history too -- putting back is
+ * itself undoable.
+ */
+export async function restoreAppearance(input: {
+  block: (typeof VERSIONED_BLOCKS)[number];
+  versionId: string;
+}): Promise<AppearanceResult> {
+  const actor = await requirePermission('cms:write');
+  if (!(VERSIONED_BLOCKS as readonly string[]).includes(input.block)) return { ok: false, error: 'Unknown block.' };
+
+  const version = (await getBlockHistory(input.block)).find((entry) => entry.id === input.versionId);
+  if (!version) return { ok: false, error: 'That version is no longer in the history.' };
+
+  const parsed = schemas[input.block].safeParse(version.value);
+  if (!parsed.success) return { ok: false, error: 'That version no longer fits the current settings.' };
+
+  await saveSiteContent({ [input.block]: parsed.data } as Partial<SiteContent>, actor);
+  await audit.record({
+    actor,
+    action: 'content.appearance.restore',
+    entityType: 'siteContent',
+    entityId: input.block,
+    entityLabel: input.block,
+    severity: 'NOTICE',
+  });
+
+  refreshStorefront();
+  return { ok: true };
+}
+
+/** Earlier values of a block, for the editor's History. */
+export async function appearanceHistory(input: { block: (typeof VERSIONED_BLOCKS)[number] }) {
+  await requirePermission('cms:write');
+  if (!(VERSIONED_BLOCKS as readonly string[]).includes(input.block)) return [];
+  return (await getBlockHistory(input.block)).map((version) => ({
+    id: version.id,
+    at: version.at,
+    byName: version.byName,
+    summary: summarise(input.block, version.value),
+  }));
+}
+
+function summarise(block: string, value: unknown): string {
+  if (Array.isArray(value)) {
+    const noun = { announcements: 'line', valueProps: 'promise', footerBadges: 'badge', footerColumns: 'column' }[block] ?? 'item';
+    return `${value.length} ${noun}${value.length === 1 ? '' : 's'}`;
+  }
+  if (block === 'headerActions' && value && typeof value === 'object') {
+    const on = Object.entries(value as Record<string, boolean>).filter(([, enabled]) => enabled).map(([key]) => key);
+    return on.length ? `On: ${on.join(', ')}` : 'All actions off';
+  }
+  if (block === 'pageChrome') return 'Page layout rules';
+  return 'Earlier version';
 }
 
 /**

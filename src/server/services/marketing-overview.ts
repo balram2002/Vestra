@@ -101,8 +101,8 @@ export async function getMarketingOverview(): Promise<MarketingOverview> {
       stripShowing: site.visibility.announcements,
       activeAnnouncements: site.announcements.filter((item) => item.isActive).length,
       hiddenFrameRules: CHROME_PAGES.reduce(
-        (count, page) => count + CHROME_PARTS.filter((part) => !site.pageChrome[page.key][part]).length,
-        0,
+        (count, page) => count + CHROME_PARTS.filter((part) => site.pageChrome.pages[page.key][part] !== 'all').length,
+        site.pageChrome.overrides.length,
       ),
     },
   };

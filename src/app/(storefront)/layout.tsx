@@ -2,7 +2,7 @@ import { Suspense } from 'react';
 
 import { BottomNav, BottomNavBar } from '@/components/layout/bottom-nav';
 import { ChromeGate } from '@/components/layout/chrome-gate';
-import { hiddenPagesFor } from '@/domain/page-chrome';
+import { hasRules, modesFor } from '@/domain/page-chrome';
 import { getSiteContent } from '@/server/services/site-content';
 import { RouteProgress } from '@/components/layout/route-progress';
 import { SiteFooter } from '@/components/layout/site-footer';
@@ -86,7 +86,7 @@ async function BottomNavWithCounts() {
       bagCount={bagCount}
       wishlistCount={wishlistCount}
       hide={hide}
-      hiddenOnPages={hiddenPagesFor(pageChrome, 'bottomNav')}
+      modes={modesFor(pageChrome, 'bottomNav')}
     />
   );
 }
@@ -94,16 +94,16 @@ async function BottomNavWithCounts() {
 /*
  * The header and footer, each switchable per page from Admin › Page layout.
  *
- * The gate is mounted only when some page actually switches the piece off:
+ * The gate is mounted only when some page or path actually changes the piece:
  * it reads the path on the client, and the untouched default should stay in
  * the static shell exactly as it always has.
  */
 async function HeaderSlot() {
   const { pageChrome } = await getSiteContent();
-  const hiddenOn = hiddenPagesFor(pageChrome, 'header');
-  if (hiddenOn.length === 0) return <SiteHeader />;
+  const modes = modesFor(pageChrome, 'header');
+  if (!hasRules(modes)) return <SiteHeader />;
   return (
-    <ChromeGate hiddenOn={hiddenOn}>
+    <ChromeGate modes={modes}>
       <SiteHeader />
     </ChromeGate>
   );
@@ -111,18 +111,13 @@ async function HeaderSlot() {
 
 async function FooterSlot() {
   const { pageChrome } = await getSiteContent();
-  const hiddenOn = hiddenPagesFor(pageChrome, 'footer');
-  if (hiddenOn.length === 0) return <SiteFooter />;
+  const modes = modesFor(pageChrome, 'footer');
+  if (!hasRules(modes)) return <SiteFooter />;
 
   // The footer reserved the room under the fixed bottom bar. Where the footer
-  // goes but the bar stays, something else has to.
-  const barStays = hiddenOn.filter((page) => pageChrome[page].bottomNav);
+  // goes but the bar stays, the gate puts a spacer in its place.
   return (
-    <ChromeGate
-      hiddenOn={hiddenOn}
-      replaceOn={barStays}
-      replacement={<div aria-hidden className="h-(--spacing-bottom-nav) lg:hidden" />}
-    >
+    <ChromeGate modes={modes} spacerModes={modesFor(pageChrome, 'bottomNav')}>
       <SiteFooter />
     </ChromeGate>
   );

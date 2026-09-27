@@ -32,5 +32,6 @@ export default function AdminPageChromePage() {
 async function Editor() {
   await requirePermission('cms:write');
   const { pageChrome } = await getSiteContent();
-  return <PageChromeEditor initial={pageChrome} />;
+  // Keyed on the rules, so a put-back from History remounts with the restored table.
+  return <PageChromeEditor key={JSON.stringify(pageChrome)} initial={pageChrome} />;
 }

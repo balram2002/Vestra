@@ -21,7 +21,7 @@
  */
 
 /** Icons an editor can choose from, by meaning rather than by library name. */
-import { DEFAULT_PAGE_CHROME, withChromeDefaults, type PageChrome } from './page-chrome';
+import { DEFAULT_PAGE_CHROME, withChromeDefaults, type PageLayoutRules } from './page-chrome';
 
 export const CONTENT_ICONS = [
   'delivery',
@@ -42,6 +42,12 @@ export interface AnnouncementItem {
   /** Optional destination. A promise that is not a link is fine. */
   href: string | null;
   isActive: boolean;
+  /**
+   * Optional window: a festive offer that starts and ends on its own. Absent
+   * means always, while switched on.
+   */
+  startsAt?: string | null;
+  endsAt?: string | null;
 }
 
 export interface ValueProp {
@@ -110,7 +116,7 @@ export interface SiteContent {
   footerBadges: FooterBadge[];
   footerNote: string | null;
   /** Which of strip, header, footer and bottom bar each page family wears. */
-  pageChrome: PageChrome;
+  pageChrome: PageLayoutRules;
 }
 
 export const DEFAULT_SITE_CONTENT: SiteContent = {
@@ -227,3 +233,32 @@ export function withDefaults(stored: Partial<SiteContent> | null | undefined): S
     pageChrome: withChromeDefaults(stored.pageChrome),
   };
 }
+
+/** The strip's lines that are on, and inside their window, at `nowMs`. */
+export function liveAnnouncements(items: AnnouncementItem[], nowMs: number): AnnouncementItem[] {
+  return items.filter(
+    (item) =>
+      item.isActive &&
+      !(item.startsAt && Date.parse(item.startsAt) > nowMs) &&
+      !(item.endsAt && Date.parse(item.endsAt) <= nowMs),
+  );
+}
+
+/** One earlier value of a block, kept so a save can be put back. */
+export interface SiteContentVersion {
+  id: string;
+  at: string;
+  byName: string;
+  /** What the block held BEFORE the save made at `at`. */
+  value: unknown;
+}
+
+/** Blocks with a history in the editor. */
+export const VERSIONED_BLOCKS = [
+  'announcements',
+  'headerActions',
+  'valueProps',
+  'footerBadges',
+  'footerColumns',
+  'pageChrome',
+] as const;

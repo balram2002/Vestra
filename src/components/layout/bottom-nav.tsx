@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 import { CountBubble } from '@/components/ui/badge';
-import { chromePageFor, type ChromePageKey } from '@/domain/page-chrome';
+import { modeAt, type PartModes } from '@/domain/page-chrome';
 import { cn } from '@/lib/cn';
 import { isImmersivePath } from '@/lib/immersive';
 
@@ -245,17 +245,18 @@ function NavTarget({
  * Kept separate so the layout can render `BottomNavBar` directly as a fallback.
  */
 export function BottomNav({
-  hiddenOnPages = [],
+  modes,
   ...props
 }: {
   bagCount?: number;
   wishlistCount?: number;
   hide?: string[];
-  /** Page families where the whole bar is switched off, from Admin › Page layout. */
-  hiddenOnPages?: ChromePageKey[];
+  /** Where the bar is switched off, from Admin › Page layout. */
+  modes?: PartModes;
 }) {
   const pathname = usePathname();
-  const page = chromePageFor(pathname);
-  if (page && hiddenOnPages.includes(page)) return null;
+  // The bar only exists on phones, so "desktop only" means not at all.
+  const mode = modes ? modeAt(pathname, modes) : 'all';
+  if (mode === 'none' || mode === 'desktop') return null;
   return <BottomNavBar pathname={pathname} {...props} />;
 }

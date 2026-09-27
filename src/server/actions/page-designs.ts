@@ -53,7 +53,9 @@ async function run(
   // nothing shoppers can see, so it expires nothing.
   if (action !== 'draft') updateTag(tags.pageDesign(page));
 
-  revalidatePath(`/admin/design/${page}`);
+  // Not the designer's own route: the screen applies the state returned below.
+  // Refreshing it as well re-rendered the designer mid-edit, and a change made
+  // in the moments after a publish could be lost with the pending autosave.
   revalidatePath('/admin/marketing');
   return { ok: true, state: await designs.getDesignState(page) };
 }

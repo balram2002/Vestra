@@ -55,8 +55,10 @@ async function finish(page: CmsPage, action: string, actor: Awaited<ReturnType<t
     updateTag(tags.content);
     revalidatePath(`/${page.slug}`);
   }
+  // The list, not the editor itself: the editor applies the state returned
+  // below, and refreshing it too could remount it mid-edit and drop a
+  // pending autosave.
   revalidatePath('/admin/pages');
-  revalidatePath(`/admin/pages/${page.id}`);
   const state = await pages.getContentPageState(page.id);
   return state ? { ok: true, state } : { ok: false, error: 'Page not found.' };
 }
