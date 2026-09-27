@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
-import Link from 'next/link';
 import { SectionBuilder } from '@/components/console/section-builder';
 import { PageHeader } from '@/components/console/page-header';
 import { ADDABLE_SECTION_KINDS } from '@/domain/sections';
@@ -8,6 +7,8 @@ import { requirePermission } from '@/server/auth/session';
 import { categoryPageEditorSections } from '@/server/services/category-page';
 import { InitializeCategories } from '@/components/console/initialize-categories';
 import { collections } from '@/server/db/collections';
+import { CompositionBar } from '@/components/console/composition-bar';
+import { getCompositionState } from '@/server/services/compositions';
 
 export const metadata: Metadata = { title: 'Shop page' };
 export default function CategoriesEditorPage() {
@@ -16,10 +17,11 @@ export default function CategoriesEditorPage() {
 }
 async function Composition() {
   await requirePermission('cms:write');
+  const state = await getCompositionState('categories');
   const sections = await categoryPageEditorSections();
   const initialized = await (await collections.homeSections()).countDocuments({ page: 'categories' });
   return <div className="mt-6 space-y-6">
-    <Link href="/categories" target="_blank" className="text-accent-ink inline-flex min-h-11 items-center text-sm underline">Preview shop page</Link>
+    <CompositionBar state={state} />
     {initialized ? <SectionBuilder page="categories" sections={sections} addable={ADDABLE_SECTION_KINDS} /> : <InitializeCategories sections={sections} />}
   </div>;
 }

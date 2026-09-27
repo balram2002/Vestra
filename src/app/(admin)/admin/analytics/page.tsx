@@ -10,6 +10,8 @@ import { FINANCE } from '@/config/business';
 import { formatMoney, formatMoneyCompact } from '@/lib/format';
 import { requirePermission } from '@/server/auth/session';
 import { getAdminDashboard, getPlatformFinance, type PlatformFinance } from '@/server/services/admin';
+import { experimentOverview } from '@/server/services/experiments';
+import { ExperimentSummary } from '@/components/console/experiment-summary';
 
 export const metadata: Metadata = { title: 'Analytics' };
 
@@ -39,9 +41,10 @@ export default function AdminAnalyticsPage() {
 async function Analytics() {
   await requirePermission('analytics:read');
 
-  const [dashboard, finance] = await Promise.all([
+  const [dashboard, finance, experiments] = await Promise.all([
     getAdminDashboard(90),
     getPlatformFinance(),
+    experimentOverview(),
   ]);
 
   type MonthRow = PlatformFinance['byMonth'][number];
@@ -149,6 +152,8 @@ async function Analytics() {
           </div>
         </dl>
       </Card>
+
+      <ExperimentSummary experiments={experiments} />
 
       <section>
         <h2 className="text-ink mb-2 text-md font-semibold">By month</h2>

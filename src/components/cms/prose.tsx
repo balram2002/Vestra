@@ -1,5 +1,7 @@
 import { Fragment } from 'react';
 
+import { anchorFor } from '@/domain/content-pages';
+
 /**
  * Minimal markdown renderer for CMS content.
  *
@@ -120,7 +122,8 @@ export function Prose({ markdown }: { markdown: string }) {
         switch (block.kind) {
           case 'h2':
             return (
-              <h2 key={key} className="font-display text-ink mt-8 text-lg first:mt-0">
+              // Anchored, so a help article's contents list can link to it.
+              <h2 key={key} id={anchorFor(block.text)} className="font-display text-ink mt-8 scroll-mt-24 text-lg first:mt-0">
                 {inline(block.text, key)}
               </h2>
             );

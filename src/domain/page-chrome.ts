@@ -56,15 +56,43 @@ export const CHROME_PAGES = [
 
 export type ChromePageKey = (typeof CHROME_PAGES)[number]['key'];
 
-export type ChromeRule = Record<ChromePart, boolean>;
+/**
+ * Where a part shows. The phone bottom bar only ever shows on phones, so for
+ * it the editor offers just `all` and `none`.
+ */
+export const CHROME_MODES = ['all', 'desktop', 'mobile', 'none'] as const;
+export type ChromeMode = (typeof CHROME_MODES)[number];
+
+export const CHROME_MODE_LABEL: Record<ChromeMode, string> = {
+  all: 'Everywhere',
+  desktop: 'Desktop only',
+  mobile: 'Phones only',
+  none: 'Off',
+};
+
+export type ChromeRule = Record<ChromePart, ChromeMode>;
 export type PageChrome = Record<ChromePageKey, ChromeRule>;
 
-const ALL_ON: ChromeRule = { strip: true, header: true, footer: true, bottomNav: true };
+/** One exact page with its own rule, ahead of its family's. */
+export interface ChromeOverride {
+  id: string;
+  /** An exact path: `/sell-with-us/apply`. No query string. */
+  path: string;
+  rule: ChromeRule;
+}
+
+export interface PageLayoutRules {
+  pages: PageChrome;
+  overrides: ChromeOverride[];
+}
+
+const ALL_ON: ChromeRule = { strip: 'all', header: 'all', footer: 'all', bottomNav: 'all' };
 
 /** Everything showing everywhere: how the shop has always looked. */
-export const DEFAULT_PAGE_CHROME = Object.fromEntries(
-  CHROME_PAGES.map((page) => [page.key, ALL_ON]),
-) as PageChrome;
+export const DEFAULT_PAGE_CHROME: PageLayoutRules = {
+  pages: Object.fromEntries(CHROME_PAGES.map((page) => [page.key, ALL_ON])) as PageChrome,
+  overrides: [],
+};
 
 const KEY_BY_SEGMENT = new Map<string, ChromePageKey>(
   CHROME_PAGES.map((page) => [page.segment, page.key]),
@@ -78,20 +106,85 @@ export function chromePageFor(pathname: string | null): ChromePageKey | null {
   return KEY_BY_SEGMENT.get(segment) ?? null;
 }
 
-/** The page families on which one part is switched off. */
-export function hiddenPagesFor(chrome: PageChrome, part: ChromePart): ChromePageKey[] {
-  return CHROME_PAGES.filter((page) => chrome[page.key]?.[part] === false).map((page) => page.key);
+/**
+ * What the client gate needs for one part: only the families and paths where
+ * the part is NOT everywhere. Empty maps mean the gate need not mount at all.
+ */
+export interface PartModes {
+  pages: Partial<Record<ChromePageKey, ChromeMode>>;
+  paths: Record<string, ChromeMode>;
+}
+
+export function modesFor(rules: PageLayoutRules, part: ChromePart): PartModes {
+  const pages: PartModes['pages'] = {};
+  for (const page of CHROME_PAGES) {
+    const mode = rules.pages[page.key]?.[part] ?? 'all';
+    if (mode !== 'all') pages[page.key] = mode;
+  }
+  const paths: PartModes['paths'] = {};
+  for (const override of rules.overrides) {
+    // An override that says "everywhere" still matters: it can undo a family rule.
+    paths[normalisePath(override.path)] = override.rule[part];
+  }
+  return { pages, paths };
+}
+
+export function hasRules(modes: PartModes): boolean {
+  return Object.keys(modes.pages).length > 0 || Object.keys(modes.paths).length > 0;
+}
+
+/** The mode at one path: its own override first, then its family, then everywhere. */
+export function modeAt(pathname: string | null, modes: PartModes): ChromeMode {
+  if (pathname) {
+    const own = modes.paths[normalisePath(pathname)];
+    if (own) return own;
+  }
+  const page = chromePageFor(pathname);
+  return (page && modes.pages[page]) || 'all';
+}
+
+export function normalisePath(path: string): string {
+  const trimmed = path.trim().split(/[?#]/)[0] ?? '';
+  const withSlash = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+  return withSlash.length > 1 ? withSlash.replace(/\/+$/, '') : withSlash;
+}
+
+/** Old rules stored a boolean per part: true everywhere, false off. */
+function toMode(value: unknown): ChromeMode {
+  if (value === true || value === undefined) return 'all';
+  if (value === false) return 'none';
+  return (CHROME_MODES as readonly unknown[]).includes(value) ? (value as ChromeMode) : 'all';
+}
+
+function toRule(stored: Partial<Record<string, unknown>> | undefined): ChromeRule {
+  return {
+    strip: toMode(stored?.strip),
+    header: toMode(stored?.header),
+    footer: toMode(stored?.footer),
+    bottomNav: toMode(stored?.bottomNav),
+  };
 }
 
 /**
  * Stored rules over the defaults, page by page and part by part.
  *
- * Deep, unlike the rest of the site content: a record saved before a page
- * family existed must read as that page showing everything, not as a page
- * with no frame at all.
+ * Reads both shapes: the first version stored a plain map of page family to
+ * booleans; this one stores `{ pages, overrides }` with a mode per part. A
+ * family added later reads as showing everything, not as a page with no frame.
  */
-export function withChromeDefaults(stored: Partial<Record<string, Partial<ChromeRule>>> | undefined): PageChrome {
-  return Object.fromEntries(
-    CHROME_PAGES.map((page) => [page.key, { ...ALL_ON, ...stored?.[page.key] }]),
-  ) as PageChrome;
+export function withChromeDefaults(stored: unknown): PageLayoutRules {
+  const value = (stored ?? {}) as Record<string, unknown>;
+  const pagesSource = (value.pages && typeof value.pages === 'object' ? value.pages : value) as Record<
+    string,
+    Partial<Record<string, unknown>>
+  >;
+  const overrides = Array.isArray(value.overrides) ? (value.overrides as ChromeOverride[]) : [];
+  return {
+    pages: Object.fromEntries(CHROME_PAGES.map((page) => [page.key, toRule(pagesSource[page.key])])) as PageChrome,
+    overrides: overrides.map((override) => ({
+      id: String(override.id),
+      path: normalisePath(String(override.path)),
+      rule: toRule(override.rule as unknown as Record<string, unknown>),
+    })),
+  };
 }

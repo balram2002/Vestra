@@ -150,6 +150,11 @@ export interface Seller {
     productsSold: string | null;
     showStats: boolean;
   };
+  /**
+   * The store-page layout the seller chose, from those Marketing allows.
+   * Null or withdrawn, the store uses the marketplace's layout.
+   */
+  storefrontLayout?: string | null;
   status: SellerStatus;
   ownerUserId: string;
   supportEmail: string;

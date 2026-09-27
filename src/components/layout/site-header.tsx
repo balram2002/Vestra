@@ -9,11 +9,11 @@ import { cn } from '@/lib/cn';
 import { currentOwner, getSessionUser } from '@/server/auth/session';
 import { getBagCount } from '@/server/services/cart';
 import { getMegaMenu } from '@/server/services/catalog';
-import { getSiteContent } from '@/server/services/site-content';
+import { getLiveAnnouncements, getSiteContent } from '@/server/services/site-content';
 import { getWishlistCount } from '@/server/services/wishlist';
 import { workspacesFor } from '@/server/services/workspaces';
 import { DEFAULT_SITE_CONTENT } from '@/domain/site-content';
-import { hiddenPagesFor } from '@/domain/page-chrome';
+import { hasRules, modesFor } from '@/domain/page-chrome';
 
 import { AccountMenu } from './account-menu';
 import { StripGate } from './chrome-gate';
@@ -151,23 +151,20 @@ const DEFAULT_STRIP = DEFAULT_SITE_CONTENT.announcements
   .map((item) => item.text);
 
 export async function SiteHeader() {
-  const [menu, content] = await Promise.all([getMegaMenu(), getSiteContent()]);
+  const [menu, content, liveStrip] = await Promise.all([getMegaMenu(), getSiteContent(), getLiveAnnouncements()]);
   const { headerActions } = content;
-  const stripHiddenOn = hiddenPagesFor(content.pageChrome, 'strip');
+  const stripModes = modesFor(content.pageChrome, 'strip');
 
   const announcements = (
     <AnnouncementStrip
-      items={
-        content.visibility.announcements
-          ? content.announcements.filter((item) => item.isActive).map((item) => item.text)
-          : []
-      }
+      // Switched on and inside their window: see getLiveAnnouncements.
+      items={liveStrip}
     />
   );
   // Only when some page switches the strip off does the header read the path.
   const strip =
-    stripHiddenOn.length > 0 ? (
-      <StripGate hiddenOn={stripHiddenOn}>{announcements}</StripGate>
+    hasRules(stripModes) ? (
+      <StripGate modes={stripModes}>{announcements}</StripGate>
     ) : (
       announcements
     );

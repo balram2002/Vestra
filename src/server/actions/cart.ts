@@ -7,6 +7,7 @@ import { CART } from '@/config/business';
 
 import { currentOwner, ensureGuestToken, getGuestToken } from '../auth/session';
 import * as cart from '../services/cart';
+import { creditConversion } from '../services/experiment-visitor';
 import { LIMITS, clientIp, hit, peek, retryMessage } from '../security/rate-limit';
 
 /**
@@ -58,6 +59,9 @@ export async function addToBag(input: {
 
   const result = await cart.addItem(owner, parsed.data);
   if (!result.ok) return { ok: false, error: result.error };
+
+  // Credited to any A/B test this shopper was shown. Never fails the add.
+  await creditConversion('addedToBag');
 
   // The bag count lives in the header on every page, so the router cache has
   // to be refreshed rather than a single tag invalidated.

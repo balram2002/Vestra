@@ -7,6 +7,7 @@ import { FilterRail } from '@/components/commerce/filter-rail';
 import { ListingToolbar, SortChips } from '@/components/commerce/listing-toolbar';
 import { Pagination } from '@/components/commerce/pagination';
 import { ProductGrid } from '@/components/commerce/product-grid';
+import { ProductWall } from '@/components/commerce/product-wall';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import type { ProductListResult, ProductSort } from '@/domain/types';
@@ -55,6 +56,11 @@ export async function ListingView({
   heading,
   /** Rendered instead of the grid when nothing matched. Pages word this themselves. */
   emptyState,
+  rail: docked = true,
+  quickFilters = true,
+  tiles,
+  display = 'grid',
+  density = 'standard',
   className,
 }: {
   result: ProductListResult;
@@ -63,6 +69,16 @@ export async function ListingView({
   sort: ProductSort;
   heading?: React.ReactNode;
   emptyState?: React.ReactNode;
+  /** The filter rail docked beside the grid on a desktop. Off, filters open from the bar at every width. */
+  rail?: boolean;
+  /** One-tap filter chips on a phone. */
+  quickFilters?: boolean;
+  /** Editorial tiles placed between products. */
+  tiles?: React.ReactNode[];
+  /** A card grid, or the photo wall (see `ProductWall`). */
+  display?: 'grid' | { wall: 'airy' | 'dense'; quickView: boolean };
+  /** The card grid's density. */
+  density?: 'standard' | 'compact';
   className?: string;
 }) {
   /*
@@ -101,7 +117,8 @@ export async function ListingView({
       <div
         className={cn(
           'glass border-line sticky z-30 -mx-4 mt-4 flex min-w-0 items-center gap-2 border-b px-4 py-2.5 transition-[top] duration-200',
-          'top-(--app-sticky-offset) sm:-mx-6 sm:px-6 lg:hidden',
+          'top-(--app-sticky-offset) sm:-mx-6 sm:px-6',
+          docked && 'lg:hidden',
         )}
       >
         <FilterDrawer appliedCount={result.appliedFilterCount}>{rail}</FilterDrawer>
@@ -116,8 +133,8 @@ export async function ListingView({
         <SortChips activeSort={sort} params={params} basePath={basePath} className="min-w-0" />
       </div>
 
-      <p className="text-muted mt-4 text-xs lg:hidden" role="status"><span className="text-ink font-semibold">{result.total}</span> {result.total === 1 ? 'style' : 'styles'} available</p>
-      <div aria-label="Popular filters" className="no-scrollbar mt-2 flex min-w-0 gap-2 overflow-x-auto pb-1 lg:hidden">
+      <p className={cn('text-muted mt-4 text-xs', docked && 'lg:hidden')} role="status"><span className="text-ink font-semibold">{result.total}</span> {result.total === 1 ? 'style' : 'styles'} available</p>
+      {quickFilters ? <div aria-label="Popular filters" className="no-scrollbar mt-2 flex min-w-0 gap-2 overflow-x-auto pb-1 lg:hidden">
         {[
           { label: 'In stock', key: 'inStock', value: '1' },
           { label: '4 stars & above', key: 'rating', value: '4' },
@@ -127,7 +144,7 @@ export async function ListingView({
           const active = params[filter.key] === filter.value;
           return <Link key={filter.key} href={withParam(params, filter.key, active ? null : filter.value, basePath)} aria-current={active ? 'true' : undefined} className={cn('inline-flex min-h-10 shrink-0 items-center rounded-full border px-3 text-xs', active ? 'border-ink bg-ink text-canvas font-medium' : 'border-line-control bg-raised text-muted')}>{filter.label}</Link>;
         })}
-      </div>
+      </div> : null}
 
       <AppliedFilters
         facets={result.facets}
@@ -142,7 +159,7 @@ export async function ListingView({
           facets is taller than a screen, and a rail that scrolls away means
           filtering row forty requires scrolling back to row one.
         */}
-        <div className="hidden w-60 shrink-0 lg:block">
+        <div className={cn('hidden w-60 shrink-0', docked && 'lg:block')}>
           <div className="sticky top-[calc(var(--app-sticky-offset)+1rem)] max-h-[calc(100dvh-var(--app-sticky-offset)-2rem)] overflow-y-auto overscroll-contain pr-1">
             {rail}
           </div>
@@ -154,10 +171,10 @@ export async function ListingView({
             activeSort={sort}
             params={params}
             basePath={basePath}
-            className="hidden lg:flex"
+            className={cn('hidden', docked && 'lg:flex')}
           />
 
-          <div className="lg:mt-6">
+          <div className={cn(docked && 'lg:mt-6')}>
             {/*
               Three different empties: the page's own wording (a search with no
               hits), an empty shelf with no filters to blame, and filters that
@@ -165,10 +182,20 @@ export async function ListingView({
             */}
             {result.total === 0 && (emptyState || result.appliedFilterCount === 0) ? (
               (emptyState ?? <NothingListed />)
+            ) : display !== 'grid' && result.items.length > 0 ? (
+              <ProductWall
+                products={result.items}
+                savedIds={[...savedIds]}
+                density={display.wall}
+                quickView={display.quickView}
+                tiles={tiles}
+              />
             ) : (
               <ProductGrid
                 products={result.items}
                 savedIds={savedIds}
+                tiles={tiles}
+                density={density}
                 emptyAction={{ href: basePath, label: 'Clear all filters' }}
               />
             )}

@@ -1,5 +1,5 @@
 import type { Seller } from '@/domain/types';
-import type { StorePageSettings } from '@/domain/store-page';
+import type { StorePageSettings } from '@/domain/page-designs/store';
 
 import { formatCompactNumber } from './format';
 

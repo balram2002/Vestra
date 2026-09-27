@@ -2,8 +2,12 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { notFound } from 'next/navigation';
 import { absoluteUrl } from '@/config/site';
-import { ProductDemo } from '@/components/live/product-demo';
+import { DemoView } from '@/components/live/demo-view';
+import type { DemoPageSettings, DemoPageVariant } from '@/domain/page-designs/demo';
+import { getLiveDesign } from '@/server/services/page-designs';
 import { getProductDemo } from '@/server/services/product-demo';
+import { getRunningExperiment } from '@/server/services/experiments';
+import { ExperimentArm } from '@/components/experiments/experiment-arm';
 
 type Props = { params: Promise<{ slug: string }>; searchParams: Promise<{ clip?: string | string[] }> };
 
@@ -26,7 +30,12 @@ export default function DemoPage(props: Props) {
 }
 
 async function DemoContent(props: Props) {
-  const demo = await readDemo(props);
+  const [demo, design, experiment] = await Promise.all([readDemo(props), getLiveDesign('demo'), getRunningExperiment('demo')]);
   if (!demo) notFound();
-  return <ProductDemo key={demo.path} demo={demo} />;
+  // Which layout, and which of its parts, is decided under Admin › Page designs › Product demo.
+  const view = (layout: string) => (
+    <DemoView demo={demo} variant={layout as DemoPageVariant} settings={design.settings[layout] as DemoPageSettings} />
+  );
+  // Already inside this page's Suspense: under an A/B test the layout is chosen per visitor.
+  return experiment ? <ExperimentArm experiment={experiment}>{view}</ExperimentArm> : view(design.variant);
 }

@@ -12,6 +12,7 @@ import { collections, toEntity } from '../db/collections';
 import { cancelItems, findOrderForViewer, placeOrder, settlePayment } from '../services/orders';
 import { requestExchange } from '../services/exchanges';
 import { requestReturn } from '../services/returns';
+import { creditConversion } from '../services/experiment-visitor';
 
 /**
  * Checkout and post-purchase actions.
@@ -109,6 +110,14 @@ export async function submitOrder(input: {
   });
 
   if (!result.ok) return { ok: false, error: result.error };
+
+  // Credited to any A/B test this shopper was shown, before the redirect
+  // below ends the action. Never fails the order.
+  const placed = await collections
+    .orders()
+    .then((orders) => orders.findOne({ _id: result.orderId }, { projection: { pricing: 1 } }))
+    .catch(() => null);
+  await creditConversion('order', placed?.pricing?.payable ?? 0);
 
   // A guest has no account to look this order up from later, so the browser is
   // given the only handle to it.

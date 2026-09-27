@@ -1,3 +1,4 @@
+import type { ContentFields, ContentRevision, ContentTemplate } from '../content-pages';
 import type {
   NotificationCategory,
   NotificationChannel,
@@ -381,6 +382,17 @@ export interface CmsPage {
   isPublished: boolean;
   updatedAt: string;
   updatedByUserId: string | null;
+  /** How the page is laid out; absent means PLAIN, the original layout. */
+  template?: ContentTemplate;
+  /** The standfirst under the title (Editorial). */
+  summary?: string | null;
+  heroImageUrl?: string | null;
+  /** Kept out of search results. */
+  noindex?: boolean;
+  /** Unpublished edits. Null when the page is exactly as published. */
+  draft?: ContentFields | null;
+  /** The last ten published versions, newest first. */
+  revisions?: ContentRevision[];
 }
 
 export interface NavigationNode {

@@ -78,3 +78,93 @@ Google's live consent screen still requires deployment-owned OAuth credentials. 
 - **Admin › Marketing › Page layout** is a table of every storefront page family against the promotion strip, header, footer and phone bottom bar. The gates run on the client and mount only when a part is actually hidden somewhere, so the default frame stays in the static shell.
 - Both settings are stored as new blocks in the existing `siteContent` document, merged deep over code defaults, and saved through `saveAppearance`. That keeps validation, audit logging and cache invalidation the same as the rest of Appearance.
 - `npm run verify` passed. A browser run against the local demo dataset hid the header and footer on the store profile from the admin table, confirmed they disappeared there and stayed on `/stores`, then restored them. The desktop and phone screenshot review of all three layouts and both admin screens showed no page errors.
+
+## Marketing roadmap, Milestone 1: the Page Designer — 26 September 2026
+
+The plan for bringing every Marketing screen up to one standard lives in `docs/marketing-roadmap.md` (5 milestones, 25 phases). This milestone builds the framework the rest depend on.
+
+- **Page designs are definitions.** `src/domain/page-designs/` describes a designable page as plain data: variants, grouped fields (toggle, text, choice), per-variant defaults and a preview path. The zod schema, the defaults merge and the admin screen are all derived from it. A definition-level test fails if any variant is missing a default.
+- **Draft, preview, publish.** Designs moved from `siteContent` into a `pageDesigns` collection, one document per page, holding the published config, a draft, an optional schedule and the last 20 revisions. Every change is a single-document write. The Store page's existing settings are read as the published config until the first save, so nothing changed for shoppers during the migration.
+- **One designer screen for every page** (`/admin/design/[page]`). It has layout cards with sketches and Live / In draft badges, grouped settings with a "Changed" marker that restores the default in one click, per-layout reset, "Copy from…", a draft that autosaves after each change (Ctrl+S saves immediately), and an embedded preview at phone, tablet and desktop widths with a real-store picker. Publishing takes an optional note, and a publish can be scheduled or cancelled. History lists the last 20 publishes, and any of them can be put back.
+- **Publishing is immediate.** Publish, revert and schedule changes call `updateTag`, so the next shopper request gets the new design rather than a stale copy. Scheduled publishes apply on read inside the cached scope, with a cache lifetime that turns over within about five minutes of the go-live time, so no cron is needed.
+- **Marketing overview** (`/admin/marketing`) shows live and scheduled campaign counts, what ends or starts this week, each page design's live layout with any pending draft or schedule, and site-wide status. The admin nav is regrouped into *Campaigns*, *Page designs* and *Site-wide*.
+- The Store page runs on the framework, and `/admin/store-page` now redirects to `/admin/design/store`.
+- Verification: `npm run verify` passed; 354 unit tests passed (13 new). The new `npm run smoke:marketing` passed 13/13, covering draft hidden from shoppers, preview, publish live, discard, schedule and cancel, put back, and leaving the page as found. `smoke:rbac` passed 27/27 with new cases: Marketing may enter, Support is refused, and anonymous visitors are refused the draft preview. Desktop and 1024px screenshots were reviewed.
+
+## Marketing roadmap, Milestone 2: every Marketing screen to one standard — 27 September 2026
+
+- **Coupons** (`/admin/coupons`): status tabs, search and sort, rules stated in plain words, and a usage meter on each row. A full-page editor covers create and edit, with a bag preview, generated small print and an example-bag saving; category, brand and store targeting and payment methods are now exposed. Codes are fixed once used; coupons can be duplicated, archived and restored. Each coupon shows its redemptions, discount given, revenue influenced and latest uses.
+- **Promotions** (`/admin/promotions`): the same list treatment, an eight-week calendar, and an editor for all eight offer kinds. The editor's preview is priced by the checkout evaluator itself, and a live overlap panel says which offer a shopper would get. New offers still start paused. The list now reads `valueKind`; it used to infer rupees or percent from the offer type.
+- **Homepage and Shop page**: the builders edit a draft, and shoppers read a published snapshot in `compositions`. The first open sets the baseline from what was live, so the switch changed nothing for shoppers. A publish bar lists changes in words, with draft preview, discard, publish with a note, and history with put-back.
+- **Content pages**: autosaved drafts, separate from the immediate show/hide switch. Three templates (Plain, Editorial, Help article), a search panel with a result preview and warnings, hide-from-search, a staff-only preview, and history with put-back. "Load the shipped wording" now makes a draft instead of publishing.
+- **Appearance**: every card has a History with put-back, and strip lines can be scheduled to start and end on their own, with a live preview of the band.
+- **Page layout**: each part is Everywhere, Desktop only, Phones only or Off, per page family; single-page rules override a family; history with put-back. Rules saved in the old boolean format read as before.
+- **Fixed along the way**: publishing now reaches shoppers on the next request (`updateTag`). An autosaving editor no longer refreshes its own route, which could remount it and drop an edit made just after a publish.
+- **Verification**: `smoke:marketing` passed 42/42 twice in a row, `smoke:rbac` 27/27, and new unit tests for coupon, promotion, composition, content-page and page-layout rules. Screens were reviewed from screenshots.
+
+## Marketing roadmap, Milestone 3: Product page designer — 27 September 2026
+
+- **Admin › Page designs › Product page** (`/admin/design/product`) runs on the same designer as the Store page: layout cards, 22 settings in four groups, an autosaved draft, an embedded preview with a product picker, publish or schedule, and history.
+- **Variant 1 · Classic** is the page as shipped; every part answers to a switch. **Variant 2 · Lookbook** shows the photographs as a spread (the first full width, the rest in pairs) with the listing's highlights set large between them, a buy panel that stays in view, and "Complete the look" from the same store. **Variant 3 · Social** puts the seller first (story-ring logo, trust numbers, WhatsApp, Visit store), then a tall 9:16 hero, photo reviews with a customer-photo wall, and more from the store as reels.
+- **One buy box everywhere**: `ProductViewer` takes a layout and switches (zoom, size guide, See it live, wishlist, pinned bar, low-stock note, button label), so buying works the same in every layout.
+- **Fixed**: the Appearance editor's clock hook re-subscribed on every render, which could loop (React error #185) and crash the page intermittently. Its subscription is now module-level; the rule is in AGENTS.md.
+- **Verification**: `smoke:marketing` 48/48 twice in a row, including add-to-bag in all three layouts and publishing Lookbook to shoppers; `smoke:rbac` 29/29. Reviewed at 390px and 1440px.
+
+## Marketing roadmap, Milestone 4: Product demo designer — 27 September 2026
+
+- **Admin › Page designs › Product demo** (`/admin/design/demo`) has 11 settings covering the header, playback and shopping.
+- **Variant 1 · Classic** is the demo player as shipped, now with switches. **Variant 2 · Showroom** frames the clip on a light ground beside the lead piece, whose options and Add to bag are right there, with a shelf of the other pieces below. **Variant 3 · Stories** is tap-through: one segment per piece, progress bars, hold to pause, a sticker to shop each piece, and an end card offering "Call the store".
+- One choose-and-add step (`DemoChooser`) is shared by every layout.
+- `smoke:marketing` adds to the bag through all three layouts and publishes Stories (54/54); a test step now empties the bag first so the five-per-item cap cannot fail a working button.
+
+## Marketing roadmap, Phase 5.1: Category page designer — 27 September 2026
+
+- **Admin › Page designs › Category page** (`/admin/design/category`) has 14 settings: breadcrumbs, picture, the line above the title, description, shop-by-type (chips or photo tiles), bestseller rail, shortcut tiles, popular filters, docked filters, quick view, wall density, and the SEO copy.
+- **Variant 1 · Classic** is the listing as shipped. **Variant 2 · Editorial** is a department front, with shortcut tiles in the grid that link to this same listing with one filter applied. **Variant 3 · Visual wall** is a photo wall with a quick view (colour, then size, then add) that never leaves the page.
+- A setting can now be marked `onlyFor` some layouts, and the designer shows it only while one of those is edited.
+- `ListingView` gained options (docked rail, popular filters, tiles, wall display) that default to the old behaviour, so search, brand and store are unchanged.
+- Staff preview at `/category/[slug]/preview/[variant]` keeps filter and sort links inside the preview.
+- `smoke:marketing` 64/64 (quick view adds to the bag, tiles filter, Editorial publishes to shoppers); `smoke:rbac` 34/34.
+
+## Marketing roadmap, Phase 5.2: Sellers directory designer — 27 September 2026
+
+- **Admin › Page designs › Sellers directory** (`/admin/design/stores`) has 12 settings: breadcrumbs, title, introduction, story row, "Live now", jump to a city, the order, stores opening soon, banner, trust numbers, about line, and an invitation to sell.
+- **Variant 1 · Classic** is the directory as shipped. **Variant 2 · Local market** groups stores by city. **Variant 3 · Stories** puts a story row of logos above ranked cards; stores live for video calls lead the row.
+- The page reads a public projection of each seller (`services/store-directory.ts`), never the seller record with its KYC and bank details. Ordering and grouping are pure functions in `domain/store-directory.ts`, with tests.
+- Presence is a 90-second heartbeat, so it is read at request time in its own `<Suspense>` island; the fallback is the same row with nobody live, so the page still prerenders.
+- The designer now previews pages that have no record to preview with (`preview.entity: null`).
+- `smoke:rbac` reads the whole page when looking for a refusal. The console nav grew past its old 400-character window, which briefly made a correct refusal look like a hole. `smoke:marketing`'s publish step now waits on the status line rather than a toast that a previous publish can leave on screen.
+- `smoke:marketing` 71/71, `smoke:rbac` 36/36.
+
+## Marketing roadmap, Phase 5.3: Brand page designer — 27 September 2026
+
+- **Admin › Page designs › Brand page** (`/admin/design/brand`) has 14 settings: breadcrumbs, brand picture, logo, about, facts, rating, shop by category (chips or photo tiles), new-arrivals rail and its title, similar brands, popular filters, docked filters, and grid density.
+- **Variant 1 · Classic** is the page as shipped. **Variant 2 · Campaign** is a launch page with a full-width hero. **Variant 3 · Catalogue** is a buyer's view with a slim header and a compact grid.
+- `services/brand-page.ts` derives the brand's categories (deepest first) and similar brands (most shared categories) from its own category list. `getProductRail` takes a brand, and `ListingView`/`ProductGrid` take a `density`.
+- Fixed: the brand page counted its own brand as an applied filter, showing "Clear all (1)" before anything was filtered.
+- `smoke:marketing` 78 checks, `smoke:rbac` 38/38.
+
+## Marketing roadmap, Phase 5.4: Search results designer — 27 September 2026
+
+- **Admin › Page designs › Search results** (`/admin/design/search`) has 10 settings: search box on the page, matching stores/brands/categories, "Did you mean", popular filters, docked filters, quick view, wall density, and what a search that finds nothing offers (departments, bestsellers and their title).
+- **Variant 1 · Classic** is the page as shipped. **Variant 2 · Instant** keeps the search box on the page, with shortcuts and spelling suggestions. **Variant 3 · Visual** puts the query in a large search box over the photo wall.
+- `domain/spelling.ts` suggests corrections from the shop's own vocabulary (optimal string alignment distance, one slip for short words and two for longer ones, plurals understood, sizes and numbers never touched), with tests. `spellingSuggestion` in `services/search.ts` caches the vocabulary with the catalogue's tags.
+- The designer previews by query and offers every state a search page has: real words, a brand, a misspelling, nothing found, and an empty search.
+
+## Marketing roadmap, Phase 5.5: Category layouts and seller choice — 27 September 2026
+
+- A page definition can declare `categoryOverrides` (product page) or `sellerChoice` (store page). The design config then carries those parts, validated by the generated schema, normalised by `withDesignDefaults` (one rule per category, known layouts only) and described in History.
+- `resolveVariant(design, { categoryPath, sellerVariant })` picks the layout for one record: the deepest matching category, or the seller's pick while it is still allowed, or the published layout.
+- **Admin:** *Layouts by category* under the Product page designer, and *Sellers may choose* under the Store page designer, with a count of stores per layout.
+- **Seller console:** Store settings has a *Store layout* card offering the allowed layouts (and the marketplace default) with their sketches. `chooseStoreLayout` checks the pick against the live design, audits it and invalidates the store's cache tag.
+- `smoke:marketing` 96/96 (category rule reaches its products, deepest category wins, a seller's pick reaches shoppers, withdrawal returns the store to the default), `smoke:rbac` 40/40.
+
+## Marketing roadmap, Phase 5.6: A/B tests — 27 September 2026
+
+- Every page designer has an **A/B test** panel. Choose a challenger layout and the share of shoppers who see it (10-50%), start, watch visitors, add-to-bag rate, order rate and revenue per visitor per arm, and end the test by keeping the live layout or publishing the challenger. Earlier tests are listed with their outcome.
+- `domain/experiments.ts`: arm assignment (FNV-1a of visitor id + test id, so each shopper keeps their arm and tests assign independently), the two-proportion z-test verdict (200 visitors per arm, 95% confidence, "collecting" until then), and the exposure cookie. Tested.
+- `proxy.ts` gives a first-party `vx` visitor id on the designable routes, into the request as well as the response, so the first render already knows the arm. It is set once and marked private on that response only.
+- Routes render through `<ExperimentArm>` in their own `<Suspense>` while a test runs; with no test they are unchanged. Records with a category or seller layout stay out of the test.
+- Counting: a beacon counts each visitor once (the server recomputes the arm, dedupes by cookie and rate limits per address); `addToBag` and `submitOrder` credit the tests the shopper saw. Every count is one `$inc` on the test document. A partial unique index allows one running test per page, and the service ensures it lazily for databases seeded before tests existed.
+- While a test runs, publishing, scheduling or reverting to a different layout is refused; settings changes still apply to both arms.
+- Analytics lists running and recent tests with the same verdict.

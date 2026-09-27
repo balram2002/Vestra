@@ -9,7 +9,7 @@ import {
 import { ShoppingBag } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState, useTransition } from 'react';
+import { Fragment, useMemo, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 
 import { SeeLiveButton } from '@/components/live/see-live-button';
@@ -65,8 +65,20 @@ import { addToBag } from '@/server/actions/cart';
  *  - `prefers-reduced-motion`: the zoom is decoration, so it simply does not
  *    happen. The photograph is fully legible without it.
  */
-function ZoomShot({ media, priority = false }: { media: Media; priority?: boolean }) {
-  const reduced = useReducedMotion() ?? false;
+function ZoomShot({
+  media,
+  priority = false,
+  zoom = true,
+  frameClassName,
+}: {
+  media: Media;
+  priority?: boolean;
+  /** Off in layouts that show photographs whole rather than for inspection. */
+  zoom?: boolean;
+  /** Replaces the frame's height rules, for layouts with a different shape. */
+  frameClassName?: string;
+}) {
+  const reduced = (useReducedMotion() ?? false) || !zoom;
   const [zoomed, setZoomed] = useState(false);
 
   /*
@@ -135,7 +147,8 @@ function ZoomShot({ media, priority = false }: { media: Media; priority?: boolea
       onPointerMove={track}
       onPointerLeave={leave}
       className={cn(
-        'bg-sunken relative h-[min(32svh,22rem)] min-h-56 w-full overflow-hidden rounded-2xl lg:h-[min(72dvh,44rem)]',
+        'bg-sunken relative w-full overflow-hidden rounded-2xl',
+        frameClassName ?? 'h-[min(32svh,22rem)] min-h-56 lg:h-[min(72dvh,44rem)]',
         // Only advertise the affordance where it exists.
         !reduced && 'lg:cursor-zoom-in',
       )}
@@ -198,6 +211,9 @@ export function ProductViewer({
   colorOptions,
   header,
   footer,
+  layout = 'classic',
+  options,
+  interludes = [],
 }: {
   productId: string;
   title: string;
@@ -215,7 +231,14 @@ export function ProductViewer({
    */
   header?: React.ReactNode;
   footer?: React.ReactNode;
+  /** The page design's layout: see `domain/page-designs/product`. */
+  layout?: ViewerLayout;
+  /** Which buy-box pieces show. Anything left out is on. */
+  options?: Partial<ViewerOptions>;
+  /** Short lines set large between the photographs (Lookbook). */
+  interludes?: string[];
 }) {
+  const opt: ViewerOptions = { ...VIEWER_DEFAULTS, ...options };
   const [color, setColor] = useState(colorOptions[0]?.value ?? '');
   const [size, setSize] = useState<string | null>(null);
   const [shot, setShot] = useState(0);
@@ -294,7 +317,16 @@ export function ProductViewer({
   };
 
   return (
-    <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:gap-10 xl:gap-14">
+    <div
+      className={cn(
+        'grid min-w-0 gap-6 lg:gap-10 xl:gap-14',
+        layout === 'lookbook'
+          ? 'lg:grid-cols-[minmax(0,1.35fr)_minmax(0,0.65fr)]'
+          : layout === 'social'
+            ? 'lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]'
+            : 'lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]',
+      )}
+    >
       {/* ------------------------------------------------------- gallery */}
 
       {/*
@@ -308,12 +340,26 @@ export function ProductViewer({
         replacing it. Swiping works, the desktop click still works, and there is
         one set of images in the DOM instead of a mobile copy and a desktop copy.
       */}
-      <div className="min-w-0 flex flex-col-reverse gap-3 lg:sticky lg:top-[calc(var(--app-sticky-offset)+1rem)] lg:self-start lg:flex-row lg:gap-4">
+      {layout === 'lookbook' ? <LookbookStack gallery={gallery} interludes={interludes} /> : null}
+
+      <div
+        className={cn(
+          'min-w-0 flex flex-col-reverse gap-3',
+          layout === 'lookbook'
+            ? 'lg:hidden'
+            : layout === 'social'
+              ? 'lg:sticky lg:top-[calc(var(--app-sticky-offset)+1rem)] lg:self-start'
+              : 'lg:sticky lg:top-[calc(var(--app-sticky-offset)+1rem)] lg:self-start lg:flex-row lg:gap-4',
+        )}
+      >
         {gallery.length > 1 ? (
           <div
             aria-label={`${title} images`}
             role="group"
-            className="scrollbar-none flex max-w-full gap-2 overflow-x-auto p-1 lg:max-h-[72dvh] lg:w-16 lg:shrink-0 lg:flex-col lg:overflow-y-auto"
+            className={cn(
+              'scrollbar-none flex max-w-full gap-2 overflow-x-auto p-1',
+              layout === 'classic' && 'lg:max-h-[72dvh] lg:w-16 lg:shrink-0 lg:flex-col lg:overflow-y-auto',
+            )}
           >
             {gallery.map((item, index) => (
               <button
@@ -323,7 +369,8 @@ export function ProductViewer({
                 aria-current={index === shot}
                 onClick={() => setShot(index)}
                 className={cn(
-                  'bg-sunken relative aspect-4/5 w-14 shrink-0 overflow-hidden rounded-md lg:w-full',
+                  'bg-sunken relative aspect-4/5 w-14 shrink-0 overflow-hidden rounded-md',
+                  layout === 'classic' && 'lg:w-full',
                   'transition-[outline-color,transform] duration-(--duration-base) ease-(--ease-out)',
                   'outline-2 outline-offset-2',
                   'motion-safe:hover:scale-[1.04] motion-safe:active:scale-95',
@@ -382,7 +429,16 @@ export function ProductViewer({
                 tall before the header and breadcrumb are counted, which put the
                 title and the price below the fold on every phone made.
               */}
-              <ZoomShot media={item} priority={index === 0} />
+              <ZoomShot
+                media={item}
+                priority={index === 0}
+                zoom={opt.zoom}
+                frameClassName={
+                  layout === 'social'
+                    ? 'h-[min(62svh,34rem)] min-h-72 lg:h-[min(84dvh,54rem)]'
+                    : undefined
+                }
+              />
             </CarouselItem>
           ))}
 
@@ -419,7 +475,13 @@ export function ProductViewer({
 
       {/* ------------------------------------------------------ buy box */}
 
-      <div className="bg-raised border-line min-w-0 rounded-3xl border p-4 shadow-sm sm:p-6 lg:self-start">
+      <div
+        className={cn(
+          'bg-raised border-line min-w-0 rounded-3xl border p-4 shadow-sm sm:p-6 lg:self-start',
+          // The photographs scroll past; the decision stays in view.
+          layout !== 'classic' && 'lg:sticky lg:top-[calc(var(--app-sticky-offset)+1rem)]',
+        )}
+      >
         {header}
 
         <div className="space-y-6">
@@ -478,7 +540,7 @@ export function ProductViewer({
               <legend className="text-faint text-2xs font-medium uppercase tracking-[0.14em]">
                 Size
               </legend>
-              <SizeGuide sizes={sizeOptions} />
+              {opt.sizeGuide ? <SizeGuide sizes={sizeOptions} /> : null}
             </div>
 
             {/*
@@ -551,7 +613,7 @@ export function ProductViewer({
               )
             ) : null}
 
-            {selected && selected.inventory.available <= INVENTORY.urgencyThreshold ? (
+            {opt.urgency && selected && selected.inventory.available <= INVENTORY.urgencyThreshold ? (
               <p className="text-danger-600 mt-2.5 text-xs font-medium">
                 Only {selected.inventory.available} left in size {selected.size}
               </p>
@@ -570,6 +632,7 @@ export function ProductViewer({
             It duplicates no logic: same handler, same disabled state, same
             pending flag. Only the position differs.
           */}
+          {opt.stickyBar ? (
           <div
             style={{ margin: 0 }}
             className={cn(
@@ -595,28 +658,31 @@ export function ProductViewer({
             ) : null}
 
             {/* Keep the unfamiliar live option legible beside the purchase CTA. */}
-            <SeeLiveButton
-              productId={productId}
-              variantId={selected?.id ?? null}
-              sizeLabel={selected?.size ?? null}
-              size="sm"
-              variant="secondary"
-              label="See it live"
-              className="min-h-11 w-auto min-w-0 shrink-0 px-2.5 text-xs sm:px-4"
-            />
+            {opt.seeLive ? (
+              <SeeLiveButton
+                productId={productId}
+                variantId={selected?.id ?? null}
+                sizeLabel={selected?.size ?? null}
+                size="sm"
+                variant="secondary"
+                label="See it live"
+                className="min-h-11 w-auto min-w-0 shrink-0 px-2.5 text-xs sm:px-4"
+              />
+            ) : null}
 
             <Button size="cta" shape="pill" onClick={handleAdd} loading={pending} className="w-auto min-w-0 flex-1 px-2 text-xs sm:px-3 sm:text-sm">
               {!pending ? <ShoppingBag className="hidden size-4 min-[375px]:block" /> : null}
-              Add to bag
+              {opt.ctaLabel}
             </Button>
           </div>
+          ) : null}
 
           {/*
             Exactly one Add to bag is VISIBLE at any width. The pinned bar owns
             the action on a phone, this row owns it from `lg` up — two visible
             copies of the same button is a control people press twice.
           */}
-          <div className="hidden lg:block">
+          <div className={opt.stickyBar ? 'hidden lg:block' : 'block'}>
             <div className="flex gap-2.5">
               <Button
                 size="cta"
@@ -626,16 +692,18 @@ export function ProductViewer({
                 className="flex-1"
               >
                 {!pending ? <ShoppingBag className="size-4" /> : null}
-                Add to bag
+                {opt.ctaLabel}
               </Button>
 
-              <WishlistButton
-                productId={productId}
-                productTitle={title}
-                size="lg"
-                variant="outline"
-                className="size-12"
-              />
+              {opt.wishlist ? (
+                <WishlistButton
+                  productId={productId}
+                  productTitle={title}
+                  size="lg"
+                  variant="outline"
+                  className="size-12"
+                />
+              ) : null}
             </div>
 
             {/*
@@ -647,17 +715,86 @@ export function ProductViewer({
               position and the live option still gets a full-width target, which
               it needs because it is the unfamiliar one.
             */}
-            <SeeLiveButton
-              productId={productId}
-              variantId={selected?.id ?? null}
-              sizeLabel={selected?.size ?? null}
-              className="mt-2.5"
-            />
+            {opt.seeLive ? (
+              <SeeLiveButton
+                productId={productId}
+                variantId={selected?.id ?? null}
+                sizeLabel={selected?.size ?? null}
+                className="mt-2.5"
+              />
+            ) : null}
           </div>
         </div>
 
         {footer}
       </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------- layouts */
+
+export type ViewerLayout = 'classic' | 'lookbook' | 'social';
+
+export interface ViewerOptions {
+  zoom: boolean;
+  sizeGuide: boolean;
+  seeLive: boolean;
+  wishlist: boolean;
+  stickyBar: boolean;
+  urgency: boolean;
+  ctaLabel: string;
+}
+
+const VIEWER_DEFAULTS: ViewerOptions = {
+  zoom: true,
+  sizeGuide: true,
+  seeLive: true,
+  wishlist: true,
+  stickyBar: true,
+  urgency: true,
+  ctaLabel: 'Add to bag',
+};
+
+/**
+ * Lookbook, from `lg` up: every photograph of the colourway full width, one
+ * under another, with the listing's own lines set large between them. The
+ * buy panel beside it stays in view as they scroll past. Phones keep the
+ * swipe carousel, which is how a phone wants to see photographs.
+ */
+function LookbookStack({ gallery, interludes }: { gallery: Media[]; interludes: string[] }) {
+  // The first photograph full width, the rest in pairs, and one of the
+  // listing's lines after the first and after each pair: a spread, not a scroll.
+  const lineAfter = (index: number) => (index === 0 ? interludes[0] : index % 2 === 0 ? interludes[index / 2] : undefined);
+  return (
+    <div className="hidden min-w-0 grid-cols-2 gap-3 lg:grid">
+      {gallery.map((item, index) => {
+        const line = lineAfter(index);
+        return (
+          <Fragment key={item.id}>
+            <div
+              className={cn(
+                'bg-sunken relative w-full overflow-hidden rounded-2xl',
+                index === 0 ? 'col-span-2 aspect-4/5' : 'aspect-3/4',
+              )}
+            >
+              <Image
+                src={item.url}
+                alt={item.alt}
+                fill
+                priority={index === 0}
+                sizes={index === 0 ? '(max-width: 64rem) 100vw, 58vw' : '(max-width: 64rem) 50vw, 29vw'}
+                className="object-cover"
+              />
+            </div>
+            {line ? (
+              <p className="font-display text-ink col-span-2 mx-auto max-w-xl px-6 py-8 text-center text-2xl leading-snug text-balance xl:text-3xl">
+                {line}
+              </p>
+            ) : null}
+          </Fragment>
+        );
+      })}
     </div>
   );
 }

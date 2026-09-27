@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
+import { Suspense } from 'react';
 import { atLeastOne, PLACEHOLDER_SLUG } from '@/lib/static-params';
 import { JsonLd } from '@/components/seo/json-ld';
 import { StorePageView } from '@/components/store/store-page-view';
@@ -7,7 +8,12 @@ import { absoluteUrl } from '@/config/site';
 import { isIndexableListing, parseProductQuery, type RawSearchParams } from '@/lib/product-query';
 import { breadcrumbListJsonLd, sellerJsonLd } from '@/lib/seo/structured-data';
 import { getSellerBySlug, listSellers } from '@/server/services/catalog';
-import { getSiteContent } from '@/server/services/site-content';
+import type { StorePageSettings, StorePageVariant } from '@/domain/page-designs/store';
+import { resolveVariant } from '@/domain/page-designs/config';
+import { getLiveDesign } from '@/server/services/page-designs';
+import { getRunningExperiment } from '@/server/services/experiments';
+import { ExperimentArm } from '@/components/experiments/experiment-arm';
+import { PageSkeleton } from '@/components/skeletons/page-skeleton';
 
 /**
  * Public store page.
@@ -51,12 +57,26 @@ export async function generateMetadata({ params, searchParams }: PageProps): Pro
 
 export default async function StorePage({ params, searchParams }: PageProps) {
   const { slug } = await params;
-  const [seller, { storePage }] = await Promise.all([getSellerBySlug(slug), getSiteContent()]);
+  const [seller, design] = await Promise.all([getSellerBySlug(slug), getLiveDesign('store')]);
 
   if (!seller || !['ACTIVE', 'APPROVED'].includes(seller.status)) notFound();
   if (seller.slug !== slug) permanentRedirect(`/store/${seller.slug}`);
 
   const url = absoluteUrl(`/store/${seller.slug}`);
+  // The seller's own pick, while Marketing allows it; otherwise the published layout.
+  const variant = resolveVariant(design, { sellerVariant: seller.storefrontLayout });
+  const view = (layout: string) => (
+    <StorePageView
+      seller={seller}
+      variant={layout as StorePageVariant}
+      settings={design.settings[layout] as StorePageSettings}
+      searchParams={searchParams}
+      basePath={`/store/${seller.slug}`}
+    />
+  );
+  // Under an A/B test the layout is chosen per visitor; a store whose seller
+  // picked its own layout stays out of the test.
+  const experiment = variant === design.variant ? await getRunningExperiment('store') : null;
 
   return (
     <>
@@ -72,14 +92,14 @@ export default async function StorePage({ params, searchParams }: PageProps) {
         ]}
       />
 
-      {/* Which layout, and which of its pieces, is decided under Admin › Store page. */}
-      <StorePageView
-        seller={seller}
-        variant={storePage.variant}
-        settings={storePage.settings[storePage.variant]}
-        searchParams={searchParams}
-        basePath={`/store/${seller.slug}`}
-      />
+      {/* Which layout, and which of its pieces, is decided under Admin › Marketing › Store page. */}
+      {experiment ? (
+        <Suspense fallback={<PageSkeleton shape="profile" />}>
+          <ExperimentArm experiment={experiment}>{view}</ExperimentArm>
+        </Suspense>
+      ) : (
+        view(variant)
+      )}
     </>
   );
 }

@@ -48,6 +48,8 @@ import type {
   Wishlist,
 } from '@/domain/types';
 
+import type { Experiment } from '@/domain/experiments';
+
 import { getDb } from './client';
 
 /**
@@ -152,6 +154,12 @@ export const COLLECTIONS = {
   /* content */
   /** Site furniture an administrator edits: strips, promises, footer columns. */
   siteContent: 'siteContent',
+  /** One document per designable page: published, draft, schedule, history. */
+  pageDesigns: 'pageDesigns',
+  /** A/B tests between two layouts of one page designed under Page designs. */
+  experiments: 'experiments',
+  /** Published snapshots of composed pages (homepage, shop page) and their history. */
+  compositions: 'compositions',
   homeSections: 'homeSections',
   banners: 'banners',
   cmsPages: 'cmsPages',
@@ -234,6 +242,7 @@ export const collections = {
   homeSections: () => typed<HomeSection>(COLLECTIONS.homeSections),
   banners: () => typed<Banner>(COLLECTIONS.banners),
   cmsPages: () => typed<CmsPage>(COLLECTIONS.cmsPages),
+  experiments: () => typed<Experiment>(COLLECTIONS.experiments),
   campaigns: () => typed<Campaign>(COLLECTIONS.campaigns),
   navigation: () => typed<NavigationNode>(COLLECTIONS.navigation),
 

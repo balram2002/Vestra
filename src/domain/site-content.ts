@@ -21,8 +21,7 @@
  */
 
 /** Icons an editor can choose from, by meaning rather than by library name. */
-import { DEFAULT_PAGE_CHROME, withChromeDefaults, type PageChrome } from './page-chrome';
-import { DEFAULT_STORE_PAGE, withStorePageDefaults, type StorePageConfig } from './store-page';
+import { DEFAULT_PAGE_CHROME, withChromeDefaults, type PageLayoutRules } from './page-chrome';
 
 export const CONTENT_ICONS = [
   'delivery',
@@ -43,6 +42,12 @@ export interface AnnouncementItem {
   /** Optional destination. A promise that is not a link is fine. */
   href: string | null;
   isActive: boolean;
+  /**
+   * Optional window: a festive offer that starts and ends on its own. Absent
+   * means always, while switched on.
+   */
+  startsAt?: string | null;
+  endsAt?: string | null;
 }
 
 export interface ValueProp {
@@ -111,9 +116,7 @@ export interface SiteContent {
   footerBadges: FooterBadge[];
   footerNote: string | null;
   /** Which of strip, header, footer and bottom bar each page family wears. */
-  pageChrome: PageChrome;
-  /** The public store page's layout and its switches. */
-  storePage: StorePageConfig;
+  pageChrome: PageLayoutRules;
 }
 
 export const DEFAULT_SITE_CONTENT: SiteContent = {
@@ -202,7 +205,6 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
   footerNote: null,
 
   pageChrome: DEFAULT_PAGE_CHROME,
-  storePage: DEFAULT_STORE_PAGE,
 };
 
 /**
@@ -226,9 +228,37 @@ export function withDefaults(stored: Partial<SiteContent> | null | undefined): S
     footerColumns: stored.footerColumns ?? DEFAULT_SITE_CONTENT.footerColumns,
     footerBadges: stored.footerBadges ?? DEFAULT_SITE_CONTENT.footerBadges,
     footerNote: stored.footerNote ?? DEFAULT_SITE_CONTENT.footerNote,
-    // Both merged deep, so a page family or a switch added later reads as its
-    // default rather than as missing.
+    // Merged deep, so a page family added later reads as showing everything
+    // rather than as missing.
     pageChrome: withChromeDefaults(stored.pageChrome),
-    storePage: withStorePageDefaults(stored.storePage),
   };
 }
+
+/** The strip's lines that are on, and inside their window, at `nowMs`. */
+export function liveAnnouncements(items: AnnouncementItem[], nowMs: number): AnnouncementItem[] {
+  return items.filter(
+    (item) =>
+      item.isActive &&
+      !(item.startsAt && Date.parse(item.startsAt) > nowMs) &&
+      !(item.endsAt && Date.parse(item.endsAt) <= nowMs),
+  );
+}
+
+/** One earlier value of a block, kept so a save can be put back. */
+export interface SiteContentVersion {
+  id: string;
+  at: string;
+  byName: string;
+  /** What the block held BEFORE the save made at `at`. */
+  value: unknown;
+}
+
+/** Blocks with a history in the editor. */
+export const VERSIONED_BLOCKS = [
+  'announcements',
+  'headerActions',
+  'valueProps',
+  'footerBadges',
+  'footerColumns',
+  'pageChrome',
+] as const;

@@ -190,15 +190,55 @@ the customer's original price, coupon share and tax snapshot intact.
 - **No inline mock data in components.** Everything comes through the service
   layer.
 
-- **The storefront frame is per page, and it is data.** Whether a page family
-  shows the promotion strip, header, footer or bottom bar lives in
+- **The storefront frame is per page, and it is data.** Where each page family
+  shows the promotion strip, header, footer and bottom bar (everywhere,
+  desktop only, phones only, off), plus single-path overrides, lives in
   `siteContent.pageChrome` (`domain/page-chrome.ts`). A new top-level storefront
   route needs an entry in `CHROME_PAGES`, or it silently keeps the full frame.
-- **The store page layout is data too.** `siteContent.storePage` picks one of
-  three layouts and holds each one's switches; `components/store/` renders them.
-  A new switch goes in `StorePageSettings`, its default, the toggle groups and
-  the zod schema in `actions/appearance.ts`. Miss the last one and every save
-  is rejected.
+- **Composed pages and content pages publish; they do not save live.** The
+  homepage and shop page builders edit a working copy; shoppers read the
+  snapshot in `compositions` (`services/compositions.ts`). Content pages keep
+  a `draft` beside their live fields. Anything that reads sections, hero or
+  grid banners, or a CMS page for SHOPPERS must go through `services/content.ts`,
+  never the collections directly, or it will show unpublished work.
+- **`useSyncExternalStore`'s subscribe must be a stable, module-level function.**
+  An inline one is a new function every render, so React re-subscribes on
+  every render; if subscribing changes the snapshot (a clock stamping the time)
+  that is an update loop — React error #185, and a console page that "could not
+  load" only sometimes.
+- **An autosaving editor must not refresh its own route.** Its server actions
+  return the new state, and the screen applies it. A `revalidatePath` on the
+  editor's own path re-renders it mid-edit and can drop a pending autosave.
+  Revalidate lists and overviews, not the editor.
+- **Designable pages are definitions, not editors.** Every page under
+  Marketing › Page designs is a plain-data definition in
+  `src/domain/page-designs/` (variants, grouped fields, per-variant defaults,
+  preview path) registered in `PAGE_DESIGNS`. The admin screen
+  (`/admin/design/[page]`), the zod schema and the defaults merge are all
+  derived from it, so a new setting is one field entry plus a default in each
+  variant; `config.test.ts` fails if a default is missing. A setting that
+  means something in only some layouts says so with `onlyFor`; it still
+  needs a default in every variant.
+- **Shoppers see only what was published.** Designs live in `pageDesigns`,
+  one document per page holding `published`, `draft`, `scheduled` and the last
+  twenty `revisions`. Storefront pages read `getLiveDesign(page)` (cached,
+  tagged `pageDesign(page)`); previews read `getPreviewDesign(page)`, which
+  asserts `cms:write`. A scheduled publish is applied on read and settled into
+  the record the next time the designer opens it; there is no cron.
+- **A page's layout can depend on the record it shows.** The product page may
+  set a layout per category (`categoryOverrides`, deepest category wins) and
+  the store page may let sellers pick from the layouts Marketing allows
+  (`sellerChoice`, the pick stored as `seller.storefrontLayout`). Both
+  publish with the design. Routes must call `resolveVariant(design, …)` rather
+  than reading `design.variant`, or the exception is silently ignored.
+- **A page under an A/B test renders its layout per visitor.** Routes ask
+  `getRunningExperiment(page)` (cached, tagged with the page's design) and,
+  when a test runs and no category/seller layout applies, render through
+  `<ExperimentArm>` inside their own `<Suspense>`. The arm is a hash of the
+  `vx` visitor cookie (set by `proxy.ts` on the designable routes) and the
+  test id. Bag adds and orders credit tests via `creditConversion`, which
+  never throws. While a test runs, publishing a different layout is refused:
+  the live layout IS the control arm.
 
 ## Deliberate deviations from the brief
 

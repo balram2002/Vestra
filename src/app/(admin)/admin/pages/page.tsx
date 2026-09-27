@@ -5,109 +5,135 @@ import { Suspense } from 'react';
 import { DataTable, TableEmpty, type Column } from '@/components/console/data-table';
 import { PageHeader } from '@/components/console/page-header';
 import { Badge } from '@/components/ui/badge';
-import type { CmsPage } from '@/domain/types';
+import { CONTENT_TEMPLATE_META } from '@/domain/content-pages';
+import { cn } from '@/lib/cn';
 import { formatDateShort } from '@/lib/format';
-import { requirePermission } from '@/server/auth/session';
-import { collections, toEntities } from '@/server/db/collections';
+import { listContentPages, type ContentPageRow } from '@/server/services/content-pages';
 
-export const metadata: Metadata = { title: 'Pages' };
+export const metadata: Metadata = { title: 'Content pages' };
+
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+const SECTIONS = ['All', 'Legal', 'Help', 'Company'] as const;
 
 /**
- * Site pages.
+ * Policies, help articles, about and sell with us.
  *
- * Terms, privacy, the returns and grievance policies, the help articles, about
- * and sell with us. They are the shop's own commitments, so they are edited
- * here rather than in code, and every save is in the audit log.
+ * They are the shop's own commitments, so every edit is a draft that someone
+ * publishes, every publish is kept, and the list says which pages have
+ * something waiting.
  */
-export default function AdminPagesPage() {
+export default function AdminPagesPage({ searchParams }: { searchParams: SearchParams }) {
   return (
     <>
       <PageHeader
-        title="Pages"
-        description="Policies, help articles and the about page. Read each one before launch: they are a starting point, and they are your promises to shoppers and sellers."
+        title="Content pages"
+        description="Policies, help articles and the about page. Edits are drafts until published, and every published version is kept."
       />
-
       <Suspense fallback={<div className="skeleton mt-6 h-96 rounded-xl" aria-hidden />}>
-        <PageTable />
+        <PageTable searchParams={searchParams} />
       </Suspense>
     </>
   );
 }
 
-function sectionOf(slug: string): string {
-  if (slug.startsWith('legal/')) return 'Legal';
-  if (slug.startsWith('help/')) return 'Help';
-  return 'Company';
-}
+async function PageTable({ searchParams }: { searchParams: SearchParams }) {
+  const params = await searchParams;
+  const requested = typeof params.section === 'string' ? params.section : 'All';
+  const section = (SECTIONS as readonly string[]).includes(requested) ? requested : 'All';
 
-async function PageTable() {
-  await requirePermission('cms:write');
+  const all = await listContentPages();
+  const rows = section === 'All' ? all : all.filter((row) => row.section === section);
+  const drafts = all.filter((row) => row.hasDraft).length;
 
-  const pageCol = await collections.cmsPages();
-  const pages = toEntities(await pageCol.find({}).sort({ slug: 1 }).toArray());
-
-  const columns: Column<CmsPage>[] = [
+  const columns: Column<ContentPageRow>[] = [
     {
       key: 'page',
       header: 'Page',
-      render: (page) => (
-        <div className="min-w-0">
-          <Link
-            href={`/admin/pages/${page.id}`}
-            className="text-ink hover:text-accent-ink block truncate text-xs font-medium"
-          >
-            {page.title}
-          </Link>
-          <p className="text-faint truncate text-2xs">/{page.slug}</p>
-        </div>
+      render: (row) => (
+        <Link href={`/admin/pages/${row.id}`} className="group block min-w-0">
+          <span className="text-ink block truncate text-xs font-semibold group-hover:underline">{row.title}</span>
+          <span className="text-faint block truncate font-mono text-2xs">/{row.slug}</span>
+        </Link>
       ),
+    },
+    {
+      key: 'state',
+      header: 'State',
+      render: (row) => (
+        <span className="flex flex-wrap gap-1">
+          <Badge tone={row.isPublished ? 'success' : 'neutral'} size="sm">
+            {row.isPublished ? 'Visible' : 'Hidden'}
+          </Badge>
+          {row.hasDraft ? (
+            <Badge tone="warning" size="sm">
+              Draft
+            </Badge>
+          ) : null}
+          {row.noindex ? (
+            <Badge tone="neutral" size="sm">
+              Not in search
+            </Badge>
+          ) : null}
+        </span>
+      ),
+    },
+    {
+      key: 'template',
+      header: 'Template',
+      secondary: true,
+      render: (row) => <span className="text-muted text-xs">{CONTENT_TEMPLATE_META[row.template].name}</span>,
     },
     {
       key: 'section',
       header: 'Section',
       secondary: true,
-      render: (page) => <span className="text-muted text-xs">{sectionOf(page.slug)}</span>,
+      render: (row) => <span className="text-muted text-xs">{row.section}</span>,
     },
     {
       key: 'updated',
-      header: 'Updated',
+      header: 'Published',
       numeric: true,
       secondary: true,
-      render: (page) => <span className="text-faint text-2xs">{formatDateShort(page.updatedAt)}</span>,
-    },
-    {
-      key: 'state',
-      header: 'State',
-      render: (page) => (
-        <Badge tone={page.isPublished ? 'success' : 'neutral'} size="sm">
-          {page.isPublished ? 'Published' : 'Unpublished'}
-        </Badge>
-      ),
-    },
-    {
-      key: 'edit',
-      header: '',
-      render: (page) => (
-        <Link href={`/admin/pages/${page.id}`} className="text-accent-ink text-xs font-medium">
-          Edit
-        </Link>
-      ),
+      render: (row) => <span className="text-faint text-2xs">{formatDateShort(row.updatedAt)}</span>,
     },
   ];
 
   return (
-    <div className="mt-6">
+    <div className="mt-6 space-y-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <nav aria-label="Filter by section" className="flex flex-wrap gap-1">
+          {SECTIONS.map((item) => {
+            const count = item === 'All' ? all.length : all.filter((row) => row.section === item).length;
+            return (
+              <Link
+                key={item}
+                href={item === 'All' ? '/admin/pages' : `/admin/pages?section=${item}`}
+                aria-current={section === item ? 'page' : undefined}
+                className={cn(
+                  'inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium',
+                  section === item ? 'border-ink bg-ink text-canvas' : 'border-line bg-raised text-muted hover:text-ink',
+                )}
+              >
+                {item}
+                <span className={cn('tabular', section === item ? 'text-canvas/70' : 'text-faint')}>{count}</span>
+              </Link>
+            );
+          })}
+        </nav>
+        {drafts ? (
+          <p className="text-warning-700 text-xs font-medium">
+            {drafts} {drafts === 1 ? 'page has' : 'pages have'} unpublished changes
+          </p>
+        ) : null}
+      </div>
+
       <DataTable
         columns={columns}
-        rows={pages}
-        rowKey={(page) => page.id}
-        caption="Site pages"
-        empty={
-          <TableEmpty
-            title="No pages yet"
-            body="Run npm run seed:reference to add the policy and help pages, then edit them here."
-          />
-        }
+        rows={rows}
+        rowKey={(row) => row.id}
+        caption="Content pages"
+        empty={<TableEmpty title="No pages here" body="Pick another section." />}
       />
     </div>
   );

@@ -1,6 +1,6 @@
 import { BadgeCheck, MapPin, MessageCircle, PackageCheck, ShieldCheck, Star, Truck } from 'lucide-react';
 import type { Seller } from '@/domain/types';
-import { DEFAULT_STORE_PAGE, type StorePageSettings } from '@/domain/store-page';
+import { storePageDesign, type StorePageSettings } from '@/domain/page-designs/store';
 import { formatCompactNumber } from '@/lib/format';
 import { storeStats, whatsappLink, type StoreStat as Stat } from '@/lib/store-stats';
 import { Picture } from '@/components/ui/picture';
@@ -20,7 +20,7 @@ const STAT_ICON: Record<Stat['key'], React.ReactNode> = {
  */
 export function StoreProfile({
   seller,
-  settings = DEFAULT_STORE_PAGE.settings.classic,
+  settings = storePageDesign.defaults.classic,
 }: {
   seller: Seller;
   settings?: StorePageSettings;

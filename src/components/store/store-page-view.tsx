@@ -3,7 +3,7 @@ import { Suspense } from 'react';
 import { Breadcrumbs } from '@/components/commerce/breadcrumbs';
 import { StoreProfile } from '@/components/commerce/store-profile';
 import { ProductGridSkeleton } from '@/components/skeletons/product-card-skeleton';
-import type { StorePageSettings, StorePageVariant } from '@/domain/store-page';
+import type { StorePageSettings, StorePageVariant } from '@/domain/page-designs/store';
 import type { Seller } from '@/domain/types';
 import type { RawSearchParams } from '@/lib/product-query';
 

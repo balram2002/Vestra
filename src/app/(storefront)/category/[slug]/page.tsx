@@ -1,23 +1,17 @@
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
 import { Suspense } from 'react';
-import Image from 'next/image';
-import Link from 'next/link';
 
 import { atLeastOne, PLACEHOLDER_SLUG } from '@/lib/static-params';
-import { Breadcrumbs } from '@/components/commerce/breadcrumbs';
-import { ListingView } from '@/components/commerce/listing-view';
-import { ProductGridSkeleton } from '@/components/skeletons/product-card-skeleton';
 import { absoluteUrl } from '@/config/site';
 import { isIndexableListing, parseProductQuery, type RawSearchParams } from '@/lib/product-query';
-import { JsonLd } from '@/components/seo/json-ld';
-import { breadcrumbListJsonLd, itemListJsonLd } from '@/lib/seo/structured-data';
-import {
-  getCategoryAncestors,
-  getCategoryBySlug,
-  getCategoryTree,
-} from '@/server/services/catalog';
-import { listProducts } from '@/server/services/listing';
+import { ExperimentArm } from '@/components/experiments/experiment-arm';
+import { PageSkeleton } from '@/components/skeletons/page-skeleton';
+import { getRunningExperiment } from '@/server/services/experiments';
+import { CategoryFrame } from './category-frame';
+import { getCategoryBySlug, getCategoryTree } from '@/server/services/catalog';
+import { getLiveDesign } from '@/server/services/page-designs';
+import type { CategoryPageSettings, CategoryPageVariant } from '@/domain/page-designs/category';
 
 /**
  * Category listing.
@@ -101,127 +95,25 @@ export default async function CategoryPage({ params, searchParams }: PageProps) 
     permanentRedirect(`/category/${category.slug}`);
   }
 
-  const ancestors = await getCategoryAncestors(category.slug);
-  const children = (await getCategoryTree()).filter((item) => item.parentId === category.id);
+  // Which layout, and which of its parts, is decided under
+  // Admin › Page designs › Category page. Cached, so the shell still prerenders.
+  const [design, experiment] = await Promise.all([getLiveDesign('category'), getRunningExperiment('category')]);
+  const view = (layout: string) => (
+    <CategoryFrame
+      category={category}
+      variant={layout as CategoryPageVariant}
+      settings={design.settings[layout] as CategoryPageSettings}
+      searchParams={searchParams}
+    />
+  );
 
-  return (
-    <div className="gutter shell-max py-5">
-      <Breadcrumbs
-        items={[
-          { href: '/', label: 'Home' },
-          ...ancestors.map((c) => ({ href: `/category/${c.slug}`, label: c.name })),
-        ]}
-      />
-
-      <JsonLd
-        data={breadcrumbListJsonLd([
-          { name: 'Home', url: absoluteUrl('/') },
-          ...ancestors.map((c) => ({
-            name: c.name,
-            url: absoluteUrl(`/category/${c.slug}`),
-          })),
-        ])}
-      />
-
-      {/*
-        Tight on a phone.
-        
-        Breadcrumb, heading, description, a filter button, a count and a sort
-        row used to fill roughly two thirds of a 844px screen before the first
-        product. The description is clamped to two lines and the rest is folded
-        into the sticky bar below, so the grid starts near the top where someone
-        who came to shop is already looking.
-      */}
-      <header className="bg-ink relative mt-3 min-h-48 overflow-hidden rounded-3xl sm:min-h-64">
-        {category.imageUrl ? <Image src={category.imageUrl} alt="" fill priority sizes="(min-width: 1024px) 1200px, 100vw" className="object-cover" /> : null}
-        <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-black/10" />
-        <div className="relative flex min-h-48 max-w-2xl flex-col justify-end p-5 text-white sm:min-h-64 sm:p-10">
-        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-white/75">Explore the collection</p>
-        <h1 className="font-display text-3xl font-bold leading-tight text-white sm:text-5xl">{category.name}</h1>
-        {category.description ? (
-          <p className="mt-2 line-clamp-2 max-w-xl text-sm leading-relaxed text-white/85 sm:mt-3 sm:line-clamp-3">
-            {category.description}
-          </p>
-        ) : null}
-        </div>
-      </header>
-      {children.length ? <nav aria-label={`Shop ${category.name} by type`} className="no-scrollbar mt-4 flex gap-2 overflow-x-auto pb-1">{children.map((child) => <Link key={child.id} href={`/category/${child.slug}`} className="border-line bg-raised text-ink hover:border-ink inline-flex min-h-11 shrink-0 items-center rounded-full border px-4 text-xs font-semibold transition-colors">{child.name}</Link>)}</nav> : null}
-
-      <Suspense fallback={<ListingSkeleton />}>
-        <CategoryListing slug={category.slug} searchParams={searchParams} />
+  // Under an A/B test the layout is chosen per visitor.
+  if (experiment) {
+    return (
+      <Suspense fallback={<PageSkeleton shape="listing" />}>
+        <ExperimentArm experiment={experiment}>{view}</ExperimentArm>
       </Suspense>
-
-      {/*
-        SEO copy sits BELOW the grid: it is written for crawlers and for
-        shoppers who scrolled the whole page, and putting it above would push
-        the products people came for off the fold.
-      */}
-      {category.seoIntro ? (
-        <section className="border-line mt-12 border-t pt-6">
-          <h2 className="text-ink text-sm font-semibold">About {category.name}</h2>
-          <p className="text-muted mt-2 max-w-3xl text-pretty text-sm">{category.seoIntro}</p>
-        </section>
-      ) : null}
-    </div>
-  );
-}
-
-/** The dynamic half: everything that depends on the query string. */
-async function CategoryListing({
-  slug,
-  searchParams,
-}: {
-  slug: string;
-  searchParams: Promise<RawSearchParams>;
-}) {
-  const raw = await searchParams;
-  const query = parseProductQuery(raw, { categorySlug: slug });
-  const result = await listProducts(query);
-  const basePath = `/category/${slug}`;
-
-  return (
-    <>
-      <JsonLd
-        data={itemListJsonLd(
-          result.items.map((item) => ({
-            name: item.title,
-            url: absoluteUrl(`/product/${item.slug}`),
-          })),
-        )}
-      />
-
-      {/*
-        The entire listing arrangement — sticky mobile bar, docked rail, applied
-        chips, toolbar, grid, pagination — lives in `ListingView` and is shared
-        with search, brand and store. Four copies of this layout was four
-        chances for the filter drawer to go missing from one of them.
-      */}
-      <ListingView
-        result={result}
-        params={raw}
-        basePath={basePath}
-        sort={query.sort ?? 'popularity'}
-      />
-    </>
-  );
-}
-
-function ListingSkeleton() {
-  return (
-    <div className="mt-5 flex gap-8">
-      <div className="hidden w-60 shrink-0 space-y-4 lg:block" aria-hidden>
-        {Array.from({ length: 4 }, (_, i) => (
-          <div key={i} className="space-y-2">
-            <div className="skeleton h-4 w-24 rounded-xs" />
-            <div className="skeleton h-3 w-full rounded-xs" />
-            <div className="skeleton h-3 w-5/6 rounded-xs" />
-          </div>
-        ))}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="skeleton h-8 w-full rounded-sm" aria-hidden />
-        <ProductGridSkeleton className="mt-5" count={15} />
-      </div>
-    </div>
-  );
+    );
+  }
+  return view(design.variant);
 }

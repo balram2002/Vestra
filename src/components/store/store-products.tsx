@@ -6,7 +6,7 @@ import { ListingView } from '@/components/commerce/listing-view';
 import { Pagination } from '@/components/commerce/pagination';
 import { ProductGrid } from '@/components/commerce/product-grid';
 import { EmptyState } from '@/components/ui/empty-state';
-import type { ProductStyle, StorePageSettings, StorePageVariant } from '@/domain/store-page';
+import type { ProductStyle, StorePageSettings, StorePageVariant } from '@/domain/page-designs/store';
 import { cn } from '@/lib/cn';
 import { parseProductQuery, withParam, type RawSearchParams } from '@/lib/product-query';
 import { listProducts } from '@/server/services/listing';

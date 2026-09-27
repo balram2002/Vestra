@@ -2,7 +2,7 @@ import { BadgeCheck, MapPin, MessageCircle, Star } from 'lucide-react';
 
 import { ShareMenu } from '@/components/commerce/share-menu';
 import { Picture } from '@/components/ui/picture';
-import type { StorePageSettings } from '@/domain/store-page';
+import type { StorePageSettings } from '@/domain/page-designs/store';
 import type { Seller } from '@/domain/types';
 import { cn } from '@/lib/cn';
 import { formatCompactNumber } from '@/lib/format';

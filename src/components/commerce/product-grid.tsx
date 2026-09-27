@@ -1,5 +1,6 @@
 import { PackageOpen } from 'lucide-react';
 import Link from 'next/link';
+import { Fragment } from 'react';
 
 import { ProductCard } from '@/components/commerce/product-card';
 import { WishlistButton } from '@/components/commerce/wishlist-button';
@@ -7,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import type { ProductSummary } from '@/domain/types';
 import { cn } from '@/lib/cn';
+import { tileAfter } from '@/lib/listing-tiles';
 import { staggerIndex } from '@/lib/motion';
 
 /**
@@ -36,9 +38,15 @@ export function ProductGrid({
   products,
   savedIds,
   emptyAction,
+  tiles,
+  density = 'standard',
   className,
 }: {
   products: ProductSummary[];
+  /** Compact fits more per row, for shoppers comparing a long range. */
+  density?: 'standard' | 'compact';
+  /** Editorial tiles placed between products (see `tileAfter`). */
+  tiles?: React.ReactNode[];
   /** Product ids already on the viewer's list. Omit to hide the save control. */
   savedIds?: ReadonlySet<string>;
   /** Where to send someone whose filters returned nothing. */
@@ -67,7 +75,10 @@ export function ProductGrid({
   return (
     <ul
       className={cn(
-        'stagger grid grid-cols-2 gap-x-2.5 gap-y-4 sm:gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5',
+        'stagger grid grid-cols-2',
+        density === 'compact'
+          ? 'gap-x-2 gap-y-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'
+          : 'gap-x-2.5 gap-y-4 sm:gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5',
         className,
       )}
     >
@@ -83,7 +94,8 @@ export function ProductGrid({
 
           Deliberately a STOREFRONT-only flourish; the consoles never stagger.
         */
-        <li className="min-w-0" key={product.id} style={staggerIndex(index)}>
+        <Fragment key={product.id}>
+        <li className="min-w-0" style={staggerIndex(index)}>
           <ProductCard
             product={product}
             priority={index < 4}
@@ -99,7 +111,10 @@ export function ProductGrid({
             }
           />
         </li>
+        {tiles?.[tileAfter(index)] ? <li className="min-w-0">{tiles[tileAfter(index)]}</li> : null}
+        </Fragment>
       ))}
     </ul>
   );
 }
+

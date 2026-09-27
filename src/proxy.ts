@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
+import { VISITOR_COOKIE } from '@/domain/experiments';
 import { SESSION_COOKIE, SESSION_HINT_COOKIE, verifySession } from '@/server/auth/jwt';
 import { consoleForPath, isSellerRole, isStaffRole } from '@/server/auth/rbac';
 
@@ -20,11 +21,36 @@ import { consoleForPath, isSellerRole, isStaffRole } from '@/server/auth/rbac';
  * admin data. That is `server/auth/session.ts`.
  */
 
+/**
+ * A/B tests need a stable, anonymous visitor id. It is given on the first
+ * designable page a visitor opens, and written into THIS request as well as
+ * the response, so the very first render already knows the visitor's arm --
+ * otherwise first visits would all land in the control and skew every test.
+ *
+ * Only the response that sets it is marked private. Every later request
+ * carries the cookie and sets nothing, so pages cache as before.
+ */
+function withVisitor(request: NextRequest): NextResponse {
+  if (request.cookies.has(VISITOR_COOKIE)) return NextResponse.next();
+  const id = crypto.randomUUID();
+  request.cookies.set(VISITOR_COOKIE, id);
+  const response = NextResponse.next({ request: { headers: request.headers } });
+  response.cookies.set(VISITOR_COOKIE, id, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+    maxAge: 60 * 60 * 24 * 180,
+  });
+  response.headers.set('Cache-Control', 'private, no-store');
+  return response;
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   const area = consoleForPath(pathname);
 
-  if (area === 'public') return NextResponse.next();
+  if (area === 'public') return withVisitor(request);
 
   const claims = await verifySession(request.cookies.get(SESSION_COOKIE)?.value);
 
@@ -66,6 +92,17 @@ export const config = {
    * keeps the catalogue fully cacheable at the CDN.
    */
   matcher: [
+    /*
+     * The designable storefront pages, for the A/B visitor id only (see
+     * `withVisitor`). Nothing else on the storefront runs this file.
+     */
+    '/product/:path*',
+    '/store/:path*',
+    '/stores',
+    '/category/:path*',
+    '/brand/:path*',
+    '/search',
+    '/demo/:path*',
     '/admin/:path*',
     '/seller/:path*',
     '/account/:path*',
