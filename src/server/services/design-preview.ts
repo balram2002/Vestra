@@ -60,6 +60,27 @@ export async function previewEntities(
         options: brands.map((brand) => ({ value: brand.slug, label: `${brand.name} (${brand.productCount})` })),
       };
     }
+    case 'query': {
+      // Every state a search page has, not just the happy one: real words,
+      // a brand, a misspelling, nothing found, and no search at all.
+      const [tree, brands] = await Promise.all([getCategoryTree(), listBrands(1)]);
+      // The most specific categories: "kurtas" is a search, "ethnic wear" a department.
+      const words = tree
+        .toSorted((a, b) => b.depth - a.depth || a.position - b.position)
+        .slice(0, 3)
+        .map((category) => category.name.toLowerCase());
+      const typo = words[0] && words[0].length > 4 ? `${words[0].slice(0, 2)}${words[0][3]}${words[0][2]}${words[0].slice(4)}` : null;
+      return {
+        label: 'Preview with search',
+        options: [
+          ...words.map((word) => ({ value: word, label: `“${word}”` })),
+          ...brands.map((brand) => ({ value: brand.name.toLowerCase(), label: `“${brand.name.toLowerCase()}” (a brand)` })),
+          ...(typo ? [{ value: typo, label: `“${typo}” (misspelt)` }] : []),
+          { value: 'zqxwv', label: 'A search that finds nothing' },
+          { value: '', label: 'An empty search' },
+        ],
+      };
+    }
     default:
       return { label: 'Preview with', options: [] };
   }

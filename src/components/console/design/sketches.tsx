@@ -329,6 +329,59 @@ Object.assign(SKETCHES, {
   ),
 });
 
+Object.assign(SKETCHES, {
+  'search-classic': () => (
+    <Frame>
+      <div className="bg-ink/70 h-2.5 w-1/2 rounded-sm" />
+      <div className="flex gap-1.5">
+        <span className="flex w-5 flex-col gap-1">
+          <Tiles count={4} className="h-1.5" />
+        </span>
+        <span className="grid flex-1 grid-cols-4 gap-1">
+          <Tiles count={8} className="aspect-4/5" />
+        </span>
+      </div>
+    </Frame>
+  ),
+  'search-instant': () => (
+    <Frame>
+      <div className="border-line h-3.5 rounded-full border bg-white" />
+      <div className="flex gap-1">
+        {Array.from({ length: 3 }, (_, index) => (
+          <span key={index} className="border-line flex items-center gap-0.5 rounded-md border p-0.5">
+            <span className="size-2.5 rounded-sm bg-neutral-300" />
+            <span className={cn(tile, 'h-1 w-4')} />
+          </span>
+        ))}
+      </div>
+      <div className="bg-accent/40 h-1.5 w-1/3 rounded-sm" />
+      <div className="flex gap-1.5">
+        <span className="flex w-4 flex-col gap-1">
+          <Tiles count={3} className="h-1.5" />
+        </span>
+        <span className="grid flex-1 grid-cols-4 gap-1">
+          <Tiles count={4} className="aspect-4/5" />
+        </span>
+      </div>
+    </Frame>
+  ),
+  'search-visual': () => (
+    <Frame>
+      <div className="border-line flex h-5 items-center rounded-full border bg-white px-1.5">
+        <span className="bg-ink/70 h-2 w-1/3 rounded-sm" />
+      </div>
+      <div className="flex gap-1">
+        <Tiles count={4} className="h-2 w-6 rounded-full" />
+      </div>
+      <div className="grid grid-flow-row-dense grid-cols-4 gap-0.5">
+        <Tiles count={2} className="aspect-3/4 rounded-[2px]" />
+        <span className="col-span-2 row-span-2 rounded-[3px] bg-neutral-400" />
+        <Tiles count={4} className="aspect-3/4 rounded-[2px]" />
+      </div>
+    </Frame>
+  ),
+});
+
 export function DesignSketch({ sketch }: { sketch: string }) {
   const draw = SKETCHES[sketch];
   return draw ? draw() : <Frame><div className={cn(tile, 'h-24')} /></Frame>;

@@ -33,6 +33,7 @@ const CASES = [
   { who: 'anonymous', email: null, path: '/category/women/preview/wall', allow: false },
   { who: 'anonymous', email: null, path: '/stores/preview/market', allow: false },
   { who: 'anonymous', email: null, path: '/brand/mora-label/preview/campaign', allow: false },
+  { who: 'anonymous', email: null, path: '/search/preview/instant', allow: false },
   { who: 'anonymous', email: null, path: '/admin/design/product', allow: false },
 
   { who: 'customer', email: 'ananya.iyer@example.com', path: '/orders', allow: true },
@@ -61,6 +62,7 @@ const CASES = [
   { who: 'marketing', email: 'marketing@vestra.test', path: '/admin/design/category', allow: true },
   { who: 'marketing', email: 'marketing@vestra.test', path: '/admin/design/stores', allow: true },
   { who: 'marketing', email: 'marketing@vestra.test', path: '/admin/design/brand', allow: true },
+  { who: 'marketing', email: 'marketing@vestra.test', path: '/admin/design/search', allow: true },
   { who: 'marketing', email: 'marketing@vestra.test', path: '/category/women/preview/editorial', allow: true },
   { who: 'marketing', email: 'marketing@vestra.test', path: '/store/ash-and-oak-menswear/preview/studio', allow: true },
   { who: 'marketing', email: 'marketing@vestra.test', path: '/admin/payments', allow: false },

@@ -2,7 +2,9 @@ import 'server-only';
 
 import { cacheLife, cacheTag } from 'next/cache';
 
+import { COLORS, MATERIALS, OCCASIONS, PATTERNS } from '@/domain/attributes';
 import { galleryAssets } from '@/domain/media';
+import { buildVocabulary, didYouMean } from '@/domain/spelling';
 
 import { collections } from '../db/collections';
 import { tags } from './cache-tags';
@@ -140,4 +142,43 @@ export async function searchEverything(query: string): Promise<SearchResults> {
     results.sellers.length;
 
   return results;
+}
+
+/* ---------------------------------------------------------- did you mean */
+
+/**
+ * Every word the shop uses to describe itself: category, brand and store
+ * names, and the colour, fabric, pattern and occasion vocabulary products are
+ * tagged with. Cached with the catalogue's tags -- a new brand should be
+ * suggestible the moment it is live.
+ */
+async function searchVocabulary(): Promise<string[]> {
+  'use cache';
+  cacheTag(tags.brandList, tags.taxonomy, tags.sellerList);
+  cacheLife('hours');
+
+  const [categoryCol, brandCol, sellerCol] = await Promise.all([
+    collections.categories(),
+    collections.brands(),
+    collections.sellers(),
+  ]);
+  const [categories, brands, sellers] = await Promise.all([
+    categoryCol.find({ isActive: true }, { projection: { name: 1 } }).toArray(),
+    brandCol.find({ isActive: true }, { projection: { name: 1 } }).toArray(),
+    sellerCol.find({ status: { $in: ['ACTIVE', 'APPROVED'] } }, { projection: { displayName: 1 } }).toArray(),
+  ]);
+  const phrases = [
+    ...categories.map((row) => row.name),
+    ...brands.map((row) => row.name),
+    ...sellers.map((row) => row.displayName),
+    ...COLORS.map((color) => color.label),
+    ...[...MATERIALS, ...PATTERNS, ...OCCASIONS].map((option) => option.label),
+  ];
+  return [...buildVocabulary(phrases)];
+}
+
+/** A corrected query, or null when every word is one the shop knows. */
+export async function spellingSuggestion(query: string): Promise<string | null> {
+  const vocabulary = new Set(await searchVocabulary());
+  return didYouMean(query, vocabulary);
 }

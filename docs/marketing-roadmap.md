@@ -277,10 +277,18 @@ between layouts.
   Categories open the category filtered to the brand, so each gets its own
   facets. 14 settings. Also fixed: the brand page counted its own brand as an
   applied filter ("Clear all (1)" on an unfiltered page). Done 27 Sep 2026.
-- ☐ **Phase 5.4 — Search results** (`/search`). V1 current. V2 *Instant*
-  (the query's matching stores, brands and categories as chips above the
-  grid, with "did you mean"). V3 *Visual* (a reel wall of results with
-  sort-as-tabs).
+- ☑ **Phase 5.4 — Search results** (`/search`). V1 *Classic* (current).
+  V2 *Instant*: the search box stays on the page, matching categories,
+  brands and stores sit above the products as shortcuts, and a misspelt word
+  gets "Did you mean". V3 *Visual*: the query set large in its own search
+  box, sort as chips, filters in a drawer, and the results as the photo wall
+  with quick view. A search that finds nothing can also offer bestsellers.
+  The suggestion comes from the shop's own vocabulary (`domain/spelling.ts`:
+  category, brand and store names, colours, fabrics, patterns, occasions),
+  so it can only point at something that exists, and it is offered whatever
+  the result count: "etnhic wear" finds hundreds of products through "wear"
+  alone. The preview is chosen by query, including a misspelling, a search
+  that finds nothing and an empty search. 10 settings. Done 27 Sep 2026.
 - ☐ **Phase 5.5 — Overrides.** A product-page variant per category (e.g.
   Social for ethnic wear), and the store-page variant chosen by the seller
   from the set Marketing allows.

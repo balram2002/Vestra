@@ -208,8 +208,13 @@ export function PageDesigner({
   const settings = working.settings[editing];
   const defaults = definition.defaults[editing];
   const changedCount = changedFromDefault(definition, editing, settings).size;
-  // A page about no one record (a directory) previews without choosing one.
-  const previewPath = entity || definition.preview.entity === null ? definition.preview.path(entity, editing) : null;
+  // A page about no one record (a directory) previews without choosing one;
+  // otherwise there must be something to choose. An option's value may be
+  // empty -- the search page previews an empty search.
+  const previewPath =
+    definition.preview.entity === null || entities.some((option) => option.value === entity)
+      ? definition.preview.path(entity, editing)
+      : null;
 
   return (
     <div className="mt-6 space-y-6">

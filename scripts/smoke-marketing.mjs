@@ -624,6 +624,47 @@ try {
   await chooseLayout('Variant 1 · Classic');
   await publish();
   check('Left as found: brand Classic', await eventually(brandIsCampaign, false));
+
+  /* ----------------------------------------------------- search results */
+  await staff.goto(`${BASE}/admin/design/search`, { waitUntil: 'load' });
+  await staff.waitForTimeout(1500);
+  const searchPicker = staff.getByLabel('Preview with search');
+  const pickerOptions = await searchPicker.locator('option').evaluateAll((nodes) => nodes.map((node) => ({ value: node.value, label: node.textContent ?? '' })));
+  const word = pickerOptions[0].value;
+  const typo = pickerOptions.find((option) => option.label.includes('misspelt'))?.value ?? '';
+  const searchPreview = async (variant, q) => {
+    await staff.goto(`${BASE}/search/preview/${variant}?q=${encodeURIComponent(q)}`, { waitUntil: 'load' });
+    await staff.waitForTimeout(1200);
+  };
+
+  await searchPreview('instant', word);
+  check('Instant shows matching categories, brands and stores', await appears(staff.getByRole('navigation', { name: 'Matching stores, brands and categories' })));
+  await searchPreview('instant', typo);
+  check('A misspelt search is offered a correction', await appears(staff.getByText(/Did you mean|Search for “/).first()));
+  await searchPreview('instant', 'zqxwv');
+  check('A search that finds nothing still offers bestsellers', await appears(staff.getByRole('heading', { name: 'Bestsellers right now' })));
+  await searchPreview('instant', word);
+  await staff.locator('#page-search').fill('cotton');
+  await staff.locator('#page-search').press('Enter');
+  await staff.waitForURL((url) => url.searchParams.get('q') === 'cotton', { timeout: 30000 });
+  check('The page search box searches inside the preview', new URL(staff.url()).pathname === '/search/preview/instant');
+  await searchPreview('visual', word);
+  check('Visual shows results as a photo wall', (await staff.getByRole('button', { name: /^Quick view: / }).count()) > 0);
+
+  const searchIsInstant = async () => {
+    await shopper.goto(`${BASE}/search?q=${encodeURIComponent(word)}`, { waitUntil: 'load' });
+    await shopper.waitForTimeout(1200);
+    return (await shopper.locator('#page-search').count()) > 0;
+  };
+  await staff.goto(`${BASE}/admin/design/search`, { waitUntil: 'load' });
+  await staff.waitForTimeout(1500);
+  await chooseLayout('Variant 2 · Instant');
+  check('A search layout change is a draft', !(await searchIsInstant()));
+  await publish();
+  check('Publishing Instant reaches shoppers', await eventually(searchIsInstant, true));
+  await chooseLayout('Variant 1 · Classic');
+  await publish();
+  check('Left as found: search Classic', await eventually(searchIsInstant, false));
 } catch (error) {
   const where = String(error.stack ?? '').split('\n').find((line) => line.includes('smoke-marketing')) ?? '';
   check('Run completed', false, `${String(error).split('\n')[0]} ${where.trim()}`);

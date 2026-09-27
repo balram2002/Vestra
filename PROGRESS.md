@@ -143,3 +143,10 @@ The plan for bringing every Marketing screen up to one standard lives in `docs/m
 - `services/brand-page.ts` derives the brand's categories (deepest first) and similar brands (most shared categories) from its own category list. `getProductRail` takes a brand, and `ListingView`/`ProductGrid` take a `density`.
 - Fixed: the brand page counted its own brand as an applied filter, showing "Clear all (1)" before anything was filtered.
 - `smoke:marketing` 78 checks, `smoke:rbac` 38/38.
+
+## Marketing roadmap, Phase 5.4: Search results designer — 27 September 2026
+
+- **Admin › Page designs › Search results** (`/admin/design/search`) has 10 settings: search box on the page, matching stores/brands/categories, "Did you mean", popular filters, docked filters, quick view, wall density, and what a search that finds nothing offers (departments, bestsellers and their title).
+- **Variant 1 · Classic** is the page as shipped. **Variant 2 · Instant** keeps the search box on the page, with shortcuts and spelling suggestions. **Variant 3 · Visual** puts the query in a large search box over the photo wall.
+- `domain/spelling.ts` suggests corrections from the shop's own vocabulary (optimal string alignment distance, one slip for short words and two for longer ones, plurals understood, sizes and numbers never touched), with tests. `spellingSuggestion` in `services/search.ts` caches the vocabulary with the catalogue's tags.
+- The designer previews by query and offers every state a search page has: real words, a brand, a misspelling, nothing found, and an empty search.
