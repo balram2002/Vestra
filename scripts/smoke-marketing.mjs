@@ -592,6 +592,38 @@ try {
   await chooseLayout('Variant 1 · Classic');
   await publish();
   check('Left as found: directory Classic', await eventually(directoryIsMarket, false));
+
+  /* --------------------------------------------------------- brand page */
+  await staff.goto(`${BASE}/admin/design/brand`, { waitUntil: 'load' });
+  await staff.waitForTimeout(1500);
+  const brandSlug = await staff.getByLabel('Preview with brand').inputValue();
+  await staff.goto(`${BASE}/brand/${brandSlug}/preview/campaign`, { waitUntil: 'load' });
+  await staff.waitForTimeout(1200);
+  check('Campaign leads with the brand', await appears(staff.getByRole('link', { name: /Shop the collection/ })));
+  const brandCategory = staff.getByRole('navigation', { name: /by category$/ }).getByRole('link').first();
+  check(
+    'Shop by category opens the category filtered to the brand',
+    ((await brandCategory.getAttribute('href')) ?? '').endsWith(`?brand=${brandSlug}`),
+  );
+  await staff.goto(`${BASE}/brand/${brandSlug}/preview/catalogue`, { waitUntil: 'load' });
+  await staff.waitForTimeout(1200);
+  check('Catalogue folds the story away', await appears(staff.locator('summary', { hasText: /^About / })));
+  check('The brand itself is not counted as a filter', (await staff.getByText(/^Clear all \(/).count()) === 0);
+
+  const brandIsCampaign = async () => {
+    await shopper.goto(`${BASE}/brand/${brandSlug}`, { waitUntil: 'load' });
+    await shopper.waitForTimeout(1200);
+    return (await shopper.getByRole('link', { name: /Shop the collection/ }).count()) > 0;
+  };
+  await staff.goto(`${BASE}/admin/design/brand`, { waitUntil: 'load' });
+  await staff.waitForTimeout(1500);
+  await chooseLayout('Variant 2 · Campaign');
+  check('A brand layout change is a draft', !(await brandIsCampaign()));
+  await publish();
+  check('Publishing Campaign reaches shoppers', await eventually(brandIsCampaign, true));
+  await chooseLayout('Variant 1 · Classic');
+  await publish();
+  check('Left as found: brand Classic', await eventually(brandIsCampaign, false));
 } catch (error) {
   const where = String(error.stack ?? '').split('\n').find((line) => line.includes('smoke-marketing')) ?? '';
   check('Run completed', false, `${String(error).split('\n')[0]} ${where.trim()}`);

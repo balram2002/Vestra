@@ -268,8 +268,15 @@ between layouts.
   newest). "Near you" was dropped: it would mean asking for location on a
   directory page, and grouping by city answers the same question. Done 27 Sep
   2026.
-- ☐ **Phase 5.3 — Brand page** (`/brand/[slug]`). V1 current. V2 *Campaign*
-  (full-bleed brand film/hero). V3 *Catalogue* (compact, filter-first).
+- ☑ **Phase 5.3 — Brand page** (`/brand/[slug]`). V1 *Classic* (current).
+  V2 *Campaign*: a full-width hero with the brand's banner (or a gradient),
+  its logo and name set large, the facts, rating and "Shop the collection";
+  then its categories as photo tiles, a new-arrivals rail, the listing and
+  similar brands. V3 *Catalogue*: a slim header with the story folded into
+  "About", categories as chips, filters docked and a compact six-across grid.
+  Categories open the category filtered to the brand, so each gets its own
+  facets. 14 settings. Also fixed: the brand page counted its own brand as an
+  applied filter ("Clear all (1)" on an unfiltered page). Done 27 Sep 2026.
 - ☐ **Phase 5.4 — Search results** (`/search`). V1 current. V2 *Instant*
   (the query's matching stores, brands and categories as chips above the
   grid, with "did you mean"). V3 *Visual* (a reel wall of results with

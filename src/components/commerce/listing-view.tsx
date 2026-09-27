@@ -60,6 +60,7 @@ export async function ListingView({
   quickFilters = true,
   tiles,
   display = 'grid',
+  density = 'standard',
   className,
 }: {
   result: ProductListResult;
@@ -76,6 +77,8 @@ export async function ListingView({
   tiles?: React.ReactNode[];
   /** A card grid, or the photo wall (see `ProductWall`). */
   display?: 'grid' | { wall: 'airy' | 'dense'; quickView: boolean };
+  /** The card grid's density. */
+  density?: 'standard' | 'compact';
   className?: string;
 }) {
   /*
@@ -192,6 +195,7 @@ export async function ListingView({
                 products={result.items}
                 savedIds={savedIds}
                 tiles={tiles}
+                density={density}
                 emptyAction={{ href: basePath, label: 'Clear all filters' }}
               />
             )}

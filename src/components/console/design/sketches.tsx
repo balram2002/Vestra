@@ -279,6 +279,56 @@ Object.assign(SKETCHES, {
   ),
 });
 
+Object.assign(SKETCHES, {
+  'brand-classic': () => (
+    <Frame>
+      <div className="bg-ink/70 h-2.5 w-1/3 rounded-sm" />
+      <div className={cn(tile, 'h-1.5 w-2/3')} />
+      <div className="flex gap-1.5">
+        <span className="flex w-5 flex-col gap-1">
+          <Tiles count={4} className="h-1.5" />
+        </span>
+        <span className="grid flex-1 grid-cols-4 gap-1">
+          <Tiles count={8} className="aspect-4/5" />
+        </span>
+      </div>
+    </Frame>
+  ),
+  'brand-campaign': () => (
+    <Frame>
+      <div className="-mx-2 flex h-14 flex-col justify-end gap-1 bg-gradient-to-t from-neutral-900 to-neutral-500 p-2">
+        <span className="size-3 rounded-sm bg-white" />
+        <span className="block h-3 w-1/2 rounded-sm bg-white/90" />
+      </div>
+      <div className="flex gap-1">
+        <Tiles count={5} className="aspect-4/5 flex-1" />
+      </div>
+      <div className="grid grid-cols-4 gap-1">
+        <Tiles count={4} className="aspect-4/5" />
+      </div>
+    </Frame>
+  ),
+  'brand-catalogue': () => (
+    <Frame>
+      <div className="flex items-center gap-1">
+        <span className="size-3 rounded-sm bg-neutral-300" />
+        <span className="bg-ink/70 h-2 w-1/4 rounded-sm" />
+      </div>
+      <div className="flex gap-1">
+        <Tiles count={5} className="h-1.5 w-5 rounded-full" />
+      </div>
+      <div className="flex gap-1.5">
+        <span className="flex w-5 flex-col gap-1">
+          <Tiles count={5} className="h-1.5" />
+        </span>
+        <span className="grid flex-1 grid-cols-6 gap-0.5">
+          <Tiles count={12} className="aspect-4/5" />
+        </span>
+      </div>
+    </Frame>
+  ),
+});
+
 export function DesignSketch({ sketch }: { sketch: string }) {
   const draw = SKETCHES[sketch];
   return draw ? draw() : <Frame><div className={cn(tile, 'h-24')} /></Frame>;

@@ -3,7 +3,7 @@ import 'server-only';
 import type { PreviewEntity } from '@/domain/page-designs/types';
 
 import { requirePermission } from '../auth/session';
-import { getCategoryTree, getProductBySlug, getTopProductSlugs, listSellers } from './catalog';
+import { getCategoryTree, getProductBySlug, getTopProductSlugs, listBrands, listSellers } from './catalog';
 
 /**
  * The real records a designer can preview its page with.
@@ -50,6 +50,14 @@ export async function previewEntities(
           const parent = category.parentId ? byId.get(category.parentId) : null;
           return { value: category.slug, label: parent ? `${parent.name} › ${category.name}` : category.name };
         }),
+      };
+    }
+    case 'brand': {
+      // Biggest ranges first: a brand with three products shows little.
+      const brands = await listBrands(60);
+      return {
+        label: 'Preview with brand',
+        options: brands.map((brand) => ({ value: brand.slug, label: `${brand.name} (${brand.productCount})` })),
       };
     }
     default:

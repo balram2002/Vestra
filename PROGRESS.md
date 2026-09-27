@@ -135,3 +135,11 @@ The plan for bringing every Marketing screen up to one standard lives in `docs/m
 - The designer now previews pages that have no record to preview with (`preview.entity: null`).
 - `smoke:rbac` reads the whole page when looking for a refusal. The console nav grew past its old 400-character window, which briefly made a correct refusal look like a hole. `smoke:marketing`'s publish step now waits on the status line rather than a toast that a previous publish can leave on screen.
 - `smoke:marketing` 71/71, `smoke:rbac` 36/36.
+
+## Marketing roadmap, Phase 5.3: Brand page designer — 27 September 2026
+
+- **Admin › Page designs › Brand page** (`/admin/design/brand`) has 14 settings: breadcrumbs, brand picture, logo, about, facts, rating, shop by category (chips or photo tiles), new-arrivals rail and its title, similar brands, popular filters, docked filters, and grid density.
+- **Variant 1 · Classic** is the page as shipped. **Variant 2 · Campaign** is a launch page with a full-width hero. **Variant 3 · Catalogue** is a buyer's view with a slim header and a compact grid.
+- `services/brand-page.ts` derives the brand's categories (deepest first) and similar brands (most shared categories) from its own category list. `getProductRail` takes a brand, and `ListingView`/`ProductGrid` take a `density`.
+- Fixed: the brand page counted its own brand as an applied filter, showing "Clear all (1)" before anything was filtered.
+- `smoke:marketing` 78 checks, `smoke:rbac` 38/38.

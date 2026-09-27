@@ -39,9 +39,12 @@ export function ProductGrid({
   savedIds,
   emptyAction,
   tiles,
+  density = 'standard',
   className,
 }: {
   products: ProductSummary[];
+  /** Compact fits more per row, for shoppers comparing a long range. */
+  density?: 'standard' | 'compact';
   /** Editorial tiles placed between products (see `tileAfter`). */
   tiles?: React.ReactNode[];
   /** Product ids already on the viewer's list. Omit to hide the save control. */
@@ -72,7 +75,10 @@ export function ProductGrid({
   return (
     <ul
       className={cn(
-        'stagger grid grid-cols-2 gap-x-2.5 gap-y-4 sm:gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5',
+        'stagger grid grid-cols-2',
+        density === 'compact'
+          ? 'gap-x-2 gap-y-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'
+          : 'gap-x-2.5 gap-y-4 sm:gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5',
         className,
       )}
     >

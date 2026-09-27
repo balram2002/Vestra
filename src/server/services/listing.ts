@@ -344,6 +344,8 @@ export async function getProductRail(
   source: 'NEW_ARRIVALS' | 'BESTSELLERS' | 'TRENDING' | 'DEALS',
   limit: number = CATALOG.railSize,
   categorySlug?: string,
+  /** One brand's rail, for its brand page. */
+  brandId?: string,
 ): Promise<ProductListResult['items']> {
   'use cache';
   cacheTag(tags.productList);
@@ -352,6 +354,7 @@ export async function getProductRail(
   const products = await collections.products();
   const filter: Filter<Doc<Product>> = { status: 'PUBLISHED' };
   if (categorySlug) filter.categoryPath = categorySlug;
+  if (brandId) filter.brandId = brandId;
 
   const sort: Record<string, 1 | -1> =
     source === 'NEW_ARRIVALS'
