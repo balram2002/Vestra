@@ -54,6 +54,11 @@ const staff = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
 const shopper = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 const errors = [];
 staff.on('pageerror', (error) => errors.push(String(error).slice(0, 200)));
+if (process.env.DEBUG_SMOKE) {
+  staff.on('console', (message) => {
+    if (message.type() === 'error') console.log(`    [console] ${message.text().slice(0, 600)}`);
+  });
+}
 
 try {
   /* ---------------------------------------------------------- sign in */
@@ -397,8 +402,13 @@ try {
   await staff.goto(`${BASE}/admin/appearance`, { waitUntil: 'load' });
   await staff.waitForTimeout(1200);
   const strip = staff.getByRole('region', { name: 'Announcement strip' });
-  await strip.getByRole('button', { name: 'Add a line' }).click();
-  await strip.getByLabel('Text').last().fill(stripLine);
+  // Wait for the new row itself: a click before hydration adds nothing.
+  const linesBefore = await strip.getByLabel('Text').count();
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    await strip.getByRole('button', { name: 'Add a line' }).click();
+    if (await strip.getByLabel('Text').nth(linesBefore).waitFor({ timeout: 4000 }).then(() => true, () => false)) break;
+  }
+  await strip.getByLabel('Text').nth(linesBefore).fill(stripLine);
   await strip.getByRole('button', { name: 'Schedule' }).last().click();
   const tomorrow = new Date(Date.now() + 86_400_000);
   const tomorrowLocal = new Date(tomorrow.getTime() - tomorrow.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
@@ -425,6 +435,47 @@ try {
   await staff.getByRole('button', { name: 'Put it back' }).click();
   await staff.getByText('Put back — live on the shop').waitFor({ timeout: 30000 });
   check('Appearance History puts the strip back', !(await stripShows()));
+  /* ------------------------------------------------------ product page */
+  await staff.goto(`${BASE}/admin/design/product`, { waitUntil: 'load' });
+  await staff.waitForTimeout(1500);
+  const productSlug = await staff.getByLabel('Preview with product').inputValue();
+
+  // Start from an empty bag: repeated runs add the same size, and a bag caps
+  // each item at five, so a full bag would make a working button look broken.
+  await staff.goto(`${BASE}/bag`, { waitUntil: 'load' });
+  await staff.waitForTimeout(1500);
+  for (let guard = 0; guard < 20; guard += 1) {
+    if (await staff.getByText('Your bag is empty').isVisible()) break;
+    const remove = staff.getByRole('button', { name: 'Remove' }).filter({ visible: true }).first();
+    if (!(await remove.count())) break;
+    await remove.click({ timeout: 5000 }).catch(() => {});
+    await staff.waitForTimeout(1500);
+  }
+
+  // Buying must work in every layout: the buy box is shared, but its buttons move.
+  for (const [variant, label] of [['classic', 'Add to bag'], ['lookbook', 'Add to bag'], ['social', 'Buy now']]) {
+    await staff.goto(`${BASE}/product/${productSlug}/preview/${variant}`, { waitUntil: 'load' });
+    await staff.waitForTimeout(2000);
+    // A size chip that is in stock -- not the Size guide link, which also lives here.
+    await staff.locator('#size-options button:not([aria-disabled="true"])').filter({ hasNotText: 'Size guide' }).first().click();
+    await staff.getByRole('button', { name: label }).filter({ visible: true }).first().click();
+    check(`Add to bag works in the ${variant} layout`, await appears(staff.getByText('Added to your bag')));
+  }
+
+  const productIsLookbook = async () => {
+    await shopper.goto(`${BASE}/product/${productSlug}`, { waitUntil: 'load' });
+    await shopper.waitForTimeout(2000);
+    return (await shopper.getByRole('heading', { name: 'Complete the look' }).count()) > 0;
+  };
+  await staff.goto(`${BASE}/admin/design/product`, { waitUntil: 'load' });
+  await staff.waitForTimeout(1500);
+  await chooseLayout('Variant 2 · Lookbook');
+  check('A product layout change is a draft', !(await productIsLookbook()));
+  await publish();
+  check('Publishing the Lookbook reaches shoppers', await eventually(productIsLookbook, true));
+  await chooseLayout('Variant 1 · Classic');
+  await publish();
+  check('Left as found: product page Classic', await eventually(productIsLookbook, false));
 } catch (error) {
   const where = String(error.stack ?? '').split('\n').find((line) => line.includes('smoke-marketing')) ?? '';
   check('Run completed', false, `${String(error).split('\n')[0]} ${where.trim()}`);

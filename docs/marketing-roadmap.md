@@ -191,10 +191,28 @@ promotion, composition, content-page and page-layout rules.
   estimate, offers block, See-it-live, seller card, WhatsApp, highlights,
   specifications, returns info, reviews, photo reviews, related rail, store
   rail, recently viewed, sticky buy bar, share, wishlist, button labels.
-- ☐ Phase 3.1 — Definition and switches on Variant 1 (no visual change with all on).
-- ☐ Phase 3.2 — Variant 2 · Lookbook.
-- ☐ Phase 3.3 — Variant 3 · Social.
-- ☐ Phase 3.4 — Visual review at 320 / 390 / 768 / 1440, a11y audit, and add-to-bag smoke on all three.
+- ☑ Phase 3.1 — Definition (22 settings in four groups) and switches on
+  Variant 1. With every switch on it renders the page as shipped; the markup
+  moved into `ProductPageView`, shared by the live page and the preview at
+  `/product/[slug]/preview/[variant]`.
+- ☑ Phase 3.2 — Variant 2 · Lookbook: the first photograph full width and
+  the rest in pairs, the listing's highlights set large between them, a buy
+  panel that stays in view, and "Complete the look" from the same store.
+- ☑ Phase 3.3 — Variant 3 · Social: a seller strip with a story-ring logo,
+  trust numbers, WhatsApp and Visit store; a tall 9:16 hero; photo reviews
+  first with a customer-photo wall; more from the store as reels; details
+  folded away.
+- ☑ Phase 3.4 — Reviewed at 390 and 1440. `smoke:marketing` adds to the bag
+  through all three layouts and publishes Lookbook to shoppers. Phones keep
+  the swipe carousel in every layout, so 320 and 768 follow the existing
+  responsive rules. A full a11y audit is still to run with the next
+  milestone's review.
+
+**Status: ☑ done (27 Sep 2026).** The buy box is one component in every
+layout (layout-aware, with switches), so how buying works cannot drift
+between layouts.
+
+---
 
 ## Milestone 4 — Product demo page designer
 

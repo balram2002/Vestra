@@ -30,6 +30,7 @@ const CASES = [
   { who: 'anonymous', email: null, path: '/category/womens-ethnic-wear', allow: true },
   // A draft preview is staff-only, even though the page it previews is public.
   { who: 'anonymous', email: null, path: '/store/ash-and-oak-menswear/preview/spotlight', allow: false },
+  { who: 'anonymous', email: null, path: '/admin/design/product', allow: false },
 
   { who: 'customer', email: 'ananya.iyer@example.com', path: '/orders', allow: true },
   { who: 'customer', email: 'ananya.iyer@example.com', path: '/admin', allow: false },
@@ -51,6 +52,7 @@ const CASES = [
 
   { who: 'marketing', email: 'marketing@vestra.test', path: '/admin/marketing', allow: true },
   { who: 'marketing', email: 'marketing@vestra.test', path: '/admin/design/store', allow: true },
+  { who: 'marketing', email: 'marketing@vestra.test', path: '/admin/design/product', allow: true },
   { who: 'marketing', email: 'marketing@vestra.test', path: '/store/ash-and-oak-menswear/preview/studio', allow: true },
   { who: 'marketing', email: 'marketing@vestra.test', path: '/admin/payments', allow: false },
 

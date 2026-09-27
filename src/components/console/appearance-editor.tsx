@@ -744,27 +744,36 @@ function FooterColumnsBlock({ initial, shown }: { initial: FooterColumn[]; shown
 /* ---------------------------------------------------------- strip timing */
 
 let clock = 0;
+let ticker: ReturnType<typeof setInterval> | null = null;
 const listeners = new Set<() => void>();
+
+/*
+ * Module-level, so its identity never changes. An inline subscribe is a NEW
+ * function every render, which makes React unsubscribe and subscribe again on
+ * every render -- and a subscribe that stamps a fresh time then re-renders,
+ * which subscribes again: an update loop (React error #185).
+ */
+function subscribeToClock(notify: () => void): () => void {
+  listeners.add(notify);
+  if (!clock) clock = Date.now();
+  if (!ticker) {
+    ticker = setInterval(() => {
+      clock = Date.now();
+      listeners.forEach((listener) => listener());
+    }, 60_000);
+  }
+  return () => {
+    listeners.delete(notify);
+    if (listeners.size === 0 && ticker) {
+      clearInterval(ticker);
+      ticker = null;
+    }
+  };
+}
 
 /** The time, refreshed each minute and read outside render. 0 while server-rendering. */
 function useNow(): number {
-  return useSyncExternalStore(
-    (notify) => {
-      listeners.add(notify);
-      clock = Date.now();
-      const id = setInterval(() => {
-        clock = Date.now();
-        listeners.forEach((listener) => listener());
-      }, 60_000);
-      notify();
-      return () => {
-        clearInterval(id);
-        listeners.delete(notify);
-      };
-    },
-    () => clock,
-    () => 0,
-  );
+  return useSyncExternalStore(subscribeToClock, () => clock, () => 0);
 }
 
 function lineState(item: AnnouncementItem, now: number): 'live' | 'scheduled' | 'ended' | 'off' {

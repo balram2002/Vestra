@@ -75,6 +75,63 @@ const SKETCHES: Record<string, () => React.ReactNode> = {
   ),
 };
 
+Object.assign(SKETCHES, {
+  'product-classic': () => (
+    <Frame>
+      <div className="flex gap-1.5">
+        <span className="flex w-3 flex-col gap-1">
+          <Tiles count={4} className="aspect-4/5" />
+        </span>
+        <span className={cn(tile, 'h-20 flex-[1.2]')} />
+        <span className="flex flex-1 flex-col gap-1">
+          <span className="bg-ink/60 block h-2 w-3/4 rounded-sm" />
+          <Tiles count={2} className="h-1.5" />
+          <span className="bg-accent/60 mt-auto block h-3 rounded-sm" />
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-1">
+        <Tiles count={2} className="h-4" />
+      </div>
+    </Frame>
+  ),
+  'product-lookbook': () => (
+    <Frame>
+      <div className="flex gap-1.5">
+        <span className="flex flex-[1.6] flex-col gap-1">
+          <span className={cn(tile, 'h-11')} />
+          <span className="bg-ink/40 mx-auto block h-1.5 w-2/3 rounded-sm" />
+          <span className={cn(tile, 'h-11')} />
+        </span>
+        <span className="border-line flex flex-1 flex-col gap-1 rounded-sm border p-1">
+          <span className="bg-ink/60 block h-2 w-3/4 rounded-sm" />
+          <Tiles count={2} className="h-1.5" />
+          <span className="bg-accent/60 block h-3 rounded-sm" />
+        </span>
+      </div>
+    </Frame>
+  ),
+  'product-social': () => (
+    <Frame>
+      <div className="flex items-center gap-1.5 rounded-sm border border-dashed border-neutral-300 p-1">
+        <span className="size-4 rounded-full bg-[conic-gradient(#f59e0b,#ef4444,#d946ef,#8b5cf6,#f59e0b)]" />
+        <span className={cn(tile, 'h-1.5 flex-1')} />
+        <span className="h-2.5 w-6 rounded-full bg-[#1f9d55]" />
+      </div>
+      <div className="flex gap-1.5">
+        <span className={cn(tile, 'aspect-9/16 w-10')} />
+        <span className="flex flex-1 flex-col gap-1">
+          <span className="bg-ink/60 block h-2 w-3/4 rounded-sm" />
+          <Tiles count={2} className="h-1.5" />
+          <span className="bg-accent/60 block h-3 rounded-sm" />
+          <span className="grid grid-cols-4 gap-0.5">
+            <Tiles count={4} className="aspect-square" />
+          </span>
+        </span>
+      </div>
+    </Frame>
+  ),
+});
+
 export function DesignSketch({ sketch }: { sketch: string }) {
   const draw = SKETCHES[sketch];
   return draw ? draw() : <Frame><div className={cn(tile, 'h-24')} /></Frame>;

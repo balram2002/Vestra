@@ -201,6 +201,11 @@ the customer's original price, coupon share and tax snapshot intact.
   a `draft` beside their live fields. Anything that reads sections, hero or
   grid banners, or a CMS page for SHOPPERS must go through `services/content.ts`,
   never the collections directly, or it will show unpublished work.
+- **`useSyncExternalStore`'s subscribe must be a stable, module-level function.**
+  An inline one is a new function every render, so React re-subscribes on
+  every render; if subscribing changes the snapshot (a clock stamping the time)
+  that is an update loop — React error #185, and a console page that "could not
+  load" only sometimes.
 - **An autosaving editor must not refresh its own route.** Its server actions
   return the new state, and the screen applies it. A `revalidatePath` on the
   editor's own path re-renders it mid-edit and can drop a pending autosave.

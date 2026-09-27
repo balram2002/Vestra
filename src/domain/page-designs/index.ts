@@ -1,3 +1,4 @@
+import { productPageDesign } from './product';
 import { storePageDesign } from './store';
 import type { PageDesignDefinition } from './types';
 
@@ -9,6 +10,7 @@ import type { PageDesignDefinition } from './types';
  */
 export const PAGE_DESIGNS = {
   store: storePageDesign,
+  product: productPageDesign,
 } as const;
 
 export type PageDesignKey = keyof typeof PAGE_DESIGNS;

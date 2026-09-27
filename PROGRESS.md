@@ -101,3 +101,11 @@ The plan for bringing every Marketing screen up to one standard lives in `docs/m
 - **Page layout**: each part is Everywhere, Desktop only, Phones only or Off, per page family; single-page rules override a family; history with put-back. Rules saved in the old boolean format read as before.
 - **Fixed along the way**: publishing now reaches shoppers on the next request (`updateTag`). An autosaving editor no longer refreshes its own route, which could remount it and drop an edit made just after a publish.
 - **Verification**: `smoke:marketing` passed 42/42 twice in a row, `smoke:rbac` 27/27, and new unit tests for coupon, promotion, composition, content-page and page-layout rules. Screens were reviewed from screenshots.
+
+## Marketing roadmap, Milestone 3: Product page designer — 27 September 2026
+
+- **Admin › Page designs › Product page** (`/admin/design/product`) runs on the same designer as the Store page: layout cards, 22 settings in four groups, an autosaved draft, an embedded preview with a product picker, publish or schedule, and history.
+- **Variant 1 · Classic** is the page as shipped; every part answers to a switch. **Variant 2 · Lookbook** shows the photographs as a spread (the first full width, the rest in pairs) with the listing's highlights set large between them, a buy panel that stays in view, and "Complete the look" from the same store. **Variant 3 · Social** puts the seller first (story-ring logo, trust numbers, WhatsApp, Visit store), then a tall 9:16 hero, photo reviews with a customer-photo wall, and more from the store as reels.
+- **One buy box everywhere**: `ProductViewer` takes a layout and switches (zoom, size guide, See it live, wishlist, pinned bar, low-stock note, button label), so buying works the same in every layout.
+- **Fixed**: the Appearance editor's clock hook re-subscribed on every render, which could loop (React error #185) and crash the page intermittently. Its subscription is now module-level; the rule is in AGENTS.md.
+- **Verification**: `smoke:marketing` 48/48 twice in a row, including add-to-bag in all three layouts and publishing Lookbook to shoppers; `smoke:rbac` 29/29. Reviewed at 390px and 1440px.

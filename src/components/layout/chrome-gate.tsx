@@ -55,17 +55,17 @@ export function ChromeGate({
 }
 
 const WIDE = '(min-width: 1024px)';
+
+// Module-level so React subscribes once, not on every render.
+function subscribeToWidth(notify: () => void): () => void {
+  const query = window.matchMedia(WIDE);
+  query.addEventListener('change', notify);
+  return () => query.removeEventListener('change', notify);
+}
+
 /** Whether the desktop layout is showing; false while server-rendering. */
 function useWide(): boolean {
-  return useSyncExternalStore(
-    (notify) => {
-      const query = window.matchMedia(WIDE);
-      query.addEventListener('change', notify);
-      return () => query.removeEventListener('change', notify);
-    },
-    () => window.matchMedia(WIDE).matches,
-    () => false,
-  );
+  return useSyncExternalStore(subscribeToWidth, () => window.matchMedia(WIDE).matches, () => false);
 }
 
 /**
