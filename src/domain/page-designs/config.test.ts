@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { designFor, PAGE_DESIGN_KEYS } from '.';
-import { changedFromDefault, describeChange, effectiveConfig, fieldsOf, withDesignDefaults } from './config';
+import { changedFromDefault, describeChange, effectiveConfig, fieldsOf, resolveVariant, withDesignDefaults } from './config';
+import { productPageDesign } from './product';
 import { designConfigSchema } from './schema';
 import { storePageDesign } from './store';
 import type { DesignConfig } from './types';
@@ -113,5 +114,61 @@ describe('describing changes', () => {
   it('lists fields that differ from the layout default', () => {
     const settings = { ...base.settings.classic, breadcrumbs: false };
     expect([...changedFromDefault(storePageDesign, 'classic', settings)]).toEqual(['breadcrumbs']);
+  });
+});
+
+describe('category layouts and seller choice', () => {
+  it('only pages that support them carry them', () => {
+    expect(withDesignDefaults(productPageDesign, null).categoryOverrides).toEqual([]);
+    expect(withDesignDefaults(productPageDesign, null).sellerChoice).toBeUndefined();
+    expect(withDesignDefaults(storePageDesign, null).sellerChoice).toEqual([]);
+    expect(withDesignDefaults(storePageDesign, null).categoryOverrides).toBeUndefined();
+  });
+
+  it('keeps one rule per category and drops unknown layouts', () => {
+    const config = withDesignDefaults(productPageDesign, {
+      categoryOverrides: [
+        { category: 'kurtas', variant: 'social' },
+        { category: 'kurtas', variant: 'lookbook' },
+        { category: 'sarees', variant: 'gone' },
+        { category: ' ', variant: 'social' },
+      ],
+    });
+    expect(config.categoryOverrides).toEqual([{ category: 'kurtas', variant: 'social' }]);
+  });
+
+  it('lets the deepest matching category decide', () => {
+    const config = withDesignDefaults(productPageDesign, {
+      variant: 'classic',
+      categoryOverrides: [
+        { category: 'women', variant: 'social' },
+        { category: 'kurtas', variant: 'lookbook' },
+      ],
+    });
+    expect(resolveVariant(config, { categoryPath: ['women', 'ethnic-wear', 'kurtas'] })).toBe('lookbook');
+    expect(resolveVariant(config, { categoryPath: ['women', 'western-wear', 'dresses'] })).toBe('social');
+    expect(resolveVariant(config, { categoryPath: ['men', 'shirts'] })).toBe('classic');
+  });
+
+  it('honours a seller’s pick only while Marketing allows it', () => {
+    const allowed = withDesignDefaults(storePageDesign, { variant: 'classic', sellerChoice: ['studio', 'nope'] });
+    expect(allowed.sellerChoice).toEqual(['studio']);
+    expect(resolveVariant(allowed, { sellerVariant: 'studio' })).toBe('studio');
+    expect(resolveVariant(allowed, { sellerVariant: 'spotlight' })).toBe('classic');
+    const withdrawn = withDesignDefaults(storePageDesign, { variant: 'classic', sellerChoice: [] });
+    expect(resolveVariant(withdrawn, { sellerVariant: 'studio' })).toBe('classic');
+  });
+
+  it('describes changes to either', () => {
+    const before = withDesignDefaults(storePageDesign, null);
+    const after = withDesignDefaults(storePageDesign, { sellerChoice: ['classic', 'studio'] });
+    expect(describeChange(storePageDesign, before, after)).toBe('Sellers may choose Classic, Studio');
+  });
+
+  it('the schema accepts both and rejects a bad layout', () => {
+    const schema = designConfigSchema(designFor('product'));
+    const shipped = withDesignDefaults(productPageDesign, null);
+    expect(schema.safeParse({ ...shipped, categoryOverrides: [{ category: 'kurtas', variant: 'social' }] }).success).toBe(true);
+    expect(schema.safeParse({ ...shipped, categoryOverrides: [{ category: 'kurtas', variant: 'nope' }] }).success).toBe(false);
   });
 });

@@ -162,6 +162,7 @@ export const productPageDesign: PageDesignDefinition<ProductPageVariant, Product
       ctaLabel: 'Buy now',
     },
   },
+  categoryOverrides: true,
   preview: {
     entity: 'product',
     path: (slug, variant) => `/product/${slug}/preview/${variant}`,

@@ -23,6 +23,7 @@ import {
   type DesignResult,
 } from '@/server/actions/page-designs';
 
+import { CategoryLayouts, SellerChoice } from './design-exceptions';
 import { DesignFields } from './design-fields';
 import { DesignHistory, formatWhen } from './design-history';
 import { DesignPreview } from './design-preview';
@@ -53,11 +54,17 @@ export function PageDesigner({
   initial,
   entities,
   entityLabel,
+  categories = [],
+  layoutCounts = {},
 }: {
   page: PageDesignKey;
   initial: PageDesignState;
   entities: Array<{ value: string; label: string }>;
   entityLabel: string;
+  /** For pages with category layouts: every category, labelled with its trail. */
+  categories?: Array<{ value: string; label: string }>;
+  /** For pages sellers may choose: how many stores use each layout now. */
+  layoutCounts?: Record<string, number>;
 }) {
   const definition = designFor(page);
   const [state, setState] = useState(initial);
@@ -464,6 +471,25 @@ export function PageDesigner({
 
             <DesignFields groups={definition.groups} settings={settings} defaults={defaults} variant={editing} onChange={setField} />
           </section>
+
+          {definition.categoryOverrides ? (
+            <CategoryLayouts
+              definition={definition}
+              value={working.categoryOverrides ?? []}
+              categories={categories}
+              defaultVariant={working.variant}
+              onChange={(categoryOverrides) => update({ ...working, categoryOverrides })}
+            />
+          ) : null}
+          {definition.sellerChoice ? (
+            <SellerChoice
+              definition={definition}
+              value={working.sellerChoice ?? []}
+              defaultVariant={working.variant}
+              counts={layoutCounts}
+              onChange={(sellerChoice) => update({ ...working, sellerChoice })}
+            />
+          ) : null}
         </div>
 
         {/* ------------------------------------------------- preview */}

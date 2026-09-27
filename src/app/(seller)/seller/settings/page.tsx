@@ -15,7 +15,10 @@ import { StatusBadge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { SELLER_STATUS_META } from '@/domain/enums';
 import { formatDate, formatMoney } from '@/lib/format';
+import { StoreLayoutPicker } from '@/components/seller/store-layout-picker';
+import { storePageDesign, type StorePageVariant } from '@/domain/page-designs/store';
 import { requireSeller } from '@/server/auth/session';
+import { getLiveDesign } from '@/server/services/page-designs';
 import { collections, toEntity } from '@/server/db/collections';
 
 export const metadata: Metadata = { title: 'Settings' };
@@ -50,6 +53,11 @@ async function Settings() {
     toEntity(await locationCol.findOne({ sellerId: seller.id }));
   const hasBank = Boolean(seller.bank.accountNumberMasked);
 
+  // The layouts Marketing lets sellers pick for their store page, if any.
+  const storeDesign = await getLiveDesign('store');
+  const layoutOption = (variant: string) => ({ variant, ...storePageDesign.variantMeta[variant as StorePageVariant] });
+  const layouts = (storeDesign.sellerChoice ?? []).map(layoutOption);
+
   return (
     <div className="mt-6 space-y-6">
       <Card as="section" className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">
@@ -83,6 +91,22 @@ async function Settings() {
             }}
           />
         </Section>
+
+        {layouts.length > 0 ? (
+          <Section
+            id="layout"
+            title="Store layout"
+            description="How your store page is laid out. The marketplace chooses which layouts are on offer and what each one shows."
+            done
+          >
+            <StoreLayoutPicker
+              options={layouts}
+              marketplace={layoutOption(storeDesign.variant)}
+              initial={seller.storefrontLayout ?? null}
+              storePath={`/store/${seller.slug}`}
+            />
+          </Section>
+        ) : null}
 
         <Section
           id="business"

@@ -190,6 +190,7 @@ export const storePageDesign: PageDesignDefinition<StorePageVariant, StorePageSe
       search: false,
     },
   },
+  sellerChoice: true,
   preview: {
     entity: 'seller',
     path: (slug, variant) => `/store/${slug}/preview/${variant}`,

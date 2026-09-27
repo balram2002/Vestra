@@ -289,9 +289,16 @@ between layouts.
   the result count: "etnhic wear" finds hundreds of products through "wear"
   alone. The preview is chosen by query, including a misspelling, a search
   that finds nothing and an empty search. 10 settings. Done 27 Sep 2026.
-- ☐ **Phase 5.5 — Overrides.** A product-page variant per category (e.g.
-  Social for ethnic wear), and the store-page variant chosen by the seller
-  from the set Marketing allows.
+- ☑ **Phase 5.5 — Overrides.** The Product page designer has *Layouts by
+  category*: a category and everything inside it can use another layout, and
+  the most specific category wins ("Kurtas → Lookbook" beats "Women →
+  Social" for a kurta). The Store page designer has *Sellers may choose*: the
+  layouts a seller can pick under Store settings, each showing how many
+  stores use it now, because withdrawing one returns those stores to the
+  default when published. Both are part of the design, so they draft,
+  publish, schedule and revert with it. Routes resolve the layout with
+  `resolveVariant`. The seller's pick is checked on the server against what
+  is allowed at that moment. Done 27 Sep 2026.
 - ☐ **Phase 5.6 — A/B experiments.** Split traffic between two variants of one
   page. Assignment happens in `proxy.ts` and is carried in the URL rewrite, so
   pages stay cacheable. Results (views, add-to-bag, orders) appear in

@@ -665,6 +665,88 @@ try {
   await chooseLayout('Variant 1 · Classic');
   await publish();
   check('Left as found: search Classic', await eventually(searchIsInstant, false));
+
+  /* ---------------------------------------------------------- overrides */
+  const draftSaved = async () => {
+    await staff.waitForTimeout(1500);
+    await staff.getByText(/^Draft saved\./).first().waitFor({ timeout: 30000 });
+  };
+
+  // A layout per category: the deepest matching category wins.
+  await shopper.goto(`${BASE}/product/${productSlug}`, { waitUntil: 'load' });
+  const trail = await shopper
+    .getByRole('navigation', { name: 'Breadcrumb' })
+    .locator('a[href^="/category/"]')
+    .evaluateAll((links) => links.map((link) => (link.getAttribute('href') ?? '').split('/').pop()));
+  await staff.goto(`${BASE}/admin/design/product`, { waitUntil: 'load' });
+  await staff.waitForTimeout(1500);
+  await staff.getByRole('button', { name: 'Add a category' }).click();
+  await staff.locator('#override-category-0').selectOption(trail[0]);
+  await staff.locator('#override-variant-0').selectOption('lookbook');
+  await draftSaved();
+  check('A category layout is a draft', !(await productIsLookbook()));
+  await publish();
+  check('A category layout reaches its products', await eventually(productIsLookbook, true));
+  await staff.getByRole('button', { name: 'Add a category' }).click();
+  await staff.locator('#override-category-1').selectOption(trail.at(-1));
+  await staff.locator('#override-variant-1').selectOption('classic');
+  await draftSaved();
+  await publish();
+  check('The most specific category wins', await eventually(productIsLookbook, false));
+  while ((await staff.getByRole('button', { name: /^Remove the layout for/ }).count()) > 0) {
+    await staff.getByRole('button', { name: /^Remove the layout for/ }).first().click();
+  }
+  await draftSaved();
+  await publish();
+  check('Left as found: no category layouts', (await staff.locator('#override-category-0').count()) === 0);
+
+  // A seller picks their store layout from those Marketing allows.
+  const sellerPage = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  await sellerPage.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
+  await sellerPage.fill('input[name="email"]', 'mora01@seller.vestra.test');
+  await sellerPage.fill('input[name="password"]', PASSWORD);
+  await sellerPage.click('button[type="submit"]');
+  await sellerPage.waitForURL((url) => url.pathname === '/login/verify' || !url.pathname.startsWith('/login'), { timeout: 60000 });
+  if (new URL(sellerPage.url()).pathname === '/login/verify') {
+    const files = (await readdir('.data/outbox')).filter((name) => name.includes('sign-in-code')).sort();
+    await sellerPage.getByLabel('Sign-in code').fill(files.at(-1)?.match(/-(\d{6})-/)?.[1] ?? '');
+    await sellerPage.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 60000 });
+  }
+
+  await staff.goto(`${BASE}/admin/design/store`, { waitUntil: 'load' });
+  await staff.waitForTimeout(1500);
+  await staff.getByRole('checkbox', { name: /Variant 3 · Studio/ }).check();
+  await draftSaved();
+  await publish();
+
+  await sellerPage.goto(`${BASE}/seller/settings`, { waitUntil: 'load' });
+  await sellerPage.waitForTimeout(1500);
+  const sellerStore = (await sellerPage.getByRole('link', { name: 'View your store page' }).getAttribute('href')) ?? '';
+  const storeIsStudio = async () => {
+    await shopper.goto(`${BASE}${sellerStore}`, { waitUntil: 'load' });
+    await shopper.waitForTimeout(1200);
+    return (await shopper.getByRole('navigation', { name: 'Product views' }).count()) > 0;
+  };
+  // Start from the marketplace layout, whatever an earlier run left behind.
+  const defaultCard = sellerPage.getByRole('radio', { name: /Marketplace default/ });
+  if ((await defaultCard.getAttribute('aria-checked')) !== 'true') {
+    await defaultCard.click();
+    await appears(sellerPage.getByText('Your store uses the marketplace layout'));
+  }
+  check('A seller sees the layouts on offer', await appears(sellerPage.getByRole('radio', { name: /Studio/ })));
+  check('The store starts on the marketplace layout', await eventually(storeIsStudio, false));
+  await sellerPage.getByRole('radio', { name: /Studio/ }).click();
+  check('A seller can pick a layout', await appears(sellerPage.getByText('Your store uses its new layout')));
+  check('A seller’s pick reaches shoppers', await eventually(storeIsStudio, true));
+
+  await staff.goto(`${BASE}/admin/design/store`, { waitUntil: 'load' });
+  await staff.waitForTimeout(1500);
+  await staff.getByRole('checkbox', { name: /Variant 3 · Studio/ }).uncheck();
+  check('The designer says how many stores a withdrawal moves', await appears(staff.getByText(/1 store · will use the default/)));
+  await draftSaved();
+  await publish();
+  check('Withdrawing a layout returns the store to the default', await eventually(storeIsStudio, false));
+  await sellerPage.close();
 } catch (error) {
   const where = String(error.stack ?? '').split('\n').find((line) => line.includes('smoke-marketing')) ?? '';
   check('Run completed', false, `${String(error).split('\n')[0]} ${where.trim()}`);

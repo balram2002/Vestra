@@ -4,6 +4,7 @@ import { revalidatePath, updateTag } from 'next/cache';
 import { z } from 'zod';
 
 import { designFor, isPageDesignKey, type PageDesignKey } from '@/domain/page-designs';
+import { withDesignDefaults } from '@/domain/page-designs/config';
 import { designConfigSchema } from '@/domain/page-designs/schema';
 import type { DesignConfig, PageDesignState } from '@/domain/page-designs/types';
 
@@ -63,7 +64,8 @@ async function run(
 function parse(page: PageDesignKey, value: unknown): DesignConfig | string {
   const parsed = designConfigSchema(designFor(page)).safeParse(value);
   if (!parsed.success) return parsed.error.issues[0]?.message ?? 'Check the highlighted settings.';
-  return parsed.data as DesignConfig;
+  // Normalised as well as validated: one rule per category, known layouts only.
+  return withDesignDefaults(designFor(page), parsed.data as Parameters<typeof withDesignDefaults>[1]) as DesignConfig;
 }
 
 export async function saveDesignDraft(input: { page: string; config: unknown }) {

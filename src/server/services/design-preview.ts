@@ -3,7 +3,25 @@ import 'server-only';
 import type { PreviewEntity } from '@/domain/page-designs/types';
 
 import { requirePermission } from '../auth/session';
+import { collections } from '../db/collections';
 import { getCategoryTree, getProductBySlug, getTopProductSlugs, listBrands, listSellers } from './catalog';
+
+/**
+ * How many stores have picked each store-page layout, for the designer's
+ * "Sellers may choose" panel: withdrawing a layout moves these stores back
+ * to the default, and Marketing should see that before publishing.
+ */
+export async function sellerLayoutCounts(): Promise<Record<string, number>> {
+  await requirePermission('cms:write');
+  const sellers = await collections.sellers();
+  const rows = await sellers
+    .aggregate<{ _id: string; count: number }>([
+      { $match: { storefrontLayout: { $type: 'string' }, status: { $in: ['ACTIVE', 'APPROVED'] } } },
+      { $group: { _id: '$storefrontLayout', count: { $sum: 1 } } },
+    ])
+    .toArray();
+  return Object.fromEntries(rows.map((row) => [row._id, row.count]));
+}
 
 /**
  * The real records a designer can preview its page with.

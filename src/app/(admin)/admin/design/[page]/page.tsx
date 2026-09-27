@@ -5,7 +5,7 @@ import { Suspense } from 'react';
 import { PageDesigner } from '@/components/console/design/page-designer';
 import { PageHeader } from '@/components/console/page-header';
 import { designFor, isPageDesignKey, PAGE_DESIGN_KEYS } from '@/domain/page-designs';
-import { previewEntities } from '@/server/services/design-preview';
+import { previewEntities, sellerLayoutCounts } from '@/server/services/design-preview';
 import { getDesignState } from '@/server/services/page-designs';
 
 interface PageProps {
@@ -41,9 +41,11 @@ async function Designer({ params }: PageProps) {
   if (!isPageDesignKey(page)) notFound();
 
   const definition = designFor(page);
-  const [state, entities] = await Promise.all([
+  const [state, entities, categories, layoutCounts] = await Promise.all([
     getDesignState(page),
     previewEntities(definition.preview.entity),
+    definition.categoryOverrides ? previewEntities('category') : Promise.resolve(null),
+    definition.sellerChoice ? sellerLayoutCounts() : Promise.resolve(null),
   ]);
 
   return (
@@ -52,7 +54,14 @@ async function Designer({ params }: PageProps) {
         title={definition.title}
         description={`${definition.description} Applies to ${definition.route}.`}
       />
-      <PageDesigner page={page} initial={state} entities={entities.options} entityLabel={entities.label} />
+      <PageDesigner
+        page={page}
+        initial={state}
+        entities={entities.options}
+        entityLabel={entities.label}
+        categories={categories?.options ?? []}
+        layoutCounts={layoutCounts ?? {}}
+      />
     </>
   );
 }

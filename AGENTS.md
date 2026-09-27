@@ -225,6 +225,12 @@ the customer's original price, coupon share and tax snapshot intact.
   tagged `pageDesign(page)`); previews read `getPreviewDesign(page)`, which
   asserts `cms:write`. A scheduled publish is applied on read and settled into
   the record the next time the designer opens it; there is no cron.
+- **A page's layout can depend on the record it shows.** The product page may
+  set a layout per category (`categoryOverrides`, deepest category wins) and
+  the store page may let sellers pick from the layouts Marketing allows
+  (`sellerChoice`, the pick stored as `seller.storefrontLayout`). Both
+  publish with the design. Routes must call `resolveVariant(design, …)` rather
+  than reading `design.variant`, or the exception is silently ignored.
 
 ## Deliberate deviations from the brief
 

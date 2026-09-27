@@ -8,6 +8,7 @@ import { isIndexableListing, parseProductQuery, type RawSearchParams } from '@/l
 import { breadcrumbListJsonLd, sellerJsonLd } from '@/lib/seo/structured-data';
 import { getSellerBySlug, listSellers } from '@/server/services/catalog';
 import type { StorePageSettings, StorePageVariant } from '@/domain/page-designs/store';
+import { resolveVariant } from '@/domain/page-designs/config';
 import { getLiveDesign } from '@/server/services/page-designs';
 
 /**
@@ -58,6 +59,8 @@ export default async function StorePage({ params, searchParams }: PageProps) {
   if (seller.slug !== slug) permanentRedirect(`/store/${seller.slug}`);
 
   const url = absoluteUrl(`/store/${seller.slug}`);
+  // The seller's own pick, while Marketing allows it; otherwise the published layout.
+  const variant = resolveVariant(design, { sellerVariant: seller.storefrontLayout }) as StorePageVariant;
 
   return (
     <>
@@ -76,8 +79,8 @@ export default async function StorePage({ params, searchParams }: PageProps) {
       {/* Which layout, and which of its pieces, is decided under Admin › Marketing › Store page. */}
       <StorePageView
         seller={seller}
-        variant={design.variant as StorePageVariant}
-        settings={design.settings[design.variant] as StorePageSettings}
+        variant={variant}
+        settings={design.settings[variant] as StorePageSettings}
         searchParams={searchParams}
         basePath={`/store/${seller.slug}`}
       />

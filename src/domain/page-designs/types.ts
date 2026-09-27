@@ -76,12 +76,33 @@ export interface PageDesignDefinition<V extends string = string, S extends Setti
     /** Builds the staff-only preview path for one record in one layout. */
     path: (entity: string, variant: V) => string;
   };
+  /**
+   * Pages whose layout may differ by the category of what they show: the
+   * product page can use Social for ethnic wear and Classic for the rest.
+   */
+  categoryOverrides?: boolean;
+  /**
+   * Pages a seller may choose the layout of, from the layouts Marketing
+   * allows: the store page.
+   */
+  sellerChoice?: boolean;
+}
+
+/** Products in this category (or below it) use this layout. */
+export interface CategoryOverride<V extends string = string> {
+  /** Category slug. */
+  category: string;
+  variant: V;
 }
 
 /** What is live, or drafted: one layout chosen, and every layout's settings. */
 export interface DesignConfig<V extends string = string, S extends Settings = Settings> {
   variant: V;
   settings: Record<V, S>;
+  /** Only on pages with `categoryOverrides`. Deepest matching category wins. */
+  categoryOverrides?: CategoryOverride<V>[];
+  /** Only on pages with `sellerChoice`: the layouts a seller may pick. Empty, sellers cannot choose. */
+  sellerChoice?: V[];
 }
 
 export interface DesignRevision<V extends string = string> {

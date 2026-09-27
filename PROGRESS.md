@@ -150,3 +150,11 @@ The plan for bringing every Marketing screen up to one standard lives in `docs/m
 - **Variant 1 · Classic** is the page as shipped. **Variant 2 · Instant** keeps the search box on the page, with shortcuts and spelling suggestions. **Variant 3 · Visual** puts the query in a large search box over the photo wall.
 - `domain/spelling.ts` suggests corrections from the shop's own vocabulary (optimal string alignment distance, one slip for short words and two for longer ones, plurals understood, sizes and numbers never touched), with tests. `spellingSuggestion` in `services/search.ts` caches the vocabulary with the catalogue's tags.
 - The designer previews by query and offers every state a search page has: real words, a brand, a misspelling, nothing found, and an empty search.
+
+## Marketing roadmap, Phase 5.5: Category layouts and seller choice — 27 September 2026
+
+- A page definition can declare `categoryOverrides` (product page) or `sellerChoice` (store page). The design config then carries those parts, validated by the generated schema, normalised by `withDesignDefaults` (one rule per category, known layouts only) and described in History.
+- `resolveVariant(design, { categoryPath, sellerVariant })` picks the layout for one record: the deepest matching category, or the seller's pick while it is still allowed, or the published layout.
+- **Admin:** *Layouts by category* under the Product page designer, and *Sellers may choose* under the Store page designer, with a count of stores per layout.
+- **Seller console:** Store settings has a *Store layout* card offering the allowed layouts (and the marketplace default) with their sketches. `chooseStoreLayout` checks the pick against the live design, audits it and invalidates the store's cache tag.
+- `smoke:marketing` 96/96 (category rule reaches its products, deepest category wins, a seller's pick reaches shoppers, withdrawal returns the store to the default), `smoke:rbac` 40/40.

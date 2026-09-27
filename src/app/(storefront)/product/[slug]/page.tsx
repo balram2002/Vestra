@@ -12,6 +12,7 @@ import {
   getSellerById,
   getTopProductSlugs,
 } from '@/server/services/catalog';
+import { resolveVariant } from '@/domain/page-designs/config';
 import { getLiveDesign } from '@/server/services/page-designs';
 
 /**
@@ -81,15 +82,18 @@ export default async function ProductPage({ params }: PageProps) {
     getSellerById(product.sellerId),
   ]);
 
-  // Which layout, and which of its parts, is decided under Admin › Marketing › Product page.
+  // Which layout, and which of its parts, is decided under Admin › Marketing › Product page --
+  // including any category that has a layout of its own.
+  const variant = resolveVariant(design, { categoryPath: product.categoryPath }) as ProductPageVariant;
+
   return (
     <ProductPageView
       product={product}
       brand={brand}
       seller={seller}
       ancestors={ancestors}
-      variant={design.variant as ProductPageVariant}
-      settings={design.settings[design.variant] as ProductPageSettings}
+      variant={variant}
+      settings={design.settings[variant] as ProductPageSettings}
     />
   );
 }

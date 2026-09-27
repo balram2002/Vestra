@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { fieldsOf } from './config';
+import { fieldsOf, MAX_CATEGORY_OVERRIDES } from './config';
 import type { FieldDef, PageDesignDefinition } from './types';
 
 /**
@@ -26,10 +26,17 @@ export function designConfigSchema(definition: PageDesignDefinition) {
     Object.fromEntries(fieldsOf(definition).map((field) => [field.key, fieldSchema(field)])),
   );
 
+  const variant = z.enum(definition.variants as unknown as [string, ...string[]]);
+
   return z.object({
-    variant: z.enum(definition.variants as unknown as [string, ...string[]]),
+    variant,
     settings: z.object(
-      Object.fromEntries(definition.variants.map((variant) => [variant, settings])),
+      Object.fromEntries(definition.variants.map((key) => [key, settings])),
     ),
+    categoryOverrides: z
+      .array(z.object({ category: z.string().trim().min(1).max(120), variant }))
+      .max(MAX_CATEGORY_OVERRIDES, `At most ${MAX_CATEGORY_OVERRIDES} category layouts.`)
+      .optional(),
+    sellerChoice: z.array(variant).max(definition.variants.length).optional(),
   });
 }

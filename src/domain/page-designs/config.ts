@@ -1,4 +1,5 @@
 import type {
+  CategoryOverride,
   DesignConfig,
   DesignSchedule,
   FieldDef,
@@ -26,7 +27,15 @@ export function fieldsOf(definition: { groups: FieldGroup[] }): FieldDef[] {
  */
 export function withDesignDefaults<V extends string, S extends Settings>(
   definition: PageDesignDefinition<V, S>,
-  stored: Partial<{ variant: string; settings: Partial<Record<string, Partial<Settings>>> }> | null | undefined,
+  stored:
+    | Partial<{
+        variant: string;
+        settings: Partial<Record<string, Partial<Settings>>>;
+        categoryOverrides: unknown;
+        sellerChoice: unknown;
+      }>
+    | null
+    | undefined,
 ): DesignConfig<V, S> {
   const variant = (definition.variants as readonly string[]).includes(stored?.variant ?? '')
     ? (stored!.variant as V)
@@ -56,7 +65,68 @@ export function withDesignDefaults<V extends string, S extends Settings>(
     }),
   ) as Record<V, S>;
 
-  return { variant, settings };
+  const config: DesignConfig<V, S> = { variant, settings };
+  if (definition.categoryOverrides) config.categoryOverrides = normaliseOverrides(definition, stored?.categoryOverrides);
+  if (definition.sellerChoice) config.sellerChoice = normaliseChoice(definition, stored?.sellerChoice);
+  return config;
+}
+
+export const MAX_CATEGORY_OVERRIDES = 100;
+
+/**
+ * Valid layouts only, one entry per category (the first wins, as the
+ * designer lists them), capped. A layout removed from the definition drops
+ * its overrides rather than rendering a page that no longer exists.
+ */
+function normaliseOverrides<V extends string>(
+  definition: PageDesignDefinition<V>,
+  stored: unknown,
+): CategoryOverride<V>[] {
+  if (!Array.isArray(stored)) return [];
+  const seen = new Set<string>();
+  const out: CategoryOverride<V>[] = [];
+  for (const entry of stored) {
+    const category = typeof entry?.category === 'string' ? entry.category.trim() : '';
+    const variant = entry?.variant;
+    if (!category || seen.has(category) || !(definition.variants as readonly string[]).includes(variant)) continue;
+    seen.add(category);
+    out.push({ category, variant: variant as V });
+    if (out.length === MAX_CATEGORY_OVERRIDES) break;
+  }
+  return out;
+}
+
+/** Valid layouts only, in the definition's order, each once. */
+function normaliseChoice<V extends string>(definition: PageDesignDefinition<V>, stored: unknown): V[] {
+  if (!Array.isArray(stored)) return [];
+  return definition.variants.filter((variant) => stored.includes(variant));
+}
+
+/**
+ * Which layout a page uses for one record.
+ *
+ *  - A product page walks the product's category path from the DEEPEST
+ *    category up, so "Kurtas → Lookbook" beats "Women → Social" for a kurta.
+ *  - A store page uses the seller's own pick, but only while Marketing
+ *    still allows it; withdrawn, the store quietly returns to the default.
+ *
+ * Otherwise, the published layout.
+ */
+export function resolveVariant<V extends string>(
+  config: DesignConfig<V>,
+  context: { categoryPath?: readonly string[]; sellerVariant?: string | null } = {},
+): V {
+  if (config.categoryOverrides?.length && context.categoryPath?.length) {
+    const byCategory = new Map(config.categoryOverrides.map((rule) => [rule.category, rule.variant]));
+    for (const slug of [...context.categoryPath].reverse()) {
+      const variant = byCategory.get(slug);
+      if (variant) return variant;
+    }
+  }
+  if (context.sellerVariant && config.sellerChoice?.includes(context.sellerVariant as V)) {
+    return context.sellerVariant as V;
+  }
+  return config.variant;
 }
 
 /**
@@ -112,6 +182,14 @@ export function describeChange<V extends string>(
     if (count > 0) {
       parts.push(`${count} ${count === 1 ? 'setting' : 'settings'} in ${definition.variantMeta[variant].name}`);
     }
+  }
+  if (JSON.stringify(before.categoryOverrides ?? []) !== JSON.stringify(after.categoryOverrides ?? [])) {
+    const count = after.categoryOverrides?.length ?? 0;
+    parts.push(count ? `Category layouts (${count})` : 'Category layouts removed');
+  }
+  if (JSON.stringify(before.sellerChoice ?? []) !== JSON.stringify(after.sellerChoice ?? [])) {
+    const names = (after.sellerChoice ?? []).map((variant) => definition.variantMeta[variant].name);
+    parts.push(names.length ? `Sellers may choose ${names.join(', ')}` : 'Sellers may not choose');
   }
   return parts.length > 0 ? parts.join(' · ') : 'No changes';
 }
