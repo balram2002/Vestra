@@ -216,7 +216,9 @@ the customer's original price, coupon share and tax snapshot intact.
   preview path) registered in `PAGE_DESIGNS`. The admin screen
   (`/admin/design/[page]`), the zod schema and the defaults merge are all
   derived from it, so a new setting is one field entry plus a default in each
-  variant; `config.test.ts` fails if a default is missing.
+  variant; `config.test.ts` fails if a default is missing. A setting that
+  means something in only some layouts says so with `onlyFor`; it still
+  needs a default in every variant.
 - **Shoppers see only what was published.** Designs live in `pageDesigns`,
   one document per page holding `published`, `draft`, `scheduled` and the last
   twenty `revisions`. Storefront pages read `getLiveDesign(page)` (cached,

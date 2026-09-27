@@ -526,6 +526,43 @@ try {
   await chooseLayout('Variant 1 · Classic');
   await publish();
   check('Left as found: demo Classic', await eventually(demoIsStories, false));
+
+  /* ---------------------------------------------------- category page */
+  // The wall's quick view sells in place: colour, size, add -- no page change.
+  await emptyBag();
+  await staff.goto(`${BASE}/category/women/preview/wall`, { waitUntil: 'load' });
+  await staff.waitForTimeout(1200);
+  check('The wall preview lists products', (await staff.getByRole('button', { name: /^Quick view: / }).count()) > 0);
+  await staff.getByRole('button', { name: /^Quick view: / }).first().click();
+  const quick = staff.getByRole('dialog');
+  check('Quick view opens', await appears(quick));
+  await quick.locator('fieldset').last().locator('button:not([disabled])').first().click();
+  await quick.getByRole('button', { name: 'Add to bag' }).click();
+  check('Add to bag works from the quick view', await appears(staff.getByText('Added to your bag')));
+  check('Quick view stays on the listing', new URL(staff.url()).pathname === '/category/women/preview/wall');
+
+  // Editorial's shortcut tiles filter the same listing.
+  await staff.goto(`${BASE}/category/women/preview/editorial`, { waitUntil: 'load' });
+  await staff.waitForTimeout(1200);
+  check('Editorial shows photo tiles by type', await appears(staff.getByRole('heading', { name: 'Shop by type' })));
+  const tileHref = await staff.getByRole('link', { name: /Under ₹999/ }).first().getAttribute('href');
+  check('A shortcut tile filters this category', tileHref === '/category/women/preview/editorial?maxPrice=999');
+
+  const categoryIsEditorial = async () => {
+    await shopper.goto(`${BASE}/category/women`, { waitUntil: 'load' });
+    await shopper.waitForTimeout(1200);
+    return (await shopper.getByRole('link', { name: /Shop the edit/ }).count()) > 0;
+  };
+  await staff.goto(`${BASE}/admin/design/category`, { waitUntil: 'load' });
+  await staff.waitForTimeout(1500);
+  check('Wall-only settings are hidden while Classic is edited', (await staff.getByText('Quick view', { exact: true }).count()) === 0);
+  await chooseLayout('Variant 2 · Editorial');
+  check('A category layout change is a draft', !(await categoryIsEditorial()));
+  await publish();
+  check('Publishing Editorial reaches shoppers', await eventually(categoryIsEditorial, true));
+  await chooseLayout('Variant 1 · Classic');
+  await publish();
+  check('Left as found: category Classic', await eventually(categoryIsEditorial, false));
 } catch (error) {
   const where = String(error.stack ?? '').split('\n').find((line) => line.includes('smoke-marketing')) ?? '';
   check('Run completed', false, `${String(error).split('\n')[0]} ${where.trim()}`);

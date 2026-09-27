@@ -116,3 +116,12 @@ The plan for bringing every Marketing screen up to one standard lives in `docs/m
 - **Variant 1 · Classic** is the demo player as shipped, now with switches. **Variant 2 · Showroom** frames the clip on a light ground beside the lead piece, whose options and Add to bag are right there, with a shelf of the other pieces below. **Variant 3 · Stories** is tap-through: one segment per piece, progress bars, hold to pause, a sticker to shop each piece, and an end card offering "Call the store".
 - One choose-and-add step (`DemoChooser`) is shared by every layout.
 - `smoke:marketing` adds to the bag through all three layouts and publishes Stories (54/54); a test step now empties the bag first so the five-per-item cap cannot fail a working button.
+
+## Marketing roadmap, Phase 5.1: Category page designer — 27 September 2026
+
+- **Admin › Page designs › Category page** (`/admin/design/category`) has 14 settings: breadcrumbs, picture, the line above the title, description, shop-by-type (chips or photo tiles), bestseller rail, shortcut tiles, popular filters, docked filters, quick view, wall density, and the SEO copy.
+- **Variant 1 · Classic** is the listing as shipped. **Variant 2 · Editorial** is a department front, with shortcut tiles in the grid that link to this same listing with one filter applied. **Variant 3 · Visual wall** is a photo wall with a quick view (colour, then size, then add) that never leaves the page.
+- A setting can now be marked `onlyFor` some layouts, and the designer shows it only while one of those is edited.
+- `ListingView` gained options (docked rail, popular filters, tiles, wall display) that default to the old behaviour, so search, brand and store are unchanged.
+- Staff preview at `/category/[slug]/preview/[variant]` keeps filter and sort links inside the preview.
+- `smoke:marketing` 64/64 (quick view adds to the bag, tiles filter, Editorial publishes to shoppers); `smoke:rbac` 34/34.

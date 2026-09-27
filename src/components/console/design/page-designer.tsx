@@ -456,7 +456,7 @@ export function PageDesigner({
               </div>
             </header>
 
-            <DesignFields groups={definition.groups} settings={settings} defaults={defaults} onChange={setField} />
+            <DesignFields groups={definition.groups} settings={settings} defaults={defaults} variant={editing} onChange={setField} />
           </section>
         </div>
 

@@ -249,9 +249,14 @@ between layouts.
 
 ## Milestone 5 — More page designers, and experiments
 
-- ☐ **Phase 5.1 — Category listing** (`/category/[slug]`). V1 current. V2
-  *Editorial* (department hero, curated chips, promo tiles placed in the grid).
-  V3 *Visual wall* (reel/masonry discovery with quick-view).
+- ☑ **Phase 5.1 — Category listing** (`/category/[slug]`). V1 *Classic*
+  (current). V2 *Editorial*: the name set large beside the picture, photo
+  tiles by type, a bestseller rail, and shortcut tiles (New in, Under ₹999,
+  Top rated, 30% off) placed inside the grid. V3 *Visual wall*: a photo wall
+  in listing order with the price on the picture, sort as chips, filters in a
+  drawer, and a quick view that picks colour and size and adds to the bag in
+  place. 14 settings; wall-only ones show only while the wall is edited
+  (`onlyFor`). Done 27 Sep 2026.
 - ☐ **Phase 5.2 — Sellers directory** (`/stores`). V1 current. V2 *Local
   market* (grouped by city, "near you" first). V3 *Stories* (live and new
   stores as a story row, then trust-ranked cards).

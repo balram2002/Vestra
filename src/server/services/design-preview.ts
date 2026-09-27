@@ -3,7 +3,7 @@ import 'server-only';
 import type { PreviewEntity } from '@/domain/page-designs/types';
 
 import { requirePermission } from '../auth/session';
-import { getProductBySlug, getTopProductSlugs, listSellers } from './catalog';
+import { getCategoryTree, getProductBySlug, getTopProductSlugs, listSellers } from './catalog';
 
 /**
  * The real records a designer can preview its page with.
@@ -37,6 +37,19 @@ export async function previewEntities(
         options: products
           .filter((product): product is NonNullable<typeof product> => Boolean(product))
           .map((product) => ({ value: product.slug, label: product.title.slice(0, 60) })),
+      };
+    }
+    case 'category': {
+      // Departments first, then what is inside them: a department page has
+      // the most sub-categories, which is what a layout has to carry well.
+      const tree = await getCategoryTree();
+      const byId = new Map(tree.map((category) => [category.id, category]));
+      return {
+        label: 'Preview with category',
+        options: tree.map((category) => {
+          const parent = category.parentId ? byId.get(category.parentId) : null;
+          return { value: category.slug, label: parent ? `${parent.name} › ${category.name}` : category.name };
+        }),
       };
     }
     default:

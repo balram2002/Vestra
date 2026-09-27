@@ -176,6 +176,57 @@ Object.assign(SKETCHES, {
   ),
 });
 
+Object.assign(SKETCHES, {
+  'category-classic': () => (
+    <Frame>
+      <div className="flex h-9 items-end rounded-md bg-gradient-to-r from-neutral-700 to-neutral-300 p-1.5">
+        <span className="h-2 w-1/3 rounded-sm bg-white/90" />
+      </div>
+      <div className="flex gap-1">
+        <Tiles count={4} className="h-2 w-6 rounded-full" />
+      </div>
+      <div className="flex gap-1.5">
+        <span className="flex w-5 flex-col gap-1">
+          <Tiles count={4} className="h-1.5" />
+        </span>
+        <span className="grid flex-1 grid-cols-4 gap-1">
+          <Tiles count={8} className="aspect-4/5" />
+        </span>
+      </div>
+    </Frame>
+  ),
+  'category-editorial': () => (
+    <Frame>
+      <div className="flex gap-1">
+        <span className="flex flex-1 flex-col justify-end gap-1 rounded-md bg-neutral-100 p-1.5">
+          <span className="bg-ink/70 block h-3 w-3/4 rounded-sm" />
+          <span className={cn(tile, 'h-1.5 w-1/2')} />
+        </span>
+        <span className="h-12 flex-1 rounded-md bg-gradient-to-br from-amber-100 to-rose-200" />
+      </div>
+      <div className="flex gap-1">
+        <Tiles count={5} className="aspect-4/5 flex-1" />
+      </div>
+      <div className="grid grid-cols-4 gap-1">
+        <Tiles count={3} className="aspect-4/5" />
+        <span className="bg-accent/30 aspect-4/5 rounded-[3px]" />
+      </div>
+    </Frame>
+  ),
+  'category-wall': () => (
+    <Frame>
+      <div className="flex items-center gap-1">
+        <span className="size-3 rounded-full bg-neutral-300" />
+        <span className="bg-ink/70 h-2 w-1/3 rounded-sm" />
+      </div>
+      <div className="grid grid-flow-row-dense grid-cols-4 gap-0.5">
+        <span className="col-span-2 row-span-2 rounded-[3px] bg-neutral-400" />
+        <Tiles count={8} className="aspect-3/4 rounded-[2px]" />
+      </div>
+    </Frame>
+  ),
+});
+
 export function DesignSketch({ sketch }: { sketch: string }) {
   const draw = SKETCHES[sketch];
   return draw ? draw() : <Frame><div className={cn(tile, 'h-24')} /></Frame>;

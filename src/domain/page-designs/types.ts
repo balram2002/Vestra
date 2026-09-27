@@ -15,7 +15,7 @@
 export type SettingValue = boolean | string;
 export type Settings = Record<string, SettingValue>;
 
-export type FieldDef =
+export type FieldDef = (
   | { kind: 'toggle'; key: string; label: string; description?: string }
   | {
       kind: 'text';
@@ -31,7 +31,15 @@ export type FieldDef =
       label: string;
       description?: string;
       options: ReadonlyArray<{ value: string; label: string }>;
-    };
+    }
+) & {
+  /**
+   * The layouts this setting means something in. Omitted, it applies to all.
+   * The designer shows it only while one of these is being edited; every
+   * layout still carries a default, so switching layouts never meets a gap.
+   */
+  onlyFor?: readonly string[];
+};
 
 export interface FieldGroup {
   title: string;

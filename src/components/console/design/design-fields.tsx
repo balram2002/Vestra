@@ -17,20 +17,25 @@ export function DesignFields({
   groups,
   settings,
   defaults,
+  variant,
   onChange,
 }: {
   groups: FieldGroup[];
+  /** The layout being edited: settings that belong to other layouts are left out. */
+  variant?: string;
   settings: Settings;
   defaults: Settings;
   onChange: (key: string, value: SettingValue) => void;
 }) {
   return (
     <div className="grid gap-x-8 gap-y-7 p-4 sm:p-5 2xl:grid-cols-2">
-      {groups.map((group) => (
+      {groups.map((group) => {
+        const fields = group.fields.filter((field) => !variant || !field.onlyFor || field.onlyFor.includes(variant));
+        return fields.length === 0 ? null : (
         <fieldset key={group.title} className="min-w-0">
           <legend className="text-faint mb-1 text-2xs font-semibold uppercase tracking-wider">{group.title}</legend>
           <div className="divide-line divide-y">
-            {group.fields.map((field) => (
+            {fields.map((field) => (
               <Field
                 key={field.key}
                 field={field}
@@ -42,7 +47,8 @@ export function DesignFields({
             ))}
           </div>
         </fieldset>
-      ))}
+        );
+      })}
     </div>
   );
 }
