@@ -440,17 +440,20 @@ try {
   await staff.waitForTimeout(1500);
   const productSlug = await staff.getByLabel('Preview with product').inputValue();
 
-  // Start from an empty bag: repeated runs add the same size, and a bag caps
-  // each item at five, so a full bag would make a working button look broken.
-  await staff.goto(`${BASE}/bag`, { waitUntil: 'load' });
-  await staff.waitForTimeout(1500);
-  for (let guard = 0; guard < 20; guard += 1) {
-    if (await staff.getByText('Your bag is empty').isVisible()) break;
-    const remove = staff.getByRole('button', { name: 'Remove' }).filter({ visible: true }).first();
-    if (!(await remove.count())) break;
-    await remove.click({ timeout: 5000 }).catch(() => {});
+  // Start from an empty bag: runs add the same items, and a bag caps each
+  // item at five, so a full bag would make a working button look broken.
+  const emptyBag = async () => {
+    await staff.goto(`${BASE}/bag`, { waitUntil: 'load' });
     await staff.waitForTimeout(1500);
-  }
+    for (let guard = 0; guard < 20; guard += 1) {
+      if (await staff.getByText('Your bag is empty').isVisible()) break;
+      const remove = staff.getByRole('button', { name: 'Remove' }).filter({ visible: true }).first();
+      if (!(await remove.count())) break;
+      await remove.click({ timeout: 5000 }).catch(() => {});
+      await staff.waitForTimeout(1500);
+    }
+  };
+  await emptyBag();
 
   // Buying must work in every layout: the buy box is shared, but its buttons move.
   for (const [variant, label] of [['classic', 'Add to bag'], ['lookbook', 'Add to bag'], ['social', 'Buy now']]) {
@@ -476,6 +479,53 @@ try {
   await chooseLayout('Variant 1 · Classic');
   await publish();
   check('Left as found: product page Classic', await eventually(productIsLookbook, false));
+
+  /* ------------------------------------------------------ product demo */
+  // The demo and the product page above default to the same top product.
+  await emptyBag();
+  await staff.goto(`${BASE}/admin/design/demo`, { waitUntil: 'load' });
+  await staff.waitForTimeout(1500);
+  const demoSlug = await staff.getByLabel('Preview with product').inputValue();
+  const pickFirstOption = async () => {
+    await staff.getByRole('dialog').locator('input[type="radio"]:not([disabled])').first().check();
+    await staff.getByRole('dialog').getByRole('button', { name: 'Add to bag' }).click();
+  };
+
+  // Classic: the product panel's button opens the chooser.
+  await staff.goto(`${BASE}/demo/${demoSlug}/preview/classic`, { waitUntil: 'load' });
+  await staff.waitForTimeout(2000);
+  await staff.getByRole('button', { name: 'Choose & add' }).filter({ visible: true }).first().click();
+  await pickFirstOption();
+  check('Add to bag works in the classic demo', await appears(staff.getByText('Added to your bag')));
+
+  // Showroom: the lead piece is bought in place, no chooser.
+  await staff.goto(`${BASE}/demo/${demoSlug}/preview/showroom`, { waitUntil: 'load' });
+  await staff.waitForTimeout(2000);
+  await staff.locator('aside button[aria-pressed]:not([disabled])').first().click();
+  await staff.locator('aside').getByRole('button', { name: 'Add to bag' }).click();
+  check('Add to bag works in the showroom demo', await appears(staff.getByText('Added to your bag')));
+
+  // Stories: the sticker opens the chooser.
+  await staff.goto(`${BASE}/demo/${demoSlug}/preview/stories`, { waitUntil: 'load' });
+  await staff.waitForTimeout(2000);
+  await staff.getByRole('button', { name: 'Shop this' }).click();
+  await pickFirstOption();
+  check('Add to bag works in the stories demo', await appears(staff.getByText('Added to your bag')));
+
+  const demoIsStories = async () => {
+    await shopper.goto(`${BASE}/demo/${demoSlug}`, { waitUntil: 'load' });
+    await shopper.waitForTimeout(2000);
+    return (await shopper.getByLabel(/^Part 1 of \d+$/).count()) > 0;
+  };
+  await staff.goto(`${BASE}/admin/design/demo`, { waitUntil: 'load' });
+  await staff.waitForTimeout(1500);
+  await chooseLayout('Variant 3 · Stories');
+  check('A demo layout change is a draft', !(await demoIsStories()));
+  await publish();
+  check('Publishing Stories reaches shoppers', await eventually(demoIsStories, true));
+  await chooseLayout('Variant 1 · Classic');
+  await publish();
+  check('Left as found: demo Classic', await eventually(demoIsStories, false));
 } catch (error) {
   const where = String(error.stack ?? '').split('\n').find((line) => line.includes('smoke-marketing')) ?? '';
   check('Run completed', false, `${String(error).split('\n')[0]} ${where.trim()}`);

@@ -53,6 +53,7 @@ const CASES = [
   { who: 'marketing', email: 'marketing@vestra.test', path: '/admin/marketing', allow: true },
   { who: 'marketing', email: 'marketing@vestra.test', path: '/admin/design/store', allow: true },
   { who: 'marketing', email: 'marketing@vestra.test', path: '/admin/design/product', allow: true },
+  { who: 'marketing', email: 'marketing@vestra.test', path: '/admin/design/demo', allow: true },
   { who: 'marketing', email: 'marketing@vestra.test', path: '/store/ash-and-oak-menswear/preview/studio', allow: true },
   { who: 'marketing', email: 'marketing@vestra.test', path: '/admin/payments', allow: false },
 

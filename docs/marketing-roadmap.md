@@ -226,8 +226,26 @@ between layouts.
   product sticker per segment, swipe-up to buy and a "Call the store" end card.
 - **Switches:** seller header, captions, like and share, product tray, autoplay,
   start muted, live-call CTA, offer countdown, related demos, CTA labels.
-- ☐ Phase 4.1 — Definition and Variant 1 · ☐ Phase 4.2 — Showroom ·
-  ☐ Phase 4.3 — Stories · ☐ Phase 4.4 — Review, a11y, reduced-motion and data-saver checks.
+- ☑ Phase 4.1 — Definition (11 settings: seller, share, caption, play on
+  open, start muted, speed and full screen, featured pieces, section title,
+  button label, "Call the store", visit store) with switches on the Classic
+  player, which is unchanged with the defaults. Staff preview at
+  `/demo/[slug]/preview/[variant]`.
+- ☑ Phase 4.2 — Showroom: the clip framed 9:16 on a light ground beside the
+  lead piece, with every option as a chip and Add to bag in place, "Call the
+  store", and a shelf of the other pieces.
+- ☑ Phase 4.3 — Stories: one segment per piece with progress bars, tap to
+  step, hold to pause, a sticker to shop each piece, and an end card with
+  "Call the store", Visit store and Watch again. Timing runs on
+  `requestAnimationFrame` and refs; the photo push-in stops under reduced
+  motion.
+- ☑ Phase 4.4 — `smoke:marketing` adds to the bag through all three layouts
+  and publishes Stories to shoppers (54 checks). The shared `DemoChooser` is
+  the one choose-and-add step in every layout.
+
+**Status: ☑ done (27 Sep 2026).**
+
+---
 
 ## Milestone 5 — More page designers, and experiments
 

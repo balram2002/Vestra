@@ -132,6 +132,50 @@ Object.assign(SKETCHES, {
   ),
 });
 
+Object.assign(SKETCHES, {
+  'demo-classic': () => (
+    <Frame>
+      <div className="flex gap-1.5">
+        <span className="relative h-20 flex-[1.6] rounded-sm bg-neutral-800">
+          <span className="absolute left-1/2 top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/80" />
+        </span>
+        <span className="grid flex-1 grid-cols-2 gap-1">
+          <Tiles count={4} className="" />
+        </span>
+      </div>
+    </Frame>
+  ),
+  'demo-showroom': () => (
+    <Frame>
+      <div className="flex gap-1.5">
+        <span className="aspect-9/16 w-9 rounded-md bg-neutral-800" />
+        <span className="border-line flex flex-1 flex-col gap-1 rounded-sm border p-1">
+          <span className="bg-ink/60 block h-2 w-3/4 rounded-sm" />
+          <span className="flex gap-0.5">
+            <Tiles count={3} className="h-2 flex-1 rounded-full" />
+          </span>
+          <span className="bg-accent/60 mt-auto block h-3 rounded-full" />
+        </span>
+      </div>
+      <div className="grid grid-cols-4 gap-1">
+        <Tiles count={4} className="h-3" />
+      </div>
+    </Frame>
+  ),
+  'demo-stories': () => (
+    <Frame>
+      <div className="mx-auto flex aspect-9/16 h-24 flex-col justify-between rounded-md bg-neutral-800 p-1">
+        <span className="flex gap-0.5">
+          <span className="h-0.5 flex-1 rounded-full bg-white" />
+          <span className="h-0.5 flex-1 rounded-full bg-white/40" />
+          <span className="h-0.5 flex-1 rounded-full bg-white/40" />
+        </span>
+        <span className="block h-3 rounded-sm bg-white/90" />
+      </div>
+    </Frame>
+  ),
+});
+
 export function DesignSketch({ sketch }: { sketch: string }) {
   const draw = SKETCHES[sketch];
   return draw ? draw() : <Frame><div className={cn(tile, 'h-24')} /></Frame>;

@@ -2,7 +2,9 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { notFound } from 'next/navigation';
 import { absoluteUrl } from '@/config/site';
-import { ProductDemo } from '@/components/live/product-demo';
+import { DemoView } from '@/components/live/demo-view';
+import type { DemoPageSettings, DemoPageVariant } from '@/domain/page-designs/demo';
+import { getLiveDesign } from '@/server/services/page-designs';
 import { getProductDemo } from '@/server/services/product-demo';
 
 type Props = { params: Promise<{ slug: string }>; searchParams: Promise<{ clip?: string | string[] }> };
@@ -26,7 +28,14 @@ export default function DemoPage(props: Props) {
 }
 
 async function DemoContent(props: Props) {
-  const demo = await readDemo(props);
+  const [demo, design] = await Promise.all([readDemo(props), getLiveDesign('demo')]);
   if (!demo) notFound();
-  return <ProductDemo key={demo.path} demo={demo} />;
+  // Which layout, and which of its parts, is decided under Admin › Page designs › Product demo.
+  return (
+    <DemoView
+      demo={demo}
+      variant={design.variant as DemoPageVariant}
+      settings={design.settings[design.variant] as DemoPageSettings}
+    />
+  );
 }

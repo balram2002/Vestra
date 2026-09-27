@@ -109,3 +109,10 @@ The plan for bringing every Marketing screen up to one standard lives in `docs/m
 - **One buy box everywhere**: `ProductViewer` takes a layout and switches (zoom, size guide, See it live, wishlist, pinned bar, low-stock note, button label), so buying works the same in every layout.
 - **Fixed**: the Appearance editor's clock hook re-subscribed on every render, which could loop (React error #185) and crash the page intermittently. Its subscription is now module-level; the rule is in AGENTS.md.
 - **Verification**: `smoke:marketing` 48/48 twice in a row, including add-to-bag in all three layouts and publishing Lookbook to shoppers; `smoke:rbac` 29/29. Reviewed at 390px and 1440px.
+
+## Marketing roadmap, Milestone 4: Product demo designer — 27 September 2026
+
+- **Admin › Page designs › Product demo** (`/admin/design/demo`) has 11 settings covering the header, playback and shopping.
+- **Variant 1 · Classic** is the demo player as shipped, now with switches. **Variant 2 · Showroom** frames the clip on a light ground beside the lead piece, whose options and Add to bag are right there, with a shelf of the other pieces below. **Variant 3 · Stories** is tap-through: one segment per piece, progress bars, hold to pause, a sticker to shop each piece, and an end card offering "Call the store".
+- One choose-and-add step (`DemoChooser`) is shared by every layout.
+- `smoke:marketing` adds to the bag through all three layouts and publishes Stories (54/54); a test step now empties the bag first so the five-per-item cap cannot fail a working button.

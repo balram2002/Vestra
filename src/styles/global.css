@@ -1292,6 +1292,11 @@
   padding-top: env(safe-area-inset-top);
 }
 .demo-products { padding-bottom: env(safe-area-inset-bottom); }
+/* A story photograph's slow push-in; still under reduced motion. */
+@keyframes story-zoom { from { transform: scale(1.02); } to { transform: scale(1.1); } }
+@media (prefers-reduced-motion: reduce) { .animate-\[story-zoom_5s_ease-out_forwards\] { animation: none !important; } }
+/* The demo with its product panel switched off: the video alone. */
+.demo-layout.demo-solo { grid-template-rows: minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); }
 .demo-product-grid { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(140px, 46%); gap: 10px; }
 .demo-product-scroll:not(.is-expanded) .demo-product-grid article > a { height: 94px; aspect-ratio: auto; }
 .demo-product-scroll:not(.is-expanded) .demo-product-grid article > div { padding: 7px 9px; }
